@@ -55,6 +55,32 @@ public static class SheetToJson
         return outp;
     }
 
+    /// <summary>sheet_to_json with header: 1 (raw values, blank rows kept): each row of the sheet's extent as an array of its values from
+    /// its first column; a missing cell is a hole (null here) unless a later one is set.</summary>
+    public static List<List<object?>> ToArrays(ReadSheet sheet, bool blankRows = true)
+    {
+        var outp = new List<List<object?>>();
+        if (sheet.Ref is null) return outp;
+        var (sc, sr, ec, er) = XlsxWriter.DecodeRange(sheet.Ref);
+        for (var r = sr; r <= er; r++)
+        {
+            var row = new List<object?>();
+            var isEmpty = true;
+            for (var c = sc; c <= ec; c++)
+            {
+                var val = sheet[XlsxWriter.EncodeCell(c, r)];
+                if (val is null) continue;
+                object? v = val.T == 'e' ? null : val.V;
+                if (v is null && !(val.T == 'e' && val.V is 0)) continue;
+                while (row.Count < c - sc) row.Add(null);
+                row.Add(v);
+                if (v is not null) isEmpty = false;
+            }
+            if (!isEmpty || blankRows) outp.Add(row);
+        }
+        return outp;
+    }
+
     /// <summary>SheetJS format_cell: the cell's text — its own (.w), an error's name, else its value in General format.</summary>
     public static string FormatCell(ReadCell cell)
     {
