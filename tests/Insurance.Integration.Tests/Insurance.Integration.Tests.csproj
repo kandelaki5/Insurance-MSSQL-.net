@@ -10,7 +10,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Insurance.Application\Insurance.Application.csproj" />
-    <ProjectReference Include="..\..\src\Insurance.Tools\Insurance.Tools.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

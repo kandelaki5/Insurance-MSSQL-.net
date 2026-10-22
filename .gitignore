@@ -9,6 +9,7 @@ TestResults/
 .env
 .env.*
 !.env.example
+!.env.test.example
 appsettings.Local.json
 appsettings.*.Local.json
 *.xlsx
