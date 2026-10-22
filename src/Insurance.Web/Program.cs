@@ -1,3 +1,4 @@
+using Insurance.Application;
 using Insurance.Application.Data;
 using Insurance.Application.Services;
 using Insurance.Web.Infrastructure;
@@ -15,6 +16,9 @@ builder.Services.AddScoped<RequestUser>();
 builder.Services.AddHttpClient();
 builder.Services.AddApplicationServices();
 
+// Georgian (and every other) text is written as it is, not as &#x...; entities.
+builder.Services.Configure<Microsoft.Extensions.WebEncoders.WebEncoderOptions>(o =>
+    o.TextEncoderSettings = new System.Text.Encodings.Web.TextEncoderSettings(System.Text.Unicode.UnicodeRanges.All));
 builder.Services.AddRazorPages(options =>
 {
     // Every page needs a signed-in user except the login page; each page checks its own permission on top.

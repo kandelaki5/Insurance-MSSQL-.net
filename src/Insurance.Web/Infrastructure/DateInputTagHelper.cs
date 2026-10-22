@@ -38,7 +38,7 @@ public sealed partial class DateInputTagHelper : TagHelper
         output.Attributes.SetAttribute("data-invalid", Ka.Common.DateInvalid);
         output.Attributes.SetAttribute("data-early", Ka.Common.DateTooEarly("{0}"));
         output.Attributes.SetAttribute("data-late", Ka.Common.DateTooLate("{0}"));
-        var e = System.Net.WebUtility.HtmlEncode;
+        Func<string?, string> e = s => System.Net.WebUtility.HtmlEncode(s ?? "");
         var disabled = Disabled ? " disabled" : "";
         output.Content.SetHtmlContent(
             $"<input{(Id is null ? "" : $" id=\"{e(Id)}\"")} type=\"text\" inputmode=\"numeric\" autocomplete=\"off\" placeholder=\"{e(Ka.Common.DateFormat)}\" maxlength=\"10\" value=\"{e(text)}\"{(Required ? " required" : "")}{disabled} />" +
