@@ -13,6 +13,8 @@
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
     <!-- SqlClient 7.1.1 brings Pkcs 9.0.18, which has known advisories (GHSA-846f-f764-76mx, GHSA-2fmv-rv2c-59x7). -->
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+    <!-- The old .xls (BIFF) uploads of the policy import (SheetJS read them); MIT licence. The .xlsx, CSV and the writer are this program's own. -->
+    <PackageReference Include="ExcelDataReader" Version="3.8.0" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="..\..\database\migrations\*.sql" LinkBase="Migrations" LogicalName="Migrations.%(Filename)%(Extension)" />
