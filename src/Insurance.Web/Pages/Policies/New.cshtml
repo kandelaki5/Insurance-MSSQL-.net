@@ -1,0 +1,178 @@
+@page "/policies/new"
+@model Insurance.Web.Pages.Policies.NewModel
+@using F = Insurance.Application.Texts.PolicyTexts.Fields
+@{
+    ViewData["Title"] = PolicyTexts.New;
+}
+@functions {
+    private void Err(string name)
+    {
+        if (Model.Error(name) is { } e)
+        {
+            <div class="field-error">@e</div>
+        }
+    }
+
+    private async Task Text(string name, string label, string type = "text", string? step = null, string? min = null, string? max = null)
+    {
+        <div>
+            <label for="@name">@label</label>
+            @if (type == "date")
+            {
+                <date-input id="@name" name="@name" value="@Model.Value(name)" />
+            }
+            else
+            {
+                <input id="@name" name="@name" type="@type" value="@Model.Value(name)" step="@step" min="@min" max="@max" />
+            }
+            @{ Err(name); }
+        </div>
+    }
+
+    private async Task Select(string name, string label, IReadOnlyDictionary<string, string> options, bool blank = true)
+    {
+        var chosen = Model.Value(name);
+        <div>
+            <label for="@name">@label</label>
+            <select id="@name" name="@name">
+                @if (blank)
+                {
+                    <option value="" selected="@(chosen == "")">—</option>
+                }
+                @foreach (var (value, title) in options)
+                {
+                    <option value="@value" selected="@(chosen == value)">@title</option>
+                }
+            </select>
+            @{ Err(name); }
+        </div>
+    }
+}
+<h1>@PolicyTexts.New</h1>
+<form method="post" data-premium-total="premium">
+    @if (Model.FormError is not null)
+    {
+        <div class="alert error">@Model.FormError</div>
+    }
+    <input type="hidden" name="product_id" value="@Model.ProductId" />
+
+    <div class="card">
+        <h2>@PolicyTexts.Sections.Parties</h2>
+        <div class="grid">
+            <div class="wide">
+                <label for="policyholder_id_number">@F.PolicyholderIdNumber</label>
+                <input id="policyholder_id_number" name="policyholder_id_number" type="text" value="@Model.Value("policyholder_id_number")" />
+                @if (Model.Error("policyholder_id_number") is { } holderError)
+                {
+                    <div class="field-error">@holderError</div>
+                }
+                else
+                {
+                    <div class="hint">@PolicyTexts.PolicyholderHint</div>
+                }
+            </div>
+            <div>
+                <label>@F.Product</label>
+                <div class="static">@Model.ProductName</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>@PolicyTexts.Sections.Vehicle</h2>
+        <div class="grid">
+            @{
+                await Text("make", F.Make);
+                await Text("model", F.Model);
+                await Text("year", F.Year, "number");
+                await Text("plate", F.Plate);
+                await Text("vin", F.Vin);
+                await Text("value", F.Value, "number", "0.01", "0");
+                await Select("vehicle_type", F.VehicleType, PolicyTexts.VehicleTypes);
+                await Select("steering", F.Steering, PolicyTexts.SteeringSides);
+                await Select("usage", F.Usage, PolicyTexts.Usages);
+            }
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>@PolicyTexts.Sections.Term</h2>
+        <div class="grid">
+            @{
+                await Text("effective_from", F.EffectiveFrom, "date");
+                await Text("effective_to", F.EffectiveTo, "date");
+                await Select("currency", F.Currency, TextMap.Of(("GEL", "GEL"), ("USD", "USD"), ("EUR", "EUR")), blank: false);
+            }
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>@PolicyTexts.Sections.Coverages</h2>
+        @{ Err("coverages"); }
+        <table class="plain">
+            <thead>
+            <tr>
+                <th></th>
+                <th>@F.Coverage</th>
+                <th>@F.InsuranceClass</th>
+                <th>@F.SumInsured</th>
+                <th>@F.Deductible</th>
+                <th>@F.Premium</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var c in Model.Coverages)
+            {
+                <tr>
+                    <td>
+                        <input type="checkbox" name="cov_@(c.Code)_on" aria-label="@c.Name" data-mandatory="@(c.IsMandatory ? "1" : "0")" data-code="@c.Code"
+                               checked="@(c.IsMandatory || Model.Value($"cov_{c.Code}_on") == "on")" disabled="@c.IsMandatory" />
+                    </td>
+                    <td>@c.Name</td>
+                    <td>@c.ClassCode</td>
+                    <td><input name="cov_@(c.Code)_limit" type="number" step="0.01" min="0" aria-label="@($"{c.Name}: {F.SumInsured}")" value="@Model.Value($"cov_{c.Code}_limit")" /></td>
+                    <td><input name="cov_@(c.Code)_deductible" type="number" step="0.01" min="0" aria-label="@($"{c.Name}: {F.Deductible}")" value="@Model.Value($"cov_{c.Code}_deductible")" /></td>
+                    <td>
+                        <input name="cov_@(c.Code)_premium" type="number" step="0.01" min="0" aria-label="@($"{c.Name}: {F.Premium}")" value="@Model.Value($"cov_{c.Code}_premium")" />
+                        @{ Err($"cov_{c.Code}_premium"); }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        <p class="total" data-total hidden>@F.TotalPremium: <strong></strong></p>
+    </div>
+
+    <div class="card">
+        <h2>@PolicyTexts.Sections.Sales</h2>
+        <div class="grid">
+            <div>
+                <label for="intermediary_id">@F.Intermediary</label>
+                <select id="intermediary_id" name="intermediary_id">
+                    <option value="" selected="@(Model.Value("intermediary_id") == "")">@PolicyTexts.NoIntermediary</option>
+                    @foreach (var i in Model.Intermediaries)
+                    {
+                        <option value="@i.Id" selected="@(string.Equals(Model.Value("intermediary_id"), i.Id.ToString(), StringComparison.OrdinalIgnoreCase))">@i.Label</option>
+                    }
+                </select>
+            </div>
+            @{
+                await Text("commission_percent", F.CommissionPercent, "number", "0.01", "0", "100");
+                await Select("installments", F.Installments, PolicyTexts.PaymentPlans, blank: false);
+            }
+            <div>
+                <label for="cancel_grace_days">@F.GraceDays</label>
+                <input id="cancel_grace_days" name="cancel_grace_days" type="number" min="0" value="@Model.Value("cancel_grace_days")" />
+                <div class="hint">@PolicyTexts.GraceHint</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toolbar">
+        <button class="btn">@PolicyTexts.Issue</button>
+        <a class="btn secondary" href="/policies">@Ka.Common.Cancel</a>
+    </div>
+</form>
+@section Scripts {
+    <script src="~/js/premium-total.js" asp-append-version="true"></script>
+}

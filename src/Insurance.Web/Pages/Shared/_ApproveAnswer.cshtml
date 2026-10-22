@@ -1,0 +1,8 @@
+@using Insurance.Application.Services
+@model (PolicyActions.ApproveAnswer? Answer, bool WithNumber)
+@* The answer to a press of "approve" (legacy approve-answer.tsx ApproveAnswers): the action's own result, shown on the
+   page that was pressed — never read from the address bar, so a typed or shared link shows nothing (Codex H28, H30). *@
+@if (Model.Answer is { } answer && PolicyActions.AnswerText(answer.Outcome) is { } text)
+{
+    <div class="alert @(answer.Outcome == "done" ? "ok" : "error")">@(Model.WithNumber && answer.Number != "" ? $"{answer.Number}: " : "")@text</div>
+}

@@ -45,6 +45,29 @@ public abstract class AppPageModel : PageModel
             if (value.Count == 1 && key != "__RequestVerificationToken") Values[key] = value[0] ?? "";
     }
 
+    /// <summary>
+    /// Every posted text field, trimmed as JavaScript trims; a repeated field keeps its last value (legacy
+    /// Object.fromEntries([...form.entries()].map(([k, v]) => [k, String(v).trim()])), the values a form action received
+    /// and returned to show the form again).
+    /// </summary>
+    protected Dictionary<string, string> TrimmedForm()
+    {
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (!Request.HasFormContentType) return values;
+        foreach (var (key, value) in Request.Form)
+            if (key != "__RequestVerificationToken" && value.Count > 0) values[key] = Insurance.Domain.Common.JsText.Trim(value[^1] ?? "");
+        return values;
+    }
+
+    /// <summary>Whether the form posted a field at all (legacy form.has: a ticked checkbox).</summary>
+    protected bool Posted(string name) => Request.HasFormContentType && Request.Form.ContainsKey(name);
+
+    /// <summary>Shows the form again with these values (what the legacy action returned as `values`).</summary>
+    protected void ShowValues(IReadOnlyDictionary<string, string> values)
+    {
+        foreach (var (key, value) in values) Values[key] = value;
+    }
+
     public string Value(string name, string? fallback = null) => Values.TryGetValue(name, out var v) ? v : fallback ?? "";
     public string? Error(string name) => Errors.GetValueOrDefault(name);
 }

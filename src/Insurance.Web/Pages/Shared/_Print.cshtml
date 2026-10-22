@@ -1,0 +1,15 @@
+@* Printable documents (legacy src/app/print/layout.tsx): no navigation, A4-friendly, font at least 12pt (order №18/2017). *@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@(ViewData["Title"] is string title ? title + " — " : "")@Ka.AppName</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/print.css" asp-append-version="true" />
+</head>
+<body>
+<div class="print-body">@RenderBody()</div>
+<script src="~/js/print-button.js" asp-append-version="true"></script>
+</body>
+</html>
