@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          # A throwaway password for the CI container only; it protects nothing outside this job.
+          MSSQL_SA_PASSWORD: Ci_only_Pass_2026!
+        ports: ['1433:1433']
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'Ci_only_Pass_2026!' -Q 'select 1' -b"
+          --health-interval 10s --health-timeout 5s --health-retries 20
+    env:
+      INSURANCE_TEST_SQL_MASTER: Server=localhost,1433;User ID=sa;Password=Ci_only_Pass_2026!;TrustServerCertificate=True;Encrypt=True
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet build --configuration Release
+      - name: Browser for the browser tests
+        run: pwsh tests/Insurance.Web.Tests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+      - run: dotnet test --configuration Release --no-build --logger "trx" --results-directory TestResults
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: TestResults
+      - name: Refuse committed secrets or data files
+        run: |
+          # The only spreadsheets allowed are the regulator's blank templates, each exactly as listed by its hash in
+          # src/Insurance.Domain/Regulatory/Templates/SHA256SUMS; any other spreadsheet, PDF or .env file fails.
+          if git ls-files | grep -E '(^|/)\.env(\.|$)|\.xlsx$|\.xls$|\.pdf$' | grep -v -E '^\.env(\.test)?\.example$' | grep -v -E '^src/Insurance\.Domain/Regulatory/Templates/[^/]+\.xlsx$'; then
+            echo "Secrets or data files must not be committed" && exit 1
+          fi
+          for f in $(git ls-files 'src/Insurance.Domain/Regulatory/Templates/*.xlsx'); do
+            grep -qx "$(sha256sum "$f" | cut -d' ' -f1)  $(basename "$f")" src/Insurance.Domain/Regulatory/Templates/SHA256SUMS || { echo "Not a listed blank template: $f" && exit 1; }
+          done

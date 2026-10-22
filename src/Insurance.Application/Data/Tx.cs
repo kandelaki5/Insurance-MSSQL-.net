@@ -4,10 +4,11 @@ using Microsoft.Data.SqlClient;
 namespace Insurance.Application.Data;
 
 /// <summary>One open transaction: the connection and the transaction travel together to every query.</summary>
-public sealed class Tx(SqlConnection connection, SqlTransaction transaction)
+/// <remarks>A read outside a transaction uses a Tx without one (Db.ReadTxAsync): each statement then sees what was committed when it started.</remarks>
+public sealed class Tx(SqlConnection connection, SqlTransaction? transaction)
 {
     public SqlConnection Connection { get; } = connection;
-    public SqlTransaction Transaction { get; } = transaction;
+    public SqlTransaction? Transaction { get; } = transaction;
 
     public Task<int> ExecuteAsync(string sql, object? param = null) =>
         Connection.ExecuteAsync(sql, param, Transaction);

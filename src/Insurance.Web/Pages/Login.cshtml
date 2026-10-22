@@ -1,0 +1,24 @@
+@page "/login"
+@model Insurance.Web.Pages.LoginModel
+@{
+    Layout = "_Bare";
+    ViewData["Title"] = Ka.Login.Title;
+}
+<main class="login">
+    <form method="post" class="card">
+        <h1>@Ka.Login.Title</h1>
+        @if (Model.FormError is not null)
+        {
+            <div class="alert error">@Model.FormError</div>
+        }
+        <div class="field">
+            <label for="username">@Ka.Login.Username</label>
+            <input id="username" name="username" type="text" autocomplete="username" required autofocus />
+        </div>
+        <div class="field">
+            <label for="password">@Ka.Login.Password</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required />
+        </div>
+        <button class="btn">@Ka.Login.Submit</button>
+    </form>
+</main>

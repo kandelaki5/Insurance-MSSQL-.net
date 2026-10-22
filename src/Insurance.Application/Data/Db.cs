@@ -11,6 +11,8 @@ namespace Insurance.Application.Data;
 /// </summary>
 public sealed class Db(DbOptions options)
 {
+    static Db() => DapperSetup.Register();
+
     public string ConnectionString => options.ConnectionString;
 
     public async Task<SqlConnection> OpenAsync(CancellationToken ct = default)
@@ -27,9 +29,26 @@ public sealed class Db(DbOptions options)
         return await work(connection);
     }
 
+    /// <summary>Reads through a <see cref="Tx"/> without a transaction, so read helpers serve pages and transactions alike.</summary>
+    public async Task<T> ReadTxAsync<T>(Func<Tx, Task<T>> work, CancellationToken ct = default)
+    {
+        await using var connection = await OpenAsync(ct);
+        return await work(new Tx(connection, null));
+    }
+
     /// <summary>Runs <paramref name="work"/> in one transaction attributed to <paramref name="userId"/>; commits when it returns, rolls back when it throws.</summary>
     public Task<T> AsUserAsync<T>(Guid userId, Func<Tx, Task<T>> work, CancellationToken ct = default) =>
         InTransactionAsync(userId, work, ct);
+
+    /// <summary>Reads in one snapshot-isolation transaction: several statements see one committed state, nothing waits.</summary>
+    public async Task<T> SnapshotAsync<T>(Func<Tx, Task<T>> work, CancellationToken ct = default)
+    {
+        await using var connection = await OpenAsync(ct);
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Snapshot, ct);
+        var result = await work(new Tx(connection, transaction));
+        await transaction.CommitAsync(ct);
+        return result;
+    }
 
     /// <summary>A transaction without an actor (system work such as login bookkeeping or rate loading).</summary>
     public Task<T> InTransactionAsync<T>(Func<Tx, Task<T>> work, CancellationToken ct = default) =>

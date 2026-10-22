@@ -28,7 +28,10 @@ public static partial class DatabaseAdmin
             throw new InvalidOperationException($"Database {name} already exists; it is not changed");
         await db.ExecuteAsync($"create database [{name}] collate {Collation}");
         await db.ExecuteAsync($"alter database [{name}] set read_committed_snapshot on with rollback immediate");
-        log($"database {name} created ({Collation}, read_committed_snapshot on)");
+        // Snapshot isolation for reads that must see one consistent state across several statements (legacy
+        // "repeatable read read only": the permission inputs, the reconciliation).
+        await db.ExecuteAsync($"alter database [{name}] set allow_snapshot_isolation on");
+        log($"database {name} created ({Collation}, read_committed_snapshot on, allow_snapshot_isolation on)");
     }
 
     /// <summary>A SQL login for the application, a user in <paramref name="database"/> and a member of role core_app only.</summary>

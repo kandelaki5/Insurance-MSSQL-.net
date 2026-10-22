@@ -24,7 +24,7 @@ public static partial class Migrator
     ];
 
     /// <summary>Tables the application may only read: the migration journal is written by this runner alone (legacy M1, 0031).</summary>
-    public static readonly IReadOnlyList<string> ReadOnly = ["schema_migration", "audit_config"];
+    public static readonly IReadOnlyList<string> ReadOnly = ["schema_migration", "audit_config", "data_import"];
 
     /// <summary>Tables the application may change but never remove rows from.</summary>
     public static readonly IReadOnlyList<string> NoDelete = ["accounting_period", "subrogation_case", "subrogation_party"];
@@ -102,14 +102,16 @@ public static partial class Migrator
     /// </summary>
     private static async Task CheckDatabaseAsync(SqlConnection db)
     {
-        var settings = await db.QuerySingleAsync<(string Collation, bool Rcsi)>("""
-            select convert(nvarchar(128), databasepropertyex(db_name(), 'Collation')), is_read_committed_snapshot_on
+        var settings = await db.QuerySingleAsync<(string Collation, bool Rcsi, int Snapshot)>("""
+            select convert(nvarchar(128), databasepropertyex(db_name(), 'Collation')), is_read_committed_snapshot_on, convert(int, snapshot_isolation_state)
             from sys.databases where name = db_name()
             """);
         if (!settings.Collation.Contains("_CS_", StringComparison.Ordinal))
             throw new InvalidOperationException($"Database collation {settings.Collation} is not case-sensitive; create the database with Latin1_General_100_CS_AS_SC (Insurance.Tools create-database).");
         if (!settings.Rcsi)
             throw new InvalidOperationException("READ_COMMITTED_SNAPSHOT is off; run: alter database <name> set read_committed_snapshot on (Insurance.Tools create-database does it).");
+        if (settings.Snapshot != 1)
+            throw new InvalidOperationException("ALLOW_SNAPSHOT_ISOLATION is off; run: alter database <name> set allow_snapshot_isolation on (Insurance.Tools create-database does it).");
     }
 
     private static async Task ReassertAsync(SqlConnection db, Action<string> log)

@@ -14,6 +14,10 @@
     <ProjectReference Include="..\..\src\Insurance.Web\Insurance.Web.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <!-- The same fresh-database fixture as the integration tests. -->
+    <Compile Include="..\Insurance.Integration.Tests\TestDatabase.cs" Link="TestDatabase.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
 </Project>
