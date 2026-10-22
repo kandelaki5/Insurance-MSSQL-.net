@@ -1,0 +1,109 @@
+@page "/accounting/premium-report"
+@model Insurance.Web.Pages.Accounting.PremiumReportModel
+@{
+    ViewData["Title"] = Ka.PremiumReport.Title;
+    var t = Model.Report;
+    string M(System.Numerics.BigInteger v) => PremiumReport.ReportMoney(v);
+}
+<h1>@Ka.PremiumReport.Title</h1>
+<p class="note">@Ka.PremiumReport.Note</p>
+<form class="toolbar">
+    <div>
+        <label for="month">@Ka.PremiumReport.Month</label>
+        <input id="month" name="month" type="month" value="@Model.Month" />
+    </div>
+    <button class="btn secondary" style="align-self: flex-end">@Ka.PremiumReport.Show</button>
+    <span class="hint" style="align-self: flex-end">@Fmt.Date(t.From) – @Fmt.Date(t.To)</span>
+</form>
+
+<table>
+    <thead>
+    <tr>
+        <th>@Ka.PremiumReport.ClassCode</th>
+        <th>@Ka.PremiumReport.ClassName</th>
+        <th class="num">@Ka.PremiumReport.PoliciesIssued</th>
+        <th class="num">@Ka.PremiumReport.StatisticalWritten</th>
+        <th class="num">@Ka.PremiumReport.FinancialWritten</th>
+        <th class="num">@Ka.PremiumReport.Earned</th>
+        <th class="num">@Ka.PremiumReport.Unearned</th>
+        <th class="num">@ReinsuranceTexts.Report.Ceded</th>
+        <th class="num">@ReinsuranceTexts.Report.CededUnearned</th>
+        <th class="num">@ReinsuranceTexts.Report.RiCommission</th>
+    </tr>
+    </thead>
+    <tbody>
+    @if (t.Classes.Count == 0)
+    {
+        <tr><td colspan="10" class="empty">@Ka.Common.NoData</td></tr>
+    }
+    @foreach (var row in t.Classes)
+    {
+        <tr><td>@row.ClassCode</td><td>@row.ClassName</td><td class="num">@row.PoliciesIssued</td><td class="num">@M(row.StatisticalWrittenGel)</td><td class="num">@M(row.FinancialWrittenGel)</td><td class="num">@M(row.EarnedGel)</td><td class="num">@M(row.UnearnedGel)</td><td class="num">@M(row.CededWrittenGel)</td><td class="num">@M(row.CededUnearnedGel)</td><td class="num">@M(row.RiCommissionGel)</td></tr>
+    }
+    @if (t.Classes.Count > 0)
+    {
+        <tr class="total-row"><td colspan="2"><strong>@Ka.PremiumReport.Total</strong></td><td class="num"><strong>@t.Totals.PoliciesIssued</strong></td><td class="num"><strong>@M(t.Totals.StatisticalWrittenGel)</strong></td><td class="num"><strong>@M(t.Totals.FinancialWrittenGel)</strong></td><td class="num"><strong>@M(t.Totals.EarnedGel)</strong></td><td class="num"><strong>@M(t.Totals.UnearnedGel)</strong></td><td class="num"><strong>@M(t.Totals.CededWrittenGel)</strong></td><td class="num"><strong>@M(t.Totals.CededUnearnedGel)</strong></td><td class="num"><strong>@M(t.Totals.RiCommissionGel)</strong></td></tr>
+    }
+    </tbody>
+</table>
+@if (t.TreatyPremiumGel > 0)
+{
+    <p class="total">@ReinsuranceTexts.Report.TreatyPremium: <strong>@M(t.TreatyPremiumGel)</strong></p>
+}
+
+<h2 class="section">@Ka.PremiumReport.ClaimsTitle</h2>
+<p class="note">@Ka.PremiumReport.ClaimsNote</p>
+@if (t.Claims.Count == 0)
+{
+    <div class="card empty">@Ka.Common.NoData</div>
+}
+else
+{
+    <table>
+        <thead>
+        <tr>
+            <th>@Ka.PremiumReport.ClassCode</th>
+            <th>@Ka.PremiumReport.ClassName</th>
+            <th class="num">@Ka.PremiumReport.PaidClaims</th>
+            <th class="num">@Ka.PremiumReport.Rbns</th>
+            <th class="num">@Ka.PremiumReport.Ibnr</th>
+            <th class="num">@Ka.PremiumReport.Recovered</th>
+            <th class="num">@ReinsuranceTexts.Report.ReinsurerPaid</th>
+            <th class="num">@ReinsuranceTexts.Report.ReinsurerRbns</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var row in t.Claims)
+        {
+            <tr><td>@row.ClassCode</td><td>@row.ClassName</td><td class="num">@M(row.PaidGel)</td><td class="num">@M(row.RbnsGel)</td><td class="num">@M(row.IbnrGel)</td><td class="num">@M(row.RecoveredGel)</td><td class="num">@M(row.ReinsurerPaidGel)</td><td class="num">@M(row.ReinsurerRbnsGel)</td></tr>
+        }
+        <tr class="total-row"><td colspan="2"><strong>@Ka.PremiumReport.Total</strong></td><td class="num"><strong>@M(t.ClaimsTotals.PaidGel)</strong></td><td class="num"><strong>@M(t.ClaimsTotals.RbnsGel)</strong></td><td class="num"><strong>@M(t.ClaimsTotals.IbnrGel)</strong></td><td class="num"><strong>@M(t.ClaimsTotals.RecoveredGel)</strong></td><td class="num"><strong>@M(t.ClaimsTotals.ReinsurerPaidGel)</strong></td><td class="num"><strong>@M(t.ClaimsTotals.ReinsurerRbnsGel)</strong></td></tr>
+        </tbody>
+    </table>
+}
+
+<h2 class="section">@Ka.PremiumReport.ReceivableTitle (@Fmt.Date(t.To))</h2>
+@if (t.Receivables.Count == 0)
+{
+    <div class="card empty">@Ka.Common.NoData</div>
+}
+else
+{
+    <table style="max-width: 760px">
+        <thead>
+        <tr>
+            <th>@Ka.PremiumReport.Currency</th>
+            <th class="num">@Ka.PremiumReport.Outstanding</th>
+            <th class="num">@Ka.PremiumReport.Overdue</th>
+            <th class="num">@Ka.PremiumReport.Rate</th>
+            <th class="num">@Ka.PremiumReport.OutstandingGel</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var r in t.Receivables)
+        {
+            <tr><td>@r.Currency</td><td class="num">@M(r.Outstanding)</td><td class="num">@M(r.Overdue)</td><td class="num">@(r.Currency == "GEL" ? "" : $"{Fmt.Fixed(r.Rate, 4)} ({Fmt.Date(r.RateDate)})")</td><td class="num">@M(r.OutstandingGel)</td></tr>
+        }
+        </tbody>
+    </table>
+}

@@ -1,0 +1,104 @@
+@page "/reinsurance/treaties/{id}/bordereau"
+@model Insurance.Web.Pages.Reinsurance.Treaties.BordereauModel
+@{
+    var b = Model.B;
+    ViewData["Title"] = ReinsuranceTexts.Bordereau.Title;
+    string M(long v) => Billing.GroupedTetri(v);
+    var p = ReinsuranceTexts.Bordereau.Premium;
+    var c = ReinsuranceTexts.Bordereau.Claims;
+    var bal = ReinsuranceTexts.Bordereau.Balance;
+    var from = Fmt.Iso(b.From);
+    var to = Fmt.Iso(b.To);
+}
+<h1>@ReinsuranceTexts.Bordereau.Title: @b.Treaty.Number · @b.Treaty.Name</h1>
+<p class="note">@ReinsuranceTexts.Bordereau.Note</p>
+<form class="toolbar">
+    <div>
+        <label for="from">@ReinsuranceTexts.Bordereau.From</label>
+        <date-input id="from" name="from" value="@from" />
+    </div>
+    <div>
+        <label for="to">@ReinsuranceTexts.Bordereau.To</label>
+        <date-input id="to" name="to" value="@to" />
+    </div>
+    <button class="btn secondary" style="align-self: flex-end">@ReinsuranceTexts.Bordereau.Show</button>
+    <a class="btn" style="align-self: flex-end" href="/reinsurance/treaties/@b.Treaty.Id/bordereau/xlsx?from=@from&amp;to=@to">@ReinsuranceTexts.Bordereau.Download</a>
+    <a class="btn secondary" style="align-self: flex-end" href="/reinsurance/treaties/@b.Treaty.Id">@Ka.Common.Cancel</a>
+</form>
+
+<div class="card">
+    <dl class="facts">
+        <div><dt>@bal["reinsurer"]</dt><dd>@b.Treaty.Reinsurer@(b.Treaty.Broker is { } broker ? $" · {ReinsuranceTexts.Fields.Broker}: {broker}" : "")</dd></div>
+        <div><dt>@bal["period"]</dt><dd>@Fmt.Date(b.From) – @Fmt.Date(b.To)</dd></div>
+        <div><dt>@ReinsuranceTexts.Fields.Kind</dt><dd>@ReinsuranceTexts.Kinds.GetValueOrDefault(b.Treaty.Kind)</dd></div>
+        <div><dt>@bal["cededGel"]</dt><dd>@M(b.Totals.CededGel)</dd></div>
+        <div><dt>@bal["commissionGel"]</dt><dd>@M(b.Totals.CommissionGel)</dd></div>
+        <div><dt>@bal["brokerageGel"]</dt><dd>@M(b.Totals.BrokerageGel) (@Fmt.Plain(b.Treaty.BrokerPercent) %)</dd></div>
+        <div><dt>@bal["claimsPaidGel"]</dt><dd>@M(b.Totals.ClaimsPaidGel)</dd></div>
+        <div><dt>@bal["reserveGel"]</dt><dd>@M(b.Totals.ReserveGel)</dd></div>
+        <div><dt>@bal["balanceGel"]</dt><dd><strong>@M(b.Totals.BalanceGel)</strong></dd></div>
+    </dl>
+</div>
+
+<h2 class="section">@ReinsuranceTexts.Bordereau.PremiumsTitle</h2>
+@if (b.Premiums.Count == 0)
+{
+    <div class="card empty">@ReinsuranceTexts.Bordereau.NoRows</div>
+}
+else
+{
+    <table>
+        <thead>
+        <tr>
+            <th>@p["policyNumber"]</th><th>@p["policyholder"]</th><th>@p["object"]</th><th>@p["classCode"]</th>
+            <th>@ReinsuranceTexts.Fields.Period</th><th class="num">@p["sumInsured"]</th><th class="num">@p["sharePercent"]</th>
+            <th class="num">@p["cededPremium"]</th><th class="num">@p["cededPremiumGel"]</th><th class="num">@p["commissionGel"]</th>
+            <th>@p["bookedOn"]</th><th>@p["kind"]</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var row in b.Premiums)
+        {
+            <tr>
+                <td>@row.PolicyNumber</td><td>@row.Policyholder</td><td>@row.Object</td><td>@row.ClassCode</td>
+                <td>@Fmt.Date(row.CoverFrom) – @Fmt.Date(row.CoverTo)</td>
+                <td class="num">@(row.SumInsured is { } si ? $"{Billing.GroupedTetri(Billing.Tetri(si))} {row.Currency}" : "")</td>
+                <td class="num">@Fmt.Plain(row.SharePercent)</td>
+                <td class="num">@M(row.CededPremium) @row.Currency</td>
+                <td class="num">@M(row.CededPremiumGel)</td>
+                <td class="num">@M(row.CommissionGel)</td>
+                <td>@Fmt.Date(row.BookedOn)</td>
+                <td>@(row.IsCancellation ? p["cancellation"] : p["issue"])</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+<h2 class="section">@ReinsuranceTexts.Bordereau.ClaimsTitle</h2>
+@if (b.Claims.Count == 0)
+{
+    <div class="card empty">@ReinsuranceTexts.Bordereau.NoRows</div>
+}
+else
+{
+    <table>
+        <thead>
+        <tr>
+            <th>@c["claimNumber"]</th><th>@c["policyNumber"]</th><th>@c["occurredOn"]</th><th>@c["reportedOn"]</th><th>@c["status"]</th>
+            <th class="num">@c["paidShare"]</th><th class="num">@c["paidShareGel"]</th>
+            <th class="num">@c["reserveShare"]</th><th class="num">@c["reserveShareGel"]</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var row in b.Claims)
+        {
+            <tr>
+                <td>@row.ClaimNumber</td><td>@row.PolicyNumber</td><td>@Fmt.Date(row.OccurredOn)</td><td>@Fmt.Date(row.ReportedOn)</td><td>@ClaimTexts.Status.GetValueOrDefault(row.Status)</td>
+                <td class="num">@M(row.PaidShare) @row.Currency</td><td class="num">@M(row.PaidShareGel)</td>
+                <td class="num">@M(row.ReserveShare) @row.Currency</td><td class="num">@M(row.ReserveShareGel)</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}

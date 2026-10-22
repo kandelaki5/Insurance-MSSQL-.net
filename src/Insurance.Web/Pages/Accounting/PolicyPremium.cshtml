@@ -1,0 +1,68 @@
+@page "/accounting/policy-premium"
+@model Insurance.Web.Pages.Accounting.PolicyPremiumModel
+@{
+    ViewData["Title"] = PolicyPremiumTexts.Title;
+    var r = Model.Report;
+    string M(long v) => Billing.GroupedTetri(v);
+    var from = Fmt.Iso(r.From);
+    var to = Fmt.Iso(r.To);
+}
+<h1>@PolicyPremiumTexts.Title</h1>
+<p class="note">@PolicyPremiumTexts.Note</p>
+<form class="toolbar">
+    <div>
+        <label for="from">@PolicyPremiumTexts.From</label>
+        <date-input id="from" name="from" value="@from" style="width: 170px" />
+    </div>
+    <div>
+        <label for="to">@PolicyPremiumTexts.To</label>
+        <date-input id="to" name="to" value="@to" style="width: 170px" />
+    </div>
+    <button class="btn secondary" style="align-self: flex-end">@PolicyPremiumTexts.Show</button>
+    <a class="btn" style="align-self: flex-end" href="/accounting/policy-premium/xlsx?from=@from&amp;to=@to">@PolicyPremiumTexts.Download</a>
+    <span class="hint" style="align-self: flex-end">@Fmt.Date(r.From) – @Fmt.Date(r.To) · @PolicyPremiumTexts.Rows(r.Rows.Count)</span>
+</form>
+
+@if (r.Rows.Count == 0)
+{
+    <div class="card empty">@PolicyPremiumTexts.None</div>
+}
+else
+{
+    <div style="overflow-x: auto">
+        <table>
+            <thead>
+            <tr>
+                <th>@PolicyPremiumTexts.Columns.ContractNumber</th>
+                <th>@PolicyPremiumTexts.Columns.PolicyNumber</th>
+                <th>@PolicyPremiumTexts.Columns.Policyholder</th>
+                <th>@PolicyPremiumTexts.Columns.IsModification</th>
+                <th>@PolicyPremiumTexts.Columns.ClassCode</th>
+                <th>@PolicyPremiumTexts.Columns.Currency</th>
+                <th class="num">@PolicyPremiumTexts.Columns.Premium</th>
+                <th class="num">@PolicyPremiumTexts.Columns.Statistical</th>
+                <th class="num">@PolicyPremiumTexts.Columns.Correction</th>
+                <th class="num">@PolicyPremiumTexts.Columns.Corrected</th>
+                <th>@PolicyPremiumTexts.Columns.StartDate</th>
+                <th>@PolicyPremiumTexts.Columns.ChangeDate</th>
+                <th>@PolicyPremiumTexts.Columns.EndDate</th>
+                <th>@PolicyPremiumTexts.Columns.CancelDate</th>
+                <th class="num">@PolicyPremiumTexts.Columns.Earned</th>
+                <th class="num">@PolicyPremiumTexts.Columns.Unearned</th>
+                <th class="num">@PolicyPremiumTexts.Columns.RiPremium</th>
+                <th class="num">@PolicyPremiumTexts.Columns.RiEarned</th>
+                <th class="num">@PolicyPremiumTexts.Columns.RiUnearned</th>
+                <th class="num">@PolicyPremiumTexts.Columns.CommissionEarned</th>
+                <th class="num">@PolicyPremiumTexts.Columns.CommissionUnearned</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var row in r.Rows)
+            {
+                <tr><td>@row.ContractNumber</td><td>@row.PolicyNumber</td><td>@row.Policyholder</td><td>@(row.IsModification ? PolicyPremiumTexts.Yes : PolicyPremiumTexts.No)</td><td title="@row.ClassName">@row.ClassCode</td><td>@row.Currency</td><td class="num">@M(row.Premium)</td><td class="num">@M(row.StatisticalGel)</td><td class="num">@M(row.CorrectionGel)</td><td class="num">@M(row.CorrectedGel)</td><td>@Fmt.Date(row.StartDate)</td><td>@Fmt.Date(row.ChangeDate)</td><td>@Fmt.Date(row.EndDate)</td><td>@(row.CancelDate is { } cd ? Fmt.Date(cd) : "")</td><td class="num">@M(row.EarnedGel)</td><td class="num">@M(row.UnearnedGel)</td><td class="num">@M(row.RiPremiumGel)</td><td class="num">@M(row.RiEarnedGel)</td><td class="num">@M(row.RiUnearnedGel)</td><td class="num">@M(row.CommissionEarnedGel)</td><td class="num">@M(row.CommissionUnearnedGel)</td></tr>
+            }
+            <tr class="total-row"><td colspan="7"><strong>@PolicyPremiumTexts.Total</strong></td><td class="num"><strong>@M(r.Totals.StatisticalGel)</strong></td><td class="num"><strong>@M(r.Totals.CorrectionGel)</strong></td><td class="num"><strong>@M(r.Totals.CorrectedGel)</strong></td><td colspan="4"></td><td class="num"><strong>@M(r.Totals.EarnedGel)</strong></td><td class="num"><strong>@M(r.Totals.UnearnedGel)</strong></td><td class="num"><strong>@M(r.Totals.RiPremiumGel)</strong></td><td class="num"><strong>@M(r.Totals.RiEarnedGel)</strong></td><td class="num"><strong>@M(r.Totals.RiUnearnedGel)</strong></td><td class="num"><strong>@M(r.Totals.CommissionEarnedGel)</strong></td><td class="num"><strong>@M(r.Totals.CommissionUnearnedGel)</strong></td></tr>
+            </tbody>
+        </table>
+    </div>
+}

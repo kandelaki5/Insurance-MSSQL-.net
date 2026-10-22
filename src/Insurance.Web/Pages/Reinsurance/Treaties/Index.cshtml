@@ -1,0 +1,52 @@
+@page "/reinsurance/treaties"
+@model Insurance.Web.Pages.Reinsurance.Treaties.IndexModel
+@{
+    ViewData["Title"] = ReinsuranceTexts.Title;
+}
+<h1>@ReinsuranceTexts.Title</h1>
+<p class="note">@ReinsuranceTexts.Note</p>
+<div class="toolbar">
+    <div class="spacer"></div>
+    @if (Model.Me.CanWrite)
+    {
+        <a class="btn" href="/reinsurance/treaties/new">@ReinsuranceTexts.New</a>
+    }
+</div>
+@if (Model.Rows.Count == 0)
+{
+    <div class="card empty">@Ka.Common.NoData</div>
+}
+else
+{
+    <table>
+        <thead>
+        <tr>
+            <th>@ReinsuranceTexts.Fields.Number</th>
+            <th>@ReinsuranceTexts.Fields.Name</th>
+            <th>@ReinsuranceTexts.Fields.Reinsurer</th>
+            <th>@ReinsuranceTexts.Fields.Kind</th>
+            <th>@ReinsuranceTexts.Fields.Period</th>
+            <th>@ReinsuranceTexts.Fields.Terms</th>
+            <th>@ReinsuranceTexts.Fields.Classes</th>
+            <th class="num">@ReinsuranceTexts.Cessions.CededPremiumGel</th>
+            <th>@ReinsuranceTexts.Fields.Status</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var r in Model.Rows)
+        {
+            <tr>
+                <td><a href="/reinsurance/treaties/@r.Id">@r.Number</a></td>
+                <td>@r.Name</td>
+                <td>@r.Reinsurer</td>
+                <td>@ReinsuranceTexts.Kinds.GetValueOrDefault(r.Kind)</td>
+                <td>@Fmt.Date(r.PeriodFrom) – @Fmt.Date(r.PeriodTo)</td>
+                <td>@r.Terms @(r.Kind != "quota_share" && r.Kind != "facultative" ? r.Currency : "")</td>
+                <td>@r.Classes</td>
+                <td class="num">@Billing.GroupedTetri(Billing.Tetri(r.CededGel))</td>
+                <td><span class="badge @(r.Status == "active" ? "low" : "")">@ReinsuranceTexts.Statuses.GetValueOrDefault(r.Status)</span></td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
