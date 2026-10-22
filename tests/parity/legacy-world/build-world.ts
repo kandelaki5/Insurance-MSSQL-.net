@@ -101,7 +101,7 @@ const idFrom = (r: any, prefix: string) => {
 const expectOk = (what: string, r: any) => {
   if (r?.to && /[?&](error|refused|failed|invalid|stale)=/.test(r.to)) throw new Error(`${what}: ${r.to}`);
   if (r?.errors && Object.keys(r.errors).length) throw new Error(`${what}: ${JSON.stringify(r.errors)} ${r.message ?? ''}`);
-  if (r?.message && /უფლება|ვერ|შეუძლებელ/.test(r.message)) throw new Error(`${what}: ${r.message}`);
+  if (r?.message && /უფლება|ვერ|შეუძლებელ|დაუშვებელ|არასწორ/.test(r.message)) throw new Error(`${what}: ${r.message}`);
   if (r?.error) throw new Error(`${what}: ${r.error}`);
   return r;
 };
@@ -191,7 +191,7 @@ const [line5] = await sql`select l.id from core.policy_line l join core.product_
 const [num5] = await sql`select number from core.policy where id = ${p5}`;
 const c1 = idFrom(expectOk('claim', await run(claims.registerClaim, { request_key: randomBytes(16).toString('hex').replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5'), policy_number: num5.number, occurred_on: '2026-06-10', reported_on: '2026-06-11', description: 'შეჯახება გზაჯვარედინზე', occurred_place: 'თბილისი', policy_line_id: line5.id, initial_reserve: '5000.00', claimed_amount: '6000.00' })), '/claims');
 expectOk('reserve', await run(claims.changeReserve, { claim_id: c1, booked_on: '2026-06-20', new_level: '4500.00', reason: 'შეფასების შემდეგ' }));
-expectOk('decide', await run(claims.decideClaim, { claim_id: c1, decision: 'approved', approved_amount: '4500.00' }));
+expectOk('decide', await run(claims.decideClaim, { claim_id: c1, decision: 'approve', approved_amount: '4500.00' }));
 as('accountant');
 const [holder5] = await sql`select h.tax_id from core.policy p join core.contract c on c.id = p.contract_id join core.party h on h.id = c.policyholder_id where p.id = ${p5}`;
 expectOk('pay claim', await run(claims.payClaim, { claim_id: c1, paid_on: '2026-07-01', amount: '2000.00', payee_kind: 'policyholder', payee_id_number: holder5.tax_id, offset_premium: 'on', total_loss_mode: 'none', note: 'პირველი ნაწილი' }));
@@ -202,14 +202,79 @@ console.log('claim registered, reserved, paid and recovered');
 // ---------------------------------------------------------------- complaint, AML case and suspension
 as('sales');
 const [p1num] = await sql`select number from core.policy where id = ${p1}`;
-await run(complaints.registerComplaint, { received_on: '2026-07-02', channel: 'written', customer_id_number: '01001010101', customer_name: 'გიორგი ტესტიშვილი', policy_number: p1num.number, category: '2', description: 'გადახდის დაგვიანება' });
+await run(complaints.registerComplaint, { received_on: '2026-07-02', channel: 'written', party_id_number: '01001010101', customer_name: 'გიორგი ტესტიშვილი', policy_number: p1num.number, category: '2', description: 'გადახდის დაგვიანება' });
 as('accountant');
 await run(aml.registerCase, { party_id_number: '01001010103', opened_on: '2026-08-10', source: 'monitoring', description: 'უჩვეულოდ დიდი ნაღდი შენატანი', transaction_ref: '', class_code: '5.1' });
 
+
+// ---------------------------------------------------------------- requests above the financial director's threshold (10 000 GEL)
+as('operations_head');
+const [resReq] = await sql`select id from core.claim_reserve_request where claim_id = ${c1} order by created_at desc limit 1`;
+expectOk('approve reserve', await run(claims.approveReserveRequest, { claim_id: c1, request_id: resReq.id }));
+const p6 = await issue('01001010102', '2026-06-01', '2027-06-01', 'GEL', '1', '24000.00', undefined, 'FF-606-FF');
+as('accountant');
+await pay(p6, '2026-06-02', '24000.00');
+expectOk('cancel big', await run(cancel.cancelPolicy, { policy_id: p6, cancel_on: '2026-06-20', reason: 'გადაფორმება' }));
+expectOk('refund request', await run(payment.refundOverpayment, { policy_id: p6, method: 'bank', reference: 'დიდი დაბრუნება GE00TB0000000000000002' }));
+const [refReq] = await sql`select id from core.premium_refund_request where policy_id = ${p6}`;
+if (!refReq) throw new Error('no premium refund request');
+as('admin');
+expectOk('approve refund', await run(payment.approvePremiumRefundRequest, { policy_id: p6, request_id: refReq.id }));
+// A second claim with a payment above the threshold: requested, then authorised.
+as('claims');
+const [line1] = await sql`select l.id from core.policy_line l join core.product_coverage c on c.id = l.product_coverage_id where l.policy_id = ${p1} and c.code = 'damage'`;
+const [num1] = await sql`select number, (select tax_id from core.party where id = (select policyholder_id from core.contract where id = core.policy.contract_id)) as tax from core.policy where id = ${p1}`;
+const c2 = idFrom(expectOk('claim 2', await run(claims.registerClaim, { request_key: '7b1f9a3e-0c2d-4e5f-8a6b-9c0d1e2f3a4b', policy_number: num1.number, occurred_on: '2026-08-05', reported_on: '2026-08-06', description: 'სრული განადგურება', occurred_place: 'რუსთავი', policy_line_id: line1.id, initial_reserve: '15000.00', claimed_amount: '15000.00' })), '/claims');
+as('operations_head');
+const [res2] = await sql`select id from core.claim_reserve_request where claim_id = ${c2} order by created_at desc limit 1`;
+if (res2) expectOk('approve reserve 2', await run(claims.approveReserveRequest, { claim_id: c2, request_id: res2.id }));
+as('claims');
+expectOk('decide 2', await run(claims.decideClaim, { claim_id: c2, decision: 'approve', approved_amount: '15000.00' }));
+as('accountant');
+console.log('pay c2', JSON.stringify(await run(claims.payClaim, { claim_id: c2, paid_on: '2026-08-20', amount: '12000.00', payee_kind: 'policyholder', payee_id_number: num1.tax, total_loss_mode: 'none', note: 'ავტორიზაციით' })));
+const [cpr] = await sql`select id from core.claim_payment_request where claim_id = ${c2}`;
+if (!cpr) throw new Error('no claim payment request');
+as('admin');
+expectOk('approve claim payment', await run(claims.approveClaimPaymentRequest, { claim_id: c2, request_id: cpr.id }));
+// The second payment is reversed as a correction.
+as('accountant');
+const [cp2] = await sql`select id from core.claim_payment where claim_id = ${c2} and kind = 'payment'`;
+await run(claims.reverseClaimPayment, { claim_id: c2, claim_payment_id: cp2.id, reason: 'correction', reversed_on: '2026-08-21', note: 'არასწორი თანხა' });
+
+// ---------------------------------------------------------------- a change that reduces premium (schedule reduction)
+as('sales');
+const e2 = idFrom(expectOk('endorse down', await run(endorse.endorsePolicy, { policy_id: p5, change_on: '2026-09-01', reason: 'ქურდობის დაფარვის მოხსნა', cov_theft_on: 'on', cov_theft_delta: '-200.00', cov_theft_limit: '', cov_theft_deductible: '' })), '/policies');
+as('operations_head');
+const eb = await run(policies.approvePolicy, { id: e2 });
+if (eb?.outcome !== 'done') throw new Error(`approve reduction: ${JSON.stringify(eb)}`);
+
+// ---------------------------------------------------------------- compliance: owner, suspension, sanctions list, groups
+as('sales');
+await run(parties.addBeneficialOwner, { party_id: org, first_name: 'დავით', last_name: 'მფლობელიძე', criterion: 'share', share_percent: '60', personal_number: '01001010199', citizenship: 'GE', birth_date: '1970-02-02' });
+as('accountant');
+await run(aml.createSuspension, { party_id: clientIds[2], kind: 'oral', scope: 'all', instructed_at: '2026-09-10T10:30', note: 'ფმს-ის ზეპირი მითითება' });
+await admin`insert into core.sanction_list_version (source, generated_at, entries) values ('un', '2026-09-01T00:00:00Z', 2)`;
+await admin`insert into core.sanction_list_entry (source, data_id, kind, name, aliases, list_type, reference, listed_on, nationalities, birth_years, documents)
+  values ('un', '6908001', 'individual', 'IVAN TESTOV', ${['Ivan Testov', 'ИВАН ТЕСТОВ', 'იოანე ტესტოვი']}, 'UN List', 'QDi.999', '2020-01-15', ${['Testland']}, ${['1970']}, ${['P1234567']}),
+         ('un', '6908002', 'entity', 'TEST TRADING LLC', ${['Test Trading "Ltd"']}, 'UN List', 'QDe.999', null, ${[]}, ${[]}, ${[]})`;
+as('admin');
+const grp = await run((await legacy('src/app/(app)/users/permissions/actions.ts')).createGroupAction, { name: 'ფინანსური დირექტორები' });
+const [g] = await sql`select id from core.user_group where name = 'ფინანსური დირექტორები'`;
+const perms = await legacy('src/app/(app)/users/permissions/actions.ts');
+await run(perms.setGroupGrantAction, { group_id: g.id, permission: 'finance.panel.view', granted: 'true' });
+await run(perms.setGroupMemberAction, { group_id: g.id, user_id: users.accountant, member: 'true' });
+await run(perms.setUserDecisionAction, { user_id: users.sales, permission: 'audit.log.view', decision: 'allow' });
+void grp;
+as('sales');
+const [cmp] = await sql`select id from core.complaint limit 1`;
+await run(complaints.acknowledgeComplaint, { id: cmp.id });
+await run(complaints.respondComplaint, { id: cmp.id, status: 'partly_upheld', responded_on: '2026-07-20', response_text: 'გადახდა აღდგა', measures: 'პროცესის შემოწმება', outcome: 'ნაწილობრივ' });
+
 // ---------------------------------------------------------------- months closed
+as('accountant');
 for (const month of ['2026-01-01', '2026-02-01', '2026-03-01']) {
   const r = await run(periods.closePeriod, { period_start: month });
-  if (r?.error) throw new Error(`close ${month}: ${r.error}`);
+  if (r?.outcome !== 'closed' && r?.outcome !== 'done') throw new Error(`close ${month}: ${JSON.stringify(r)}`);
 }
 
 const counts = await admin`select relname as t, n_live_tup as n from pg_stat_user_tables where schemaname = 'core' order by relname`;
