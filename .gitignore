@@ -1,0 +1,19 @@
+bin/
+obj/
+*.user
+.vs/
+.vscode/
+TestResults/
+*.trx
+# Local secrets and data: never committed (connection strings, test passwords, client data).
+.env
+.env.*
+!.env.example
+appsettings.Local.json
+appsettings.*.Local.json
+*.xlsx
+*.xls
+*.pdf
+*.bak
+!src/Insurance.Domain/Regulatory/Templates/*.xlsx
+artifacts/

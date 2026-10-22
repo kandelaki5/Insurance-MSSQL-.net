@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Pure business rules: finance, compliance, regulatory forms. No database, no web. -->
+  <PropertyGroup>
+    <RootNamespace>Insurance.Domain</RootNamespace>
+  </PropertyGroup>
+</Project>
