@@ -10,6 +10,11 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Insurance.Domain\Insurance.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Insurance.Application\Insurance.Application.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Parity cases produced by running the old TypeScript code (tests/parity/generate); the tests compare C# against them. -->
+    <None Include="..\parity\cases\**\*.json" LinkBase="parity" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
