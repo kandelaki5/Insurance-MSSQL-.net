@@ -56,7 +56,7 @@ public sealed class PostgresImport(string postgresConnection, string sqlServerAd
             "select table_name from information_schema.tables where table_schema = 'core' and table_type = 'BASE TABLE' order by table_name", transaction: pgTx))
             .Where(t => !NotCopied.Contains(t)).ToList();
         var targetTables = (await db.QueryAsync<string>("select name from sys.tables where schema_id = schema_id(N'core') order by name", transaction: tx))
-            .Where(t => !TargetOnly.Contains(t)).ToList();
+            .Where(t => !TargetOnly.Contains(t) && !NotCopied.Contains(t)).ToList();
         var missing = sourceTables.Except(targetTables).Concat(targetTables.Except(sourceTables)).ToList();
         if (missing.Count > 0) throw new InvalidOperationException($"the schemas differ: tables {string.Join(", ", missing)}");
 
