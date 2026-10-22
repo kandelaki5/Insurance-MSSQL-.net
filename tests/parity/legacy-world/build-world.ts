@@ -243,6 +243,8 @@ await run(claims.reverseClaimPayment, { claim_id: c2, claim_payment_id: cp2.id, 
 
 // ---------------------------------------------------------------- a change that reduces premium (schedule reduction)
 as('sales');
+// No legacy screen adds policy parties (the endorsement only copies them), so the row is written as the legacy integration tests write it; the endorsement below copies it to the new policy.
+await admin`insert into core.policy_party (policy_id, party_id, role) values (${p5}, ${clientIds[0]}, 'driver')`;
 const e2 = idFrom(expectOk('endorse down', await run(endorse.endorsePolicy, { policy_id: p5, change_on: '2026-09-01', reason: 'ქურდობის დაფარვის მოხსნა', cov_theft_on: 'on', cov_theft_delta: '-200.00', cov_theft_limit: '', cov_theft_deductible: '' })), '/policies');
 as('operations_head');
 const eb = await run(policies.approvePolicy, { id: e2 });
@@ -269,6 +271,65 @@ as('sales');
 const [cmp] = await sql`select id from core.complaint limit 1`;
 await run(complaints.acknowledgeComplaint, { id: cmp.id });
 await run(complaints.respondComplaint, { id: cmp.id, status: 'partly_upheld', responded_on: '2026-07-20', response_text: 'გადახდა აღდგა', measures: 'პროცესის შემოწმება', outcome: 'ნაწილობრივ' });
+
+
+// ---------------------------------------------------------------- an agent with commission, a large receipt reversed by request, facultative, login attempts
+as('sales');
+expectOk('agent party', await run(parties.saveParty, { kind: 'person', is_resident: 'on', tax_id: '01001010110', first_name: 'აგენტი', last_name: 'შუამავლიშვილი' }));
+as('admin');
+const intermediaries = await legacy('src/app/(app)/intermediaries/actions.ts');
+expectOk('intermediary', await run(intermediaries.saveIntermediary, { party_id_number: '01001010110', kind: 'agent', commission_percent: '10', contract_no: 'AG-001', contract_date: '2026-01-01', status: 'active' }));
+const [agent] = await sql`select i.id from core.intermediary i join core.party p on p.id = i.party_id where p.tax_id = '01001010110'`;
+as('sales');
+const p7r = expectOk('issue with agent', await run(policies.issuePolicy, {
+  product_id: product.id, policyholder_id_number: '01001010101', make: 'BMW', model: 'X5', year: '2022', plate: 'GG-707-GG', value: '90000',
+  effective_from: '2026-09-01', effective_to: '2027-09-01', currency: 'GEL', installments: '1', intermediary_id: agent.id, commission_percent: '10',
+  cov_damage_on: 'on', cov_damage_premium: '15000.00', cov_damage_limit: '90000', cov_damage_deductible: '500' }));
+const p7 = idFrom(p7r, '/policies');
+as('operations_head');
+if ((await run(policies.approvePolicy, { id: p7 }))?.outcome !== 'done') throw new Error('approve p7');
+as('accountant');
+await pay(p7, '2026-09-02', '15000.00');
+const [big] = await sql`select p.id from core.payment p where p.amount_gel = 15000 and p.kind = 'receipt'`;
+await run(payment.reversePayment, { policy_id: p7, payment_id: big.id, reason: 'ბანკმა დააბრუნა' });
+const [rrq] = await sql`select id from core.receipt_reversal_request where receipt_id = ${big.id}`;
+if (!rrq) throw new Error('no receipt reversal request');
+as('admin');
+expectOk('approve reversal', await run(payment.approveReceiptReversalRequest, { policy_id: p7, request_id: rrq.id }));
+expectOk('facultative treaty', await run(treaties.createTreaty, { name: 'ფაკულტატური EUR', kind: 'facultative', reinsurer_id_number: '505050505', period_from: '2026-01-01', period_to: '2027-12-31', currency: 'EUR', ceded_percent: '50', commission_percent: '15' }));
+const [fac] = await sql`select id from core.ri_treaty where kind = 'facultative'`;
+const reinsuranceActions = await legacy('src/app/(app)/policies/[id]/reinsurance-actions.ts');
+await run(reinsuranceActions.placeFacultativeOnPolicy, { policy_id: p3, treaty_id: fac.id });
+const login = await legacy('src/app/login/actions.ts');
+setSessionToken(undefined);
+await run(login.login, { username: 'world.sales', password: 'not-the-password' });
+await run(login.login, { username: 'nobody', password: 'x' });
+
+
+// ---------------------------------------------------------------- regress on the paid CASCO claim (the old library; it had no screen) and a sanctions screening
+{
+  const subro = await legacy('src/lib/subrogation.ts');
+  const { pgStore } = await legacy('src/lib/subrogation-store.ts');
+  const { asUser } = await legacy('src/lib/db.ts');
+  const transact = (fn: any) => asUser(users.claims, (tx: any) => fn(pgStore(tx)));
+  const key = () => randomBytes(16).toString('hex').replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5');
+  const opened = await subro.openCase(transact, { claimId: c1, openedOn: '2026-08-10', note: 'მესამე პირის ბრალი', requestKey: key() });
+  if (!opened.ok) throw new Error(`regress case: ${JSON.stringify(opened)}`);
+  const party = await subro.addParty(transact, { caseId: opened.id, partyId: org, role: 'liable_person', policyNumber: null, coverage: null, limit: null });
+  if (!party.ok) throw new Error(`regress party: ${JSON.stringify(party)}`);
+  for (const m of [
+    { kind: 'claimed', amount: 300000n, bookedOn: '2026-08-12', documentKind: 'demand_letter', documentNumber: 'DL-1', documentDate: '2026-08-12' },
+    { kind: 'confirmed', amount: 200000n, bookedOn: '2026-08-20', documentKind: 'debtor_acceptance', documentNumber: 'DA-1', documentDate: '2026-08-20' },
+  ]) {
+    const r = await subro.addMovement(transact, { caseId: opened.id, note: null, requestKey: key(), ...m });
+    if (!r.ok) throw new Error(`regress movement: ${JSON.stringify(r)}`);
+  }
+  const got = await subro.receive(transact, { caseId: opened.id, requestKey: key(), bankReference: 'BANK-REG-1', payerId: party.id, amount: 50000n, receivedOn: '2026-09-15', note: 'პირველი თანხა' });
+  if (!got.ok) throw new Error(`regress receipt: ${JSON.stringify(got)}`);
+  as('accountant');
+  const sanctions = await legacy('src/app/(app)/compliance/sanctions/actions.ts');
+  await run(sanctions.screenOneParty, { party_id: clientIds[0] });
+}
 
 // ---------------------------------------------------------------- months closed
 as('accountant');
