@@ -2,7 +2,7 @@
 
 All application tables live in schema `core`, with the table and column names of the old PostgreSQL schema. `migrations/` holds the schema, applied in file-name order by `Insurance.Tools migrate` (the files are also embedded in `Insurance.Application`, so the web host and the tests use the same ones). Each file runs in one transaction together with its record in `core.schema_migration`; batches are separated by `GO` lines.
 
-The migrations are the **final state** of the legacy schema (commit `17c1f1f`, migrations 0001–0038), not a replay of its history; each object names the legacy migration it comes from.
+The migrations are the **final state** of the legacy schema (commit `17c1f1f`, migrations 0001–0038), not a replay of its history; each object names the legacy migration it comes from. Files 0001–0008 hold that state; 0009–0013 add what came after the baseline, each a new file (an applied file is never edited): 0009 the regress case pass (Codex R02), 0010 the sanctions false-positive reuse (owner, 23.10.2026), 0011 the reinsurer's commission settlement (legacy PR #362, its 0039), 0012 a GEL claim on a USD/EUR policy (H46), 0013 that claim's snapshot guarded NULL-safely (Codex R005-03).
 
 ## Requirements of the database
 
@@ -13,7 +13,7 @@ The migrations are the **final state** of the legacy schema (commit `17c1f1f`, m
 
 ## Roles
 
-- `core_app` — the application. Reads and writes `core` tables, cannot change the schema. Ledgers and requests are append-only (no update or delete): `audit_log`, `premium_transaction`, `installment`, `installment_adjustment`, `payment`, `payment_allocation`, `premium_cession`, `claim_payment`, `claim_payment_request`, `claim_recovery`, `claim_reserve`, `claim_reserve_request`, `party_risk_assessment`, `premium_refund_request(_line)`, `receipt_reversal_request(_line)`, `subrogation_movement`. Accounting periods, regress cases and their parties are never deleted. The migration journal is read-only. The runner re-asserts all of this after every run and checks the effective rights as a member of the role.
+- `core_app` — the application. Reads and writes `core` tables, cannot change the schema. Ledgers and requests are append-only (no update or delete): `audit_log`, `premium_transaction`, `installment`, `installment_adjustment`, `payment`, `payment_allocation`, `premium_cession`, `claim_payment`, `claim_payment_request`, `claim_recovery`, `claim_reserve`, `claim_reserve_request`, `party_risk_assessment`, `premium_refund_request(_line)`, `receipt_reversal_request(_line)`, `ri_commission_settlement`, `subrogation_movement`. Accounting periods, regress cases and their parties are never deleted. The migration journal is read-only. The runner re-asserts all of this after every run and checks the effective rights as a member of the role.
 - `core_reader` — reviewers: select on every table and view except `app_user` and `session`.
 
 The login the application connects with carries a password, so it is not part of the migrations:

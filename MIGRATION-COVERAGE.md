@@ -506,6 +506,7 @@ Cases = `test(`/`it(` calls in the file (v1 count). Rows changed since v1 are ma
 | — (მფლობელი, 23.10.2026) | სანქციების ცრუ დამთხვევის გადაწყვეტილების ხელახლა გამოყენება | 0010_sanctions_reuse | SanctionsReuseTests, ScreeningFingerprintTests | DONE |
 | ძველი PR #362 (0039) | გადამზღვევლის საკომისიოს ჩათვლის ჟურნალი | 0011_ri_commission_settlement | RiCommissionSettlementTests, RiCommissionPageTests | DONE |
 | H46 (ძველი docs/07 §4.5) | ლარის ზარალი სავალუტო პოლისზე: კურსის ფიქსაცია, ჩათვლის კურსი | 0012_claim_gel_currency | ClaimGelOnForeignPolicyTests, ClaimGelCardTests, CrossCurrencySetOffTests | DONE |
+| — (Codex R005-03) | ზარალის snapshot-ის NULL-უსაფრთხო დაცვა (0012-ის ტრიგერის ჩანაცვლება) | 0013_claim_snapshot_null_safe | ClaimGelOnForeignPolicyTests.The_snapshot_is_neither_wiped_nor_given_… (core_app) | DONE |
 
 ## 6. ძველი სკრიპტები (scripts/)
 
@@ -625,7 +626,17 @@ Doc rows over the 45: PASS 260 · N/A 36 · NOT TESTED 1 (db-acceptance) · OTHE
 3. `date-input-typing.test.ts` (sub-point): the drawn calendar itself (headless Chromium draws none); the ISO value it gives is tested.
 4. `dev-uat.ts`: N/A — the legacy local UAT launcher refused non-test database names; the new program has no launcher (the web app takes its connection from configuration); `test-users` keeps the refusal.
 5. **An old-number suspension (`legacy_unmapped = 1`) as a fixture** (23.10.2026, found while porting open PRs #150, #158, #177, #178): `ComplianceFixtures.LegacyUnmappedSuspensionAsync` and `OpenPrWorld.LegacyUnmappedSuspensionAsync` write such a row with the insert trigger `fms_suspension_insert` set aside for that one row on the test's own throwaway database — as the old `scripts/db-acceptance.ts:161` did on its test database. The working agreement says a fixture that bypasses a trigger is reported as SKIP; the tests that use it (AmlTests, AmlSuspensionAcceptanceTests, OpenPrAllocateReceiptTests.PR158, OpenPrTransferTests.PR177/PR178, OpenPrRefundTests.PR150) pass, but they are listed here so they are not read as plain PASS, and item 2 above (NOT TESTED for the same reason) is inconsistent with them. Codex / the owner to decide which reading holds.
-6. **H46 cases no owner rule decides** (refused with nothing written, each tested as a refusal, not as a rule): a total loss across currencies, one event or class deductible holding claims in two currencies, an XL treaty in another currency than the claim. The roundings of `limit_gel`/`deductible_gel` (to the tetri, half away from zero) and of the set-off (down to the cent) are the design's, not the owner's.
+6. **H46 — what no owner rule decides** (old program docs/07 §4.5 decides the claim in GEL, the limit and deductible at the occurrence day's rate, the set-off at the payment day's rate; the rest is listed here exactly, each with what the rewrite does — none is counted as a finished rule):
+   - (H46-U1) rounding of `limit_gel` / `deductible_gel`: to the tetri, half away from zero (`Money.ToGel`), the design's — OPEN;
+   - (H46-U2) a GEL policy's claim has no snapshot (the columns stay NULL) — OPEN;
+   - (H46-U3) a total loss across currencies: refused, nothing written (`ClaimGelOnForeignPolicyTests.A_total_loss_across_currencies_…`) — OPEN;
+   - (H46-U4) one event or class deductible holding claims in two currencies (an old USD event taking a new GEL coverage): refused — OPEN;
+   - (H46-U5) an XL treaty in another currency than the claim (RI003, the old status's open question 8): refused, registration included — OPEN;
+   - (H46-U6) GEL claims as a company setting (`claim.currency`, `gel` when none is saved) rather than for every company — OPEN;
+   - (H46-U7) what makes a claim "new": the moment it is registered under the setting — OPEN;
+   - (H46-U8) the set-off in the policy's currency is not stored on the claim payment (it is the sum of its receipt's allocations) — OPEN;
+   - (H46-U9) `offset_rate` / `offset_currency` NULL without a set-off, set on every set-off (a same-currency one included, at its rate) — the design's, OPEN;
+   - the set-off itself is rounded down to the cent and split into GEL shares by the running total rounded down (Codex R005-02) — the design's, reviewed by Codex.
 7. **The demo / hosting**: nothing was deployed and no test ran on the hosting database (Codex INS-DOTNET-MSSQL-003 forbids it; the owner's request to deploy the merged version waits on the hosting access and on approval of migrations 0009–0012 there).
 
 Known differences (documented, not gaps): `loadRates` answers "failed" for an impossible date (2026-02-30) without asking the bank (legacy sent it to the bank); SQL Server has no read-only transaction — the report pages only read (source review), and could read through a login holding only `core_reader` (owner's choice).
