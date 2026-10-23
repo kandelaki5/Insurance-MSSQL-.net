@@ -63,7 +63,7 @@ public class CrossCurrencySetOffTests
         Assert.Equal(3_000, roundTrip.Lines.Sum(l => l.Amount.Minor));
     }
 
-    [Fact(DisplayName = "allocated oldest first in the policy's currency, each line with its GEL and the rate; the last absorbs the rounding")]
+    [Fact(DisplayName = "allocated oldest first in the policy's currency, each line with its GEL and the rate; the last takes what is left")]
     public void Allocation()
     {
         var s = CrossCurrencySetOff.Amounts(10_000, new Money(10_000, Currency.USD), 2.7m);
@@ -72,9 +72,50 @@ public class CrossCurrencySetOffTests
         Assert.Equal([1_001L, 2_702L], a.Lines.Select(l => l.Amount.Minor));
         Assert.All(a.Lines, l => Assert.Equal(Currency.USD, l.Amount.Currency));
         Assert.All(a.Lines, l => Assert.Equal(2.7m, l.Rate));
-        Assert.Equal(2_703, a.Lines[0].AmountGel);           // 10.01 × 2.7 = 27.027
-        Assert.Equal(9_998 - 2_703, a.Lines[1].AmountGel);  // the rest of 99.98
+        Assert.Equal(2_702, a.Lines[0].AmountGel);           // 10.01 × 2.7 = 27.027, rounded down
+        Assert.Equal(9_998 - 2_702, a.Lines[1].AmountGel);  // the rest of 99.98
         Assert.Equal(0, a.UnallocatedGel);
         Assert.Throws<InvalidOperationException>(() => CrossCurrencySetOff.Allocate(new SetOffAmounts(new Money(20_000, Currency.USD), 54_000), [Balance("x", 1, 100)], 2.7m));
+    }
+    [Fact(DisplayName = "Codex R005-02: 12 × 0.01 USD at 2.70 — a 32-tetri receipt in shares of 2 or 3, none negative, no running total above 32")]
+    public void SmallInstalments()
+    {
+        var balances = Enumerable.Range(1, 12).Select(m => Balance($"i{m}", m, 1)).ToList();
+        var s = CrossCurrencySetOff.Amounts(1_000, new Money(12, Currency.USD), 2.7m);
+        Assert.Equal((12L, 32L), (s.Policy.Minor, s.GelMinor));
+        var a = CrossCurrencySetOff.Allocate(s, balances, 2.7m);
+        // floor(2.7 × k) for k = 1…11, then the receipt: 2, 5, 8, 10, 13, 16, 18, 21, 24, 27, 29, 32.
+        Assert.Equal([2L, 3, 3, 2, 3, 3, 2, 3, 3, 3, 2, 3], a.Lines.Select(l => l.AmountGel));
+        // Negative control: rounding each line and putting the difference on the last (the code before) gives 3 × 11 and −1, its
+        // eleventh running total 33 above the receipt — the write the receipt's guard PA002 refuses.
+        var old = Enumerable.Repeat(Money.MulDiv(1, 2_700_000, 1_000_000), 11).ToList();
+        old.Add(32 - old.Sum());
+        Assert.Equal(-1, old[^1]);
+        Assert.Equal(33, old.Take(11).Sum());
+    }
+
+    [Fact(DisplayName = "every split: each share zero or more, every running total within the receipt, both currencies added up exactly")]
+    public void EverySplit()
+    {
+        var random = new Random(20261024);
+        for (var n = 0; n < 5_000; n++)
+        {
+            var count = random.Next(1, 15);
+            var balances = Enumerable.Range(1, count).Select(m => Balance($"i{m}", 1 + (m - 1) % 12, random.Next(0, 4) == 0 ? random.Next(1, 4) : random.Next(1, 200_000))).ToList();
+            var rate = random.Next(1, 5_000_000) / 1_000_000m;
+            var unpaid = balances.Sum(b => b.Outstanding);
+            var s = CrossCurrencySetOff.Amounts(random.Next(1, 100_000_000), new Money(unpaid, Currency.USD), rate);
+            if (s.Policy.Minor == 0) continue;
+            var a = CrossCurrencySetOff.Allocate(s, balances, rate);
+            Assert.Equal(s.Policy.Minor, a.Lines.Sum(l => l.Amount.Minor));
+            Assert.Equal(s.GelMinor, a.Lines.Sum(l => l.AmountGel));
+            long running = 0;
+            foreach (var l in a.Lines)
+            {
+                Assert.True(l.AmountGel >= 0, $"case {n}: a share of {l.AmountGel}");
+                running += l.AmountGel;
+                Assert.True(running <= s.GelMinor, $"case {n}: running {running} above {s.GelMinor}");
+            }
+        }
     }
 }

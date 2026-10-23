@@ -215,4 +215,43 @@ public sealed class ClaimGelOnForeignPolicyTests(TestDatabase db) : IClassFixtur
             await w.ClaimCurrencyAsync("gel");
         }
     }
+    /// <summary>
+    /// Codex R005-02 on the real action: 12 unpaid instalments of 0.01 USD, a GEL claim of 1 000.00 after the deductible, paid with the
+    /// set-off at 2.70. The set-off is 0.12 USD = 0.32 GEL, written as twelve allocations one by one under the receipt's guard (PA002):
+    /// each 0.01 USD with a GEL share of 0.02 or 0.03, never negative; 999.68 is paid. Its reversal gives the 0.12 USD back.
+    /// </summary>
+    [Fact]
+    public async Task A_set_off_over_twelve_instalments_of_a_cent_is_written_share_by_share_and_its_reversal_gives_them_back()
+    {
+        var y = Interlocked.Increment(ref year);
+        var claims = await w.UserAsync("claims");
+        await w.RateAsync("USD", new DateOnly(y, 3, 1), 2.60m);
+        await w.RateAsync("USD", new DateOnly(y, 3, 10), 2.70m);
+        var policy = await w.PolicyAsync(claims.Id, new DateOnly(y, 1, 1), [new ClaimWorld.Line("damage", 10000m, 100m, 0.12m)],
+            Enumerable.Range(0, 12).Select(m => (new DateOnly(y, 1, 1).AddMonths(m), 0.01m)).ToArray(), "USD", 2.5m);
+        db.Clock.SetToday(new DateOnly(y, 3, 2));
+        var claim = (await w.RegisterAsync(claims, policy, new DateOnly(y, 3, 1), new DateOnly(y, 3, 2), ("damage", "1000")))[0];
+        var x = new World(claims, await w.UserAsync("accountant"), policy, claim, y);
+        await ApproveAsync(x, "1260");
+
+        var paid = await PayAsync(x, "1260");
+        Assert.True(paid.RedirectTo is not null, $"{paid.Message} {string.Join("; ", paid.Errors.Select(e => $"{e.Key}={e.Value}"))}");
+        Assert.Equal([(1260m, 260m, 0.32m, 999.68m, 999.68m, 1m, (decimal?)2.7m, "USD")], (await PaymentsAsync(x.Claim)).Select(p => p with { OffsetCurrency = p.OffsetCurrency?.Trim() }));
+        var lines = await w.RowsAsync<(decimal Amount, decimal AmountGel)>("""
+            select a.amount, a.amount_gel from core.claim_payment cp join core.payment_allocation a on a.payment_id = cp.offset_payment_id
+            join core.installment i on i.id = a.installment_id where cp.claim_id = @c and cp.kind = N'payment' order by i.due_on
+            """, new { c = x.Claim });
+        Assert.Equal(Enumerable.Repeat(0.01m, 12), lines.Select(l => l.Amount));
+        Assert.Equal([0.02m, 0.03m, 0.03m, 0.02m, 0.03m, 0.03m, 0.02m, 0.03m, 0.03m, 0.03m, 0.02m, 0.03m], lines.Select(l => l.AmountGel));
+        Assert.Equal(0m, await UnpaidUsdAsync(x.Policy));
+
+        var payment = await w.ScalarAsync<Guid>("select id from core.claim_payment where claim_id = @c", new { c = x.Claim });
+        Assert.Equal($"/claims/{x.Claim}?reversal=ok", await ClaimActions.ReverseClaimPaymentAsync(w.App, x.Accountant, ClaimWorld.Form(("claim_id", x.Claim.ToString()),
+            ("claim_payment_id", payment.ToString()), ("reason", "correction"), ("reversed_on", ClaimWorld.D(x.Paid))), x.Paid));
+        Assert.Equal(0.12m, await UnpaidUsdAsync(x.Policy));
+        // The receipt's mirror gives back each allocation exactly: nothing of the set-off is left in either currency.
+        Assert.Equal((0m, 0m), Assert.Single(await w.RowsAsync<(decimal, decimal)>("""
+            select coalesce(sum(a.amount), 0), coalesce(sum(a.amount_gel), 0) from core.payment_allocation a join core.installment i on i.id = a.installment_id where i.policy_id = @id
+            """, new { id = x.Policy.Id })));
+    }
 }

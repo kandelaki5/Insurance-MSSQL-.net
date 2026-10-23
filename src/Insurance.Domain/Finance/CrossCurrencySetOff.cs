@@ -39,8 +39,11 @@ public static class CrossCurrencySetOff
 
     /// <summary>
     /// The set-off allocated to the oldest unpaid instalments in the policy's currency, exactly <paramref name="amounts"/>.Policy;
-    /// each line carries its GEL at the rate and the rate itself, the last line absorbing the rounding difference so the
-    /// lines' GEL add up to the receipt.
+    /// each line carries its GEL at the rate and the rate itself. A line's GEL is the step of the running total converted and
+    /// rounded down (never above the receipt), the last line taking what is left: every line's GEL is zero or more, every running
+    /// total stays within the receipt — so the allocations can be written one by one under the receipt's guard (PA002) — and the
+    /// lines add up to the receipt exactly (Codex R005-02: rounding each line and putting the difference on the last could make it
+    /// negative and a running total exceed the receipt, 12 × 0.01 USD at 2.70 giving 3 × 11 and −1 of a 32-tetri receipt).
     /// </summary>
     public static PaymentAllocation Allocate(SetOffAmounts amounts, IReadOnlyList<InstallmentBalance> balances, decimal rate)
     {
@@ -57,8 +60,15 @@ public static class CrossCurrencySetOff
             parts.Add((b.Installment.Id, minor));
         }
         if (left > 0) throw new InvalidOperationException("the set-off exceeds the unpaid premium");
-        var gels = parts.Select(p => Money.MulDiv(p.Minor, scaled, RateScale)).ToList();
-        gels[^1] = amounts.GelMinor - gels.Take(gels.Count - 1).Sum();
+        var gels = new List<long>(parts.Count);
+        long policySoFar = 0, gelSoFar = 0;
+        for (var i = 0; i < parts.Count; i++)
+        {
+            policySoFar += parts[i].Minor;
+            var upTo = i == parts.Count - 1 ? amounts.GelMinor : Math.Min(amounts.GelMinor, checked((long)((Int128)policySoFar * scaled / RateScale)));
+            gels.Add(upTo - gelSoFar);
+            gelSoFar = upTo;
+        }
         return new PaymentAllocation(parts.Select((p, i) => new AllocationLine(p.InstallmentId, new Money(p.Minor, currency), gels[i], rate)).ToList(), 0);
     }
 }
