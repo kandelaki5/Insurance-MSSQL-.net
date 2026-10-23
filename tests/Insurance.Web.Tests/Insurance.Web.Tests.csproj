@@ -16,8 +16,12 @@
   <ItemGroup>
     <!-- The same fresh-database fixture as the integration tests. -->
     <Compile Include="..\Insurance.Integration.Tests\TestDatabase.cs" Link="TestDatabase.cs" />
-    <!-- The report worlds of the integration tests, for the pages over the same rows. -->
-    <Compile Include="..\Insurance.Integration.Tests\Fixtures.cs" Link="Worlds\Fixtures.cs" />
+    <!-- Fictional rows for the policy, payment and claim pages' tests (World and ClaimWorld use Fixtures). -->
+    <Compile Include="..\Insurance.Integration.Tests\Fixtures.cs" Link="Fixtures.cs" />
+    <Compile Include="..\Insurance.Integration.Tests\ClaimWorld.cs" Link="ClaimWorld.cs" />
+    <Compile Include="..\Insurance.Integration.Tests\Policies\World.cs" Link="Policies\World.cs" />
+    <Compile Include="..\Insurance.Integration.Tests\ComplianceFixtures.cs" Link="ComplianceFixtures.cs" />
+    <!-- The report worlds of the integration tests, for the report pages over the same rows. -->
     <Compile Include="..\Insurance.Integration.Tests\Worlds\*.cs" LinkBase="Worlds" />
   </ItemGroup>
   <ItemGroup>

@@ -1,0 +1,42 @@
+@page "/settings/products"
+@model Insurance.Web.Pages.Settings.Products.IndexModel
+@using Insurance.Application.Texts.Screens
+@{
+    var t = Ka.Settings.ProductTexts.Title;
+    ViewData["Title"] = t;
+}
+<h1>@Ka.Settings.ProductTexts.Title</h1>
+<p class="note">@Ka.Settings.ProductTexts.Note</p>
+@foreach (var product in Model.Products)
+{
+    var current = Model.Texts.GetValueOrDefault(product.Id) ?? new Dictionary<string, string>();
+    var missing = SettingKeys.ProductTextLabels.Keys.Count(key => !current.TryGetValue(key, out var value) || value == "" || value.Contains(Ka.Settings.ProductTexts.PlaceholderMarker, StringComparison.Ordinal));
+    <form method="post" class="card">
+        <h2>
+            @product.NameKa (@product.Code)
+            @if (!product.IsActive)
+            {
+                <span class="badge" style="margin-left: 6px">@Ka.Settings.ProductTexts.Inactive</span>
+            }
+            @if (missing > 0)
+            {
+                <span class="badge warn" style="margin-left: 6px">@Ka.Settings.ProductTexts.Incomplete(missing)</span>
+            }
+        </h2>
+        @if (Model.Saved == product.Id.ToString())
+        {
+            <div class="alert ok">@Ka.Settings.ProductTexts.Saved</div>
+        }
+        <input type="hidden" name="product_id" value="@product.Id" />
+        @foreach (var (key, label) in SettingKeys.ProductTextLabels)
+        {
+            <div style="margin-bottom: 12px">
+                <label for="@(product.Id)_@key">@label</label>
+                <textarea id="@(product.Id)_@key" name="@key" rows="@(key == "exclusions" ? 5 : 2)" style="width: 100%">@current.GetValueOrDefault(key)</textarea>
+            </div>
+        }
+        <div class="toolbar" style="margin-bottom: 0">
+            <button class="btn">@Ka.Common.Save</button>
+        </div>
+    </form>
+}

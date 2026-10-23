@@ -45,7 +45,7 @@ public sealed class ReinsuranceChainTests
         w.PolicyAsync(number, from, to, [new LineSpec(classCode, premium, gel, sumInsured, sumInsuredCurrency ?? currency)], currency: currency, rate: rate, bookedOn: bookedOn, replaces: replaces);
 
     private static Task<string?> PlaceAsync(ReportWorld w, Guid policy, Guid treaty) =>
-        Treaties.PlaceFacultativeAsync(w.App, new CurrentUser(w.Admin, "admin", "ადმინი", "admin", "ადმინისტრატორი"), policy.ToString(), treaty.ToString());
+        FacultativeConcurrencyTests.PlaceAsync(w, new CurrentUser(w.Admin, "admin", "ადმინი", "admin", "ადმინისტრატორი"), policy.ToString(), treaty.ToString());
 
     private static Task CedeCancellationAsync(ReportWorld w, Guid row) => w.WriteAsync(async tx => { await ReinsuranceStore.CedeCancellationAsync(tx, row, w.Admin); return 0; });
 

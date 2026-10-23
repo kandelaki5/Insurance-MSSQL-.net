@@ -1,0 +1,240 @@
+@page "/users/permissions"
+@model Insurance.Web.Pages.Users.Permissions.IndexModel
+@using Insurance.Domain.Common
+@{
+    var p = Model.Panel;
+    var keep = Model.Keep;
+    ViewData["Title"] = PermissionTexts.Panel.Title;
+}
+@functions {
+    private Microsoft.AspNetCore.Html.IHtmlContent AnswerOf(string key)
+    {
+        if (Model.AnswerFor != key || Model.Answer is not { } a) return Microsoft.AspNetCore.Html.HtmlString.Empty;
+        var text = System.Net.WebUtility.HtmlEncode(a.Text);
+        return new Microsoft.AspNetCore.Html.HtmlString(a.Ok ? $"<span class=\"badge low\" role=\"status\">{text}</span>" : $"<span class=\"field-error\" role=\"alert\">{text}</span>");
+    }
+}
+@{
+    async Task MemberButton(Guid groupId, Guid userId, bool member, string label, string key)
+    {
+        <form method="post" action="@Model.PostUrl("SetGroupMember")" asp-antiforgery="true" class="row-actions">
+            <input type="hidden" name="answer_for" value="@key" />
+            <input type="hidden" name="group_id" value="@groupId" />
+            <input type="hidden" name="user_id" value="@userId" />
+            <input type="hidden" name="member" value="@(member ? "true" : "false")" />
+            <button class="btn secondary" aria-label="@label">@(member ? PermissionTexts.Panel.AddTo : PermissionTexts.Panel.RemoveFrom)</button>
+            @AnswerOf(key)
+        </form>
+    }
+    async Task GroupNameForm(Guid? groupId, string? name)
+    {
+        var id = groupId is { } g ? $"group-name-{g}" : "new-group-name";
+        var key = groupId is { } k ? $"groupname:{k}" : "groupname:new";
+        <form method="post" action="@Model.PostUrl(groupId is null ? "CreateGroup" : "RenameGroup")" asp-antiforgery="true" class="row-actions">
+            <input type="hidden" name="answer_for" value="@key" />
+            @if (groupId is { } gid)
+            {
+                <input type="hidden" name="group_id" value="@gid" />
+            }
+            <label for="@id">@(groupId is null ? PermissionTexts.Panel.NewGroup : PermissionTexts.Panel.GroupName)</label>
+            <input id="@id" name="name" type="text" maxlength="100" value="@(name ?? "")" />
+            <button class="btn">@(groupId is null ? PermissionTexts.Panel.Create : PermissionTexts.Panel.Rename)</button>
+            @AnswerOf(key)
+        </form>
+    }
+}
+<h1>@PermissionTexts.Panel.Title</h1>
+<p class="note" role="note">@PermissionTexts.Panel.NotYet</p>
+
+<section class="card" aria-labelledby="users-title">
+    <h2 id="users-title">@PermissionTexts.Panel.Users</h2>
+    <form method="get" action="/users/permissions" class="row-actions">
+        <label for="q">@PermissionTexts.Panel.Search</label>
+        <input id="q" name="q" type="search" maxlength="100" value="@p.Query" />
+        @if (keep.Gq is not null)
+        {
+            <input type="hidden" name="gq" value="@keep.Gq" />
+        }
+        @if (!string.IsNullOrEmpty(keep.Group))
+        {
+            <input type="hidden" name="group" value="@keep.Group" />
+        }
+        <button class="btn secondary">@PermissionTexts.Panel.Find</button>
+    </form>
+    @if (p.Users.Count == 0)
+    {
+        <p>@PermissionTexts.Panel.NoUsers</p>
+    }
+    else
+    {
+        <table>
+            <thead><tr><th>@PermissionTexts.Panel.Username</th><th>@PermissionTexts.Panel.FullName</th><th>@PermissionTexts.Panel.Role</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var u in p.Users)
+            {
+                <tr data-user="@u.Id">
+                    <td>@u.Username@if (!u.Active) { @(" ")<span class="badge high">@PermissionTexts.Panel.Inactive</span> }</td>
+                    <td>@u.FullName</td>
+                    <td>@u.RoleName</td>
+                    <td><a href="@Model.Href(keep.Q, keep.Gq, u.Id.ToString(), keep.Group)">@PermissionTexts.Panel.Choose</a></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+</section>
+
+@if (p.UserMissing)
+{
+    <section class="card" id="chosen-user"><p role="alert">@PermissionTexts.Panel.MissingUser</p></section>
+}
+@if (p.User is { } chosen)
+{
+    var user = chosen.User;
+    <section class="card" id="chosen-user" data-user="@user.Id" aria-labelledby="chosen-user-title">
+        <h2 id="chosen-user-title">@user.FullName (@user.Username) — @user.RoleName</h2>
+        <table>
+            <thead><tr><th>@PermissionTexts.Panel.Permission</th><th>@PermissionTexts.Panel.RoleDefault</th><th>@PermissionTexts.Panel.FromGroups</th><th>@PermissionTexts.Panel.Own</th><th>@PermissionTexts.Panel.Result</th><th>@PermissionTexts.Panel.Source</th></tr></thead>
+            <tbody>
+            @foreach (var perm in chosen.Permissions)
+            {
+                var id = $"decision-{perm.Key}";
+                var key = $"decision:{perm.Key}";
+                <tr data-permission="@perm.Key">
+                    <td>@perm.Name</td>
+                    <td data-cell="role">@(perm.RoleDefault ? PermissionTexts.Panel.Yes : PermissionTexts.Panel.No)</td>
+                    <td data-cell="groups">@(perm.GroupNames.Count == 0 ? PermissionTexts.Panel.None : string.Join(", ", perm.GroupNames))</td>
+                    <td data-cell="own">
+                        <form method="post" action="@Model.PostUrl("SetUserDecision")" asp-antiforgery="true" class="row-actions">
+                            <input type="hidden" name="answer_for" value="@key" />
+                            <input type="hidden" name="user_id" value="@user.Id" />
+                            <input type="hidden" name="permission" value="@perm.Key" />
+                            <label for="@id" class="visually-hidden">@PermissionTexts.Panel.Own: @perm.Name</label>
+                            <select id="@id" name="decision">
+                                @foreach (var choice in new[] { "inherit", "allow", "deny" })
+                                {
+                                    <option value="@choice" selected="@(choice == perm.Choice)">@PermissionTexts.Panel.Choices[choice]</option>
+                                }
+                            </select>
+                            <button class="btn secondary">@PermissionTexts.Panel.Save</button>
+                            @AnswerOf(key)
+                        </form>
+                    </td>
+                    <td data-cell="result"><span class="badge @(perm.Allowed ? "low" : "high")">@(perm.Allowed ? PermissionTexts.Panel.Allowed : PermissionTexts.Panel.Refused)</span></td>
+                    <td data-cell="source">@perm.SourceText</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        <h3>@PermissionTexts.Panel.Memberships</h3>
+        @if (chosen.MembershipGroups.Count == 0)
+        {
+            <p>@PermissionTexts.Panel.NoGroups</p>
+        }
+        else
+        {
+            <table>
+                <tbody>
+                @foreach (var g in chosen.MembershipGroups)
+                {
+                    var member = chosen.MemberOf.Contains(g.Id);
+                    <tr data-group="@g.Id">
+                        <td>@g.Name</td>
+                        <td data-cell="member">@(member ? PermissionTexts.Panel.Member : PermissionTexts.Panel.NotMember)</td>
+                        <td>@{ await MemberButton(g.Id, user.Id, !member, $"{(member ? PermissionTexts.Panel.RemoveFrom : PermissionTexts.Panel.AddTo)}: {g.Name}", $"member:user:{g.Id}"); }</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+    </section>
+}
+
+<section class="card" aria-labelledby="groups-title">
+    <h2 id="groups-title">@PermissionTexts.Panel.Groups</h2>
+    @{ await GroupNameForm(null, null); }
+    <form method="get" action="/users/permissions" class="row-actions">
+        <label for="gq">@PermissionTexts.Panel.GroupSearch</label>
+        <input id="gq" name="gq" type="search" maxlength="100" value="@p.GroupQuery" />
+        @if (keep.Q is not null)
+        {
+            <input type="hidden" name="q" value="@keep.Q" />
+        }
+        @if (!string.IsNullOrEmpty(keep.User))
+        {
+            <input type="hidden" name="user" value="@keep.User" />
+        }
+        <button class="btn secondary">@PermissionTexts.Panel.Find</button>
+    </form>
+    @if (p.FoundGroups.Count == 0)
+    {
+        <p>@PermissionTexts.Panel.NoGroups</p>
+    }
+    else
+    {
+        <ul>
+            @foreach (var g in p.FoundGroups)
+            {
+                <li data-group="@g.Id"><a href="@Model.Href(keep.Q, keep.Gq, keep.User, g.Id.ToString())">@g.Name</a></li>
+            }
+        </ul>
+    }
+</section>
+
+@if (p.GroupMissing)
+{
+    <section class="card" id="chosen-group"><p role="alert">@PermissionTexts.Panel.MissingGroup</p></section>
+}
+@if (p.Group is { } chosenGroup)
+{
+    var group = chosenGroup.Group;
+    <section class="card" id="chosen-group" data-group="@group.Id" aria-labelledby="chosen-group-title">
+        <h2 id="chosen-group-title">@group.Name</h2>
+        @{ await GroupNameForm(group.Id, group.Name); }
+        <h3>@PermissionTexts.Panel.GroupPermissions</h3>
+        <table>
+            <tbody>
+            @foreach (var entry in Permissions.Catalogue(PermissionTexts.Permissions, PermissionTexts.Sections))
+            {
+                var ticked = chosenGroup.Granted.Contains(entry.Key);
+                var key = $"grant:{entry.Key}";
+                <tr data-permission="@entry.Key">
+                    <td>@entry.Name</td>
+                    <td data-cell="ticked">@(ticked ? PermissionTexts.Panel.Ticked : PermissionTexts.Panel.NotTicked)</td>
+                    <td>
+                        <form method="post" action="@Model.PostUrl("SetGroupGrant")" asp-antiforgery="true" class="row-actions">
+                            <input type="hidden" name="answer_for" value="@key" />
+                            <input type="hidden" name="group_id" value="@group.Id" />
+                            <input type="hidden" name="permission" value="@entry.Key" />
+                            <input type="hidden" name="granted" value="@(ticked ? "false" : "true")" />
+                            <button class="btn secondary" aria-label="@(ticked ? PermissionTexts.Panel.Untick : PermissionTexts.Panel.Tick): @entry.Name">@(ticked ? PermissionTexts.Panel.Untick : PermissionTexts.Panel.Tick)</button>
+                            @AnswerOf(key)
+                        </form>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        <h3>@PermissionTexts.Panel.Members</h3>
+        @if (chosenGroup.Members.Count == 0)
+        {
+            <p>@PermissionTexts.Panel.NoMembers</p>
+        }
+        else
+        {
+            <table>
+                <tbody>
+                @foreach (var m in chosenGroup.Members)
+                {
+                    <tr data-member="@m.Id">
+                        <td>@m.Username</td>
+                        <td>@m.FullName</td>
+                        <td>@m.RoleName</td>
+                        <td>@{ await MemberButton(group.Id, m.Id, false, $"{PermissionTexts.Panel.RemoveFrom}: {m.Username}", $"member:group:{m.Id}"); }</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+    </section>
+}

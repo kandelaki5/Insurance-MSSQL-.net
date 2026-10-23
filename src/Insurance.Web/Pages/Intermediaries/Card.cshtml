@@ -1,0 +1,13 @@
+@page "/intermediaries/{id}"
+@model Insurance.Web.Pages.Intermediaries.CardModel
+@{
+    ViewData["Title"] = Model.PartyName;
+}
+<h1>
+    @Model.PartyName <span class="badge">@Ka.Intermediary.Kind.GetValueOrDefault(Model.Kind)</span>
+</h1>
+@if (Model.Saved)
+{
+    <div class="alert ok">@Ka.Party.Saved</div>
+}
+<partial name="_IntermediaryForm" model="Model.FormModel" />

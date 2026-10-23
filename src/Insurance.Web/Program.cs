@@ -15,6 +15,7 @@ builder.Services.AddSingleton<Auth>();
 builder.Services.AddScoped<RequestUser>();
 builder.Services.AddHttpClient();
 builder.Services.AddApplicationServices();
+builder.Services.Configure<SanctionsOptions>(builder.Configuration.GetSection("Insurance:Sanctions"));
 
 // Georgian (and every other) text is written as it is, not as &#x...; entities.
 builder.Services.Configure<Microsoft.Extensions.WebEncoders.WebEncoderOptions>(o =>

@@ -1,0 +1,66 @@
+@page "/policies/pending"
+@model Insurance.Web.Pages.Policies.PendingModel
+@using F = Insurance.Application.Texts.PolicyTexts.Fields
+@{
+    ViewData["Title"] = PolicyTexts.Pending.Title;
+}
+<h1>@PolicyTexts.Pending.Title</h1>
+<p class="note">@PolicyTexts.Pending.Note</p>
+<partial name="_ApproveAnswer" model="(Model.Answer, true)" />
+@if (Model.Rows.Count == 0)
+{
+    <div class="card empty">@PolicyTexts.Pending.None</div>
+}
+else
+{
+    <table>
+        <thead>
+        <tr>
+            <th>@F.Number</th>
+            <th>@F.ContractNumber</th>
+            <th>@F.Policyholder</th>
+            <th>@F.Object</th>
+            <th>@F.Term</th>
+            <th class="num">@F.Premium</th>
+            <th>@F.IssuedOn</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var r in Model.Rows)
+        {
+            <tr>
+                <td>
+                    <a href="/policies/@r.Id">@r.Number</a>
+                    @if (!string.IsNullOrEmpty(r.ChangeNote))
+                    {
+                        <div class="hint">@PolicyTexts.Endorse.ChangeNote: @r.ChangeNote</div>
+                    }
+                </td>
+                <td>@r.ContractNumber</td>
+                <td>@r.Policyholder</td>
+                <td>@r.Object</td>
+                <td>@Fmt.Date(r.EffectiveFrom) – @Fmt.Date(r.EffectiveTo)</td>
+                <td class="num">@Fmt.Fixed(r.Premium, 2) @r.PremiumCurrency</td>
+                <td>
+                    @Fmt.Date(r.IssuedOn)
+                    @if (!string.IsNullOrEmpty(r.IssuedBy))
+                    {
+                        <div class="hint">@r.IssuedBy</div>
+                    }
+                </td>
+                <td>
+                    @if (Model.Approves)
+                    {
+                        <form method="post" asp-page-handler="Approve">
+                            <input type="hidden" name="id" value="@r.Id" />
+                            <button class="btn">@PolicyTexts.Approve</button>
+                        </form>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+<p class="hint" style="margin-top: 10px">@(Model.Approves ? "" : PolicyTexts.Pending.NoRight)</p>

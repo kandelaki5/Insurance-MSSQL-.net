@@ -1,0 +1,52 @@
+@page "/payments/overdue"
+@model Insurance.Web.Pages.Payments.OverdueModel
+@using Insurance.Application.Services
+@using O = Insurance.Application.Texts.BillingTexts.Overdue
+@{
+    ViewData["Title"] = O.Title;
+    string Money(long tetri) => Billing.GroupedTetri(tetri);
+}
+<h1>@O.Title</h1>
+<p class="note">@O.AsOf: @Fmt.Date(Model.Today)</p>
+@if (Model.Rows.Count == 0)
+{
+    <div class="card empty">@O.None</div>
+}
+else
+{
+    <table>
+        <thead>
+        <tr>
+            <th>@O.Policy</th>
+            <th>@O.Policyholder</th>
+            <th>@O.OldestDue</th>
+            <th class="num">@O.DaysLate</th>
+            <th class="num">@O.OverdueText</th>
+            <th class="num">@O.Total</th>
+            <th class="num">@O.OverdueText, ₾</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var r in Model.Rows)
+        {
+            <tr>
+                <td><a href="/policies/@r.Id">@r.Number</a></td>
+                <td>@r.Policyholder</td>
+                <td>@Fmt.Date(r.OldestDue)</td>
+                <td class="num">@r.DaysLate</td>
+                <td class="num">@Money(r.Overdue) @r.Currency</td>
+                <td class="num">@Money(r.Outstanding) @r.Currency</td>
+                <td class="num">@Money(r.OverdueGel)</td>
+                <td>
+                    @if (Model.Me.CanWrite)
+                    {
+                        <a class="btn secondary" href="/policies/@r.Id/payment">@O.Register</a>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+    <p class="note" style="margin-top: 10px">@O.TotalGel: @Money(Model.TotalGel)</p>
+}

@@ -28,19 +28,20 @@ public sealed class TemplateWorkbook
     private sealed record Given(bool IsNumber, string Text);
 
     private const RegexOptions O = RegexOptions.CultureInvariant;
+    private const RegexOptions C = RegexOptions.CultureInvariant | RegexOptions.Compiled;
     private static string Unescape(string s) => s.Replace("&lt;", "<").Replace("&gt;", ">").Replace("&quot;", "\"").Replace("&apos;", "'").Replace("&amp;", "&");
     private static string Escape(string s) => s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
-    private static readonly Regex CellRe = new("<c\\b([^>]*?)(?:/>|>([\\s\\S]*?)</c>)", O);
-    private static readonly Regex RowRe = new("<row\\b([^>]*?)(?:/>|>([\\s\\S]*?)</row>)", O);
-    private static readonly Regex FormulaRe = new("<f\\b([^>]*?)(?:/>|>([\\s\\S]*?)</f>)", O);
-    private static readonly Regex VRe = new("<v(?:\\s[^>]*)?>([\\s\\S]*?)</v>", O);
-    private static readonly Regex IsRe = new("<is>([\\s\\S]*?)</is>", O);
-    private static readonly Regex TRe = new("<t\\b[^>]*>([\\s\\S]*?)</t>", O);
+    private static readonly Regex CellRe = new("<c\\b([^>]*?)(?:/>|>([\\s\\S]*?)</c>)", C);
+    private static readonly Regex RowRe = new("<row\\b([^>]*?)(?:/>|>([\\s\\S]*?)</row>)", C);
+    private static readonly Regex FormulaRe = new("<f\\b([^>]*?)(?:/>|>([\\s\\S]*?)</f>)", C);
+    private static readonly Regex VRe = new("<v(?:\\s[^>]*)?>([\\s\\S]*?)</v>", C);
+    private static readonly Regex IsRe = new("<is>([\\s\\S]*?)</is>", C);
+    private static readonly Regex TRe = new("<t\\b[^>]*>([\\s\\S]*?)</t>", C);
     private static readonly Dictionary<string, Regex> AttrRes = [];
     private static string? Attr(string attrs, string name)
     {
         Regex re;
-        lock (AttrRes) { if (!AttrRes.TryGetValue(name, out re!)) AttrRes[name] = re = new Regex($"\\b{name}=\"([^\"]*)\"", O); }
+        lock (AttrRes) { if (!AttrRes.TryGetValue(name, out re!)) AttrRes[name] = re = new Regex($"\\b{name}=\"([^\"]*)\"", C); }
         var m = re.Match(attrs);
         return m.Success ? m.Groups[1].Value : null;
     }
@@ -59,9 +60,9 @@ public sealed class TemplateWorkbook
             var r = Attr(attrs, "r");
             if (string.IsNullOrEmpty(r)) throw new InvalidDataException($"A cell without its reference in {path}");
             var (col, row) = SplitRef(r);
-            var fm = FormulaRe.Match(body);
-            var v = VRe.Match(body);
-            var inline = IsRe.Match(body);
+            var fm = body.Length == 0 ? Match.Empty : FormulaRe.Match(body);
+            var v = body.Length == 0 ? Match.Empty : VRe.Match(body);
+            var inline = body.Length == 0 ? Match.Empty : IsRe.Match(body);
             cells.Set(r, new Cell(r, col, row, attrs, Attr(attrs, "t"),
                 fm.Success ? fm.Value : null,
                 fm.Success && fm.Groups[2].Success ? Unescape(fm.Groups[2].Value) : null,
@@ -131,7 +132,7 @@ public sealed class TemplateWorkbook
         for (var k = 2; k <= 4; k++) if ((v.N * BigInteger.Pow(10, k) % v.D).IsZero) return k;
         return 4;
     }
-    private static readonly Regex SplitRefRe = new("^([A-Z]+)([0-9]+)\\z", O);
+    private static readonly Regex SplitRefRe = new("^([A-Z]+)([0-9]+)\\z", C);
     public static (int Col, int Row) SplitRef(string? reference)
     {
         var m = SplitRefRe.Match(reference ?? "undefined");

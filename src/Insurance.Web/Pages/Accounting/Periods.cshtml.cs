@@ -41,7 +41,7 @@ public sealed class PeriodsModel : AppPageModel
         // The closing deadline is the company's own setting (owner, 06.10.2026); 5 days until it is set.
         var (settings, first, closed) = await Db.ReadTxAsync(async tx =>
         {
-            var settings = await Settings.LoadSettingsAsync(tx);
+            var settings = await Insurance.Application.Services.Settings.LoadSettingsAsync(tx);
             var first = await tx.ExecuteScalarAsync<DateOnly?>("select min(effective_from) from core.policy");
             var closed = (await tx.QueryAsync<ClosedRow>("""
                 select p.period_start as PeriodStart,

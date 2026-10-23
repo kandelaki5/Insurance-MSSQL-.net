@@ -1,0 +1,145 @@
+@page "/print/policies/{id:guid}"
+@model Insurance.Web.Pages.Print.PolicyModel
+@using Insurance.Application.Services
+@using Insurance.Domain.Common
+@using Insurance.Domain.Finance
+@using F = Insurance.Application.Texts.PolicyTexts.Fields
+@using P = Insurance.Application.Texts.PolicyTexts.Print
+@{
+    Layout = "_Print";
+    var policy = Model.Policy;
+    ViewData["Title"] = policy.Number;
+    var currency = policy.Currency;
+    var lastDay = Dates.AddDays(policy.EffectiveTo, -1);
+    string Or(string? v) => string.IsNullOrEmpty(v) ? "—" : v;
+}
+<main class="sheet">
+    <div class="toolbar no-print">
+        <button class="btn" data-print>@P.PrintText</button>
+        <a class="btn secondary" href="/policies/@policy.Id">@P.Back</a>
+    </div>
+
+    <div class="company">
+        <div>
+            <strong>@Model.Setting("company_name")</strong>
+            <div>@Model.Setting("company_address") · @Phone.FormatPhone(Model.Settings.GetValueOrDefault("company_phone")) · @Model.Setting("company_email")</div>
+            <div>@P.CompanyId: @Model.Setting("company_id_number") · @Model.Setting("company_licence")</div>
+        </div>
+        <div style="text-align: right">
+            <div>@P.PolicyTitle</div>
+            <strong>№ @policy.Number</strong>
+            <div>@F.ContractNumber: @policy.ContractNumber</div>
+            <div>@F.IssuedOn: @Fmt.Date(policy.IssuedOn)</div>
+            @if (policy.Status != "active")
+            {
+                <div class="badge">@PolicyTexts.Status.GetValueOrDefault(policy.Status)</div>
+            }
+        </div>
+    </div>
+
+    <h1>@policy.Product</h1>
+    @if (!string.IsNullOrEmpty(policy.ReplacesNumber))
+    {
+        <p>@PolicyTexts.Endorse.Replaces № @policy.ReplacesNumber: @policy.ChangeNote</p>
+    }
+
+    <h2>@P.Parties</h2>
+    <dl class="facts">
+        <div><dt>@F.Policyholder</dt><dd>@policy.HolderName</dd></div>
+        <div><dt>@Ka.Party.Fields["idNumber"]</dt><dd>@policy.HolderId</dd></div>
+        <div><dt>@Ka.Party.Fields["legalAddress"]</dt><dd>@(policy.HolderAddress ?? "—")</dd></div>
+        <div><dt>@Ka.Party.Fields["phone"]</dt><dd>@Or(Phone.FormatPhone(policy.HolderPhone))</dd></div>
+        @foreach (var pp in Model.Parties)
+        {
+            <div><dt>@(P.Roles.GetValueOrDefault(pp.Role) ?? pp.Role)</dt><dd>@pp.Name @(string.IsNullOrEmpty(pp.IdNumber) ? "" : $"({pp.IdNumber})")</dd></div>
+        }
+        <div><dt>@F.Intermediary</dt><dd>@(Model.Intermediaries.Count == 0 ? PolicyTexts.NoIntermediary : string.Join(", ", Model.Intermediaries))</dd></div>
+    </dl>
+
+    <h2>@PolicyTexts.Sections.Vehicle</h2>
+    <dl class="facts">
+        <div><dt>@F.Make / @F.Model</dt><dd>@Model.Attr("make") @Model.Attr("model")</dd></div>
+        <div><dt>@F.Year</dt><dd>@(Model.Attr("year") ?? "—")</dd></div>
+        <div><dt>@F.Plate</dt><dd>@(Model.Attr("plate") ?? "—")</dd></div>
+        <div><dt>@F.Vin</dt><dd>@(Model.Attr("vin") ?? "—")</dd></div>
+        <div><dt>@F.Value</dt><dd>@(Model.Truthy("value") ? $"{Model.Money(Model.Vehicle["value"])} {currency}" : "—")</dd></div>
+        <div><dt>@F.Usage</dt><dd>@(Model.Truthy("usage") ? PolicyTexts.Usages.GetValueOrDefault(Model.Attr("usage") ?? "") : "—")</dd></div>
+    </dl>
+
+    <h2>@PolicyTexts.Sections.Term</h2>
+    <dl class="facts">
+        <div><dt>@P.Period</dt><dd>@Fmt.Date(policy.EffectiveFrom) 00:00 – @Fmt.Date(lastDay) 24:00 (@Dates.DaysBetween(policy.EffectiveFrom, policy.EffectiveTo) @PolicyTexts.Days)</dd></div>
+        <div><dt>@F.Currency</dt><dd>@currency@(currency != "GEL" ? $" ({F.Rate}: {Fmt.Fixed(policy.PremiumRate, 4)})" : "")</dd></div>
+    </dl>
+
+    <h2>@PolicyTexts.Sections.Coverages</h2>
+    <table>
+        <thead>
+        <tr>
+            <th>@F.Coverage</th>
+            <th>@F.InsuranceClass</th>
+            <th class="num">@F.SumInsured, @currency</th>
+            <th class="num">@F.Deductible, @currency</th>
+            <th class="num">@F.Premium, @currency</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var l in Model.Lines)
+        {
+            <tr>
+                <td>@(l.Coverage ?? l.ClassCode)</td>
+                <td>@l.ClassCode</td>
+                <td class="num">@(l.SumInsured is { } s ? PolicyModel.Money(s) : "—")</td>
+                <td class="num">@(l.Deductible is { } d ? PolicyModel.Money(d) : "—")</td>
+                <td class="num">@PolicyModel.Money(l.Premium)</td>
+            </tr>
+        }
+        <tr>
+            <td colspan="4"><strong>@F.TotalPremium</strong></td>
+            <td class="num"><strong>@Billing.GroupedTetri(Model.Total) @currency</strong></td>
+        </tr>
+        </tbody>
+    </table>
+
+    @if (Model.Schedule.Count > 0)
+    {
+        <h2>@PolicyTexts.Sections.Schedule</h2>
+        <table style="max-width: 420px">
+            <thead>
+            <tr>
+                <th>@F.DueOn</th>
+                <th class="num">@F.Amount, @currency</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var s in Model.Schedule)
+            {
+                <tr>
+                    <td>@Fmt.Date(s.DueOn)</td>
+                    <td class="num">@PolicyModel.Money(s.Amount)</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        <p style="font-size: 11pt">@P.PaymentNote</p>
+    }
+
+    <h2>@P.SignificantTerms</h2>
+    <div class="terms">
+        <p><strong>@P.IncompleteNotice @Model.Text("documents")</strong> @(Model.Text("terms_version") is { Length: > 0 } tv ? $"({tv})" : "")</p>
+        <p><strong>@P.PeriodLabel:</strong> @Model.Text("start_condition")</p>
+        <p><strong>@P.SumInsuredLabel:</strong> @P.SumInsuredText</p>
+        <p><strong>@P.ClaimsLabel:</strong> @Model.Text("claims_procedure")</p>
+        <p><strong>@P.DisclosureLabel:</strong> @Model.Text("disclosure_duty")</p>
+        <p><strong>@P.WithdrawalLabel:</strong> @Model.Text("withdrawal")</p>
+        <p><strong>@P.TerminationLabel:</strong> @Model.Text("termination")</p>
+        <p><strong>@P.ComplaintsLabel:</strong> @Model.Setting("complaints_unit"); @Model.Setting("complaints_channels"); @P.ComplaintsResponse(Model.Settings.GetValueOrDefault("complaints_response_days") ?? "30")</p>
+        <p class="exclusions"><strong>@P.ExclusionsLabel:</strong> @Model.Text("exclusions")</p>
+        <p><strong>@P.RegulatorLabel:</strong> @Model.Setting("regulator_name"), @Model.Setting("regulator_address")</p>
+    </div>
+
+    <div class="signatures">
+        <div>@Model.Setting("company_name")</div>
+        <div>@F.Policyholder: @policy.HolderName</div>
+    </div>
+</main>

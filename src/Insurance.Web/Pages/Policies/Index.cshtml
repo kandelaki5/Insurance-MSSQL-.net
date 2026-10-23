@@ -1,0 +1,52 @@
+@page "/policies"
+@model Insurance.Web.Pages.Policies.IndexModel
+@{
+    ViewData["Title"] = PolicyTexts.Title;
+}
+<h1>@PolicyTexts.Title</h1>
+<div class="toolbar">
+    <form style="display: flex; gap: 8px; flex: 1; max-width: 520px">
+        <input type="search" name="q" value="@Model.Q" placeholder="@($"{PolicyTexts.Fields.Number}, {PolicyTexts.Fields.Policyholder}")" />
+        <button class="btn secondary">@Ka.Common.Search</button>
+    </form>
+    <div class="spacer"></div>
+    @if (Model.Me.CanWrite)
+    {
+        <a class="btn secondary" href="/policies/import">@PolicyTexts.Import.Button</a>
+        <a class="btn" href="/policies/new">@PolicyTexts.New</a>
+    }
+</div>
+@if (Model.Rows.Count == 0)
+{
+    <div class="card empty">@Ka.Common.NoData</div>
+}
+else
+{
+    <table>
+        <thead>
+        <tr>
+            <th>@PolicyTexts.Fields.Number</th>
+            <th>@PolicyTexts.Fields.Policyholder</th>
+            <th>@PolicyTexts.Fields.Product</th>
+            <th>@PolicyTexts.Fields.Object</th>
+            <th>@PolicyTexts.Fields.Term</th>
+            <th class="num">@PolicyTexts.Fields.Premium</th>
+            <th>@PolicyTexts.Fields.Status</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var row in Model.Rows)
+        {
+            <tr>
+                <td><a href="/policies/@row.Id">@row.Number</a></td>
+                <td>@row.Policyholder</td>
+                <td>@row.Product</td>
+                <td>@row.Object</td>
+                <td>@Fmt.Date(row.EffectiveFrom) – @Fmt.Date(row.EffectiveTo)</td>
+                <td class="num">@Fmt.Fixed(row.Premium, 2) @row.PremiumCurrency</td>
+                <td><span class="badge @(row.Status == "active" ? "low" : "")">@PolicyTexts.Status.GetValueOrDefault(row.Status)</span></td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}

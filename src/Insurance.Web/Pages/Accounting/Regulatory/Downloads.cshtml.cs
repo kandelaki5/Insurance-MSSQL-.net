@@ -45,7 +45,7 @@ public sealed class ReservesXlsxModel(Rates rates) : AppPageModel
         var requested = Query("month");
         var month = Insurance.Application.Services.PremiumReport.ReportMonth(requested);
         if (requested != month) return Downloads.Text("Bad month", 400);
-        var (report, settings) = await Db.ReadTxAsync(async tx => (await Insurance.Application.Services.PremiumReport.BuildAsync(tx, rates, month), await Settings.LoadSettingsAsync(tx)));
+        var (report, settings) = await Db.ReadTxAsync(async tx => (await Insurance.Application.Services.PremiumReport.BuildAsync(tx, rates, month), await Insurance.Application.Services.Settings.LoadSettingsAsync(tx)));
         return Downloads.Form(Response, RegulatoryForms.Reserves(report, settings).Workbook, $"reserves-placement-{month}.xlsx");
     }
 }

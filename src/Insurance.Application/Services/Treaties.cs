@@ -131,31 +131,4 @@ public static class Treaties
         await db.AsUserAsync(user.Id, tx => tx.ExecuteAsync("update core.ri_treaty set status = N'closed' where id = @id and status = N'active'", new { id }));
     }
 
-    /// <summary>
-    /// Places a facultative treaty on a policy (legacy policies/[id]/reinsurance-actions.ts placeFacultativeOnPolicy): the outcome code
-    /// for the policy card (placed, not-found, already-placed, nothing-to-cede, over-ceded, xol-with-proportional, period-closed), or null
-    /// when nothing is done (a viewer, a malformed id).
-    /// </summary>
-    public static async Task<string?> PlaceFacultativeAsync(Db db, CurrentUser user, string? policyIdText, string? treatyIdText)
-    {
-        if (!user.CanWrite || !Guid.TryParseExact(policyIdText ?? "", "D", out var policyId) || !Guid.TryParseExact(treatyIdText ?? "", "D", out var treatyId)) return null;
-        try
-        {
-            var outcome = await db.AsUserAsync(user.Id, tx => ReinsuranceStore.PlaceFacultativeAsync(tx, policyId, treatyId, user.Id));
-            return outcome switch
-            {
-                ReinsuranceStore.FacultativeOutcome.Placed => "placed",
-                ReinsuranceStore.FacultativeOutcome.NotFound => "not-found",
-                ReinsuranceStore.FacultativeOutcome.AlreadyPlaced => "already-placed",
-                ReinsuranceStore.FacultativeOutcome.NothingToCede => "nothing-to-cede",
-                ReinsuranceStore.FacultativeOutcome.OverCeded => "over-ceded",
-                _ => "xol-with-proportional",
-            };
-        }
-        catch (Exception e) when (DbError.From(e) is { Code: DbError.CheckViolation })
-        {
-            return "period-closed";
-        }
-    }
-
 }
