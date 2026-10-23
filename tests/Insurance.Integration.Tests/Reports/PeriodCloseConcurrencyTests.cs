@@ -88,4 +88,23 @@ public sealed class PeriodCloseConcurrencyTests
         await using var c = await w.Database.OpenAppAsync();
         Assert.Equal(1, await c.ExecuteScalarAsync<int>("select count(*) from core.accounting_period where status = N'closed'"));
     }
+
+    [Fact]
+    public async Task A_read_that_fails_inside_the_close_stops_it_writes_nothing_and_the_next_press_closes_the_month()
+    {
+        // legacy period-close: "a failed read stops it" (its fake database failed a statement); here SQL Server refuses the app role the
+        // policies table for one press, after the lock is taken.
+        await using var w = await CreateAsync();
+        var month = Current.AddMonths(-1);
+        await w.PolicyAsync("P-CLOSE", month.ToString("yyyy-MM-dd"), month.AddYears(1).ToString("yyyy-MM-dd"), [new LineSpec("5.1", 100m, 100m)]);
+        var accountant = User(w.Accountant, "accountant");
+        await using (var c = await w.Database.OpenAdminAsync()) await c.ExecuteAsync("deny select on core.policy to core_app");
+        await Assert.ThrowsAsync<SqlException>(() => PeriodClose.CloseAsync(w.App, accountant, month.ToString("yyyy-MM-dd")));
+        await using (var c = await w.Database.OpenAdminAsync())
+        {
+            await c.ExecuteAsync("grant select on core.policy to core_app");
+            Assert.Equal(0, await c.ExecuteScalarAsync<int>("select count(*) from core.accounting_period"));
+        }
+        Assert.Equal(new PeriodClose.Answer("done", month.ToString("yyyy-MM-dd")), await PeriodClose.CloseAsync(w.App, accountant, month.ToString("yyyy-MM-dd")));
+    }
 }
