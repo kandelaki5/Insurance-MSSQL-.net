@@ -27,8 +27,11 @@ public sealed class PostgresImport(string postgresConnection, string sqlServerAd
     /// <summary>Source tables that are not copied.</summary>
     public static readonly IReadOnlySet<string> NotCopied = new HashSet<string>(StringComparer.Ordinal) { "session", "schema_migration" };
 
-    /// <summary>Target tables that have no source counterpart.</summary>
-    public static readonly IReadOnlySet<string> TargetOnly = new HashSet<string>(StringComparer.Ordinal) { "audit_config", "data_import", "schema_migration", "case_money_pass" };
+    /// <summary>
+    /// Target tables that have no source counterpart. ri_commission_settlement (0011) is the old program's 0039 of PR #362, which the
+    /// baseline database the import reads does not have: an import leaves that ledger empty.
+    /// </summary>
+    public static readonly IReadOnlySet<string> TargetOnly = new HashSet<string>(StringComparer.Ordinal) { "audit_config", "data_import", "schema_migration", "case_money_pass", "ri_commission_settlement" };
 
     /// <summary>
     /// Nullable target columns the old database never had: left null on imported rows (sanctions fingerprints and the reuse

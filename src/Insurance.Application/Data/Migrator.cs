@@ -21,6 +21,7 @@ public static partial class Migrator
         "audit_log", "premium_transaction", "payment", "payment_allocation", "installment", "installment_adjustment", "premium_cession",
         "claim_payment", "claim_payment_request", "claim_recovery", "claim_reserve", "claim_reserve_request", "party_risk_assessment",
         "premium_refund_request", "premium_refund_request_line", "receipt_reversal_request", "receipt_reversal_request_line", "subrogation_movement",
+        "ri_commission_settlement",
     ];
 
     /// <summary>Tables the application may only read: the migration journal is written by this runner alone (legacy M1, 0031).</summary>

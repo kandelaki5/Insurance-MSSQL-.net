@@ -14,7 +14,8 @@ public static class PermissionTexts
         ("payment.large.authorize", "ზღვარზე მეტი გადახდის ავტორიზაცია (ფინანსური დირექტორი)"),
         ("finance.panel.view", "ფინანსური დირექტორის პანელის ნახვა"),
         ("policy.approve", "პოლისის დამტკიცება"),
-        ("accounting.period.close", "თვის დახურვა"));
+        ("accounting.period.close", "თვის დახურვა"),
+        ("reinsurance.commission.settle", "გადამზღვევლის საკომისიოს ანგარიშსწორება"));
 
     public static readonly global::System.Collections.Generic.IReadOnlyDictionary<string, string> Sections = global::Insurance.Application.Texts.TextMap.Of(
         ("premiums", "პრემიები"),
@@ -22,7 +23,8 @@ public static class PermissionTexts
         ("policies", "პოლისები"),
         ("periods", "საანგარიშო პერიოდები"),
         ("audit", "აუდიტი"),
-        ("finance", "ფინანსები"));
+        ("finance", "ფინანსები"),
+        ("reinsurance", "გადაზღვევა"));
 
     public static readonly global::System.Collections.Generic.IReadOnlyDictionary<string, string> Sources = global::Insurance.Application.Texts.TextMap.Of(
         ("role", "როლიდან"),

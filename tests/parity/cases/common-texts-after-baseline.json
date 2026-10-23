@@ -1,5 +1,8 @@
 {
  "source": "Texts after the baseline 17c1f1f: each item names its origin (an old-program pull request head with the owner's rule, or a rewrite text for an owner decision).",
+ "classes": [
+  "RiCommissionTexts"
+ ],
  "items": [
   {
    "kind": "text",
@@ -242,6 +245,452 @@
    "cs": "ImpairmentTexts.NotForExcel",
    "value": "ამ თარიღის ზოგიერთ თანხას 15-ზე მეტი ციფრი აქვს: Excel მას თეთრამდე ზუსტად ვერ შეინახავს, ამიტომ Excel-ის ფაილი არ გაიცემა. გვერდზე ციფრები ზუსტია.",
    "origin": "Insurance-Software PR #361 head 61de62c (impairment precision guard; Codex INS-PR361-GUARD-FIX-61DE62C-20261020, a technical invariant, no new business rule)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.nav",
+   "cs": "RiCommissionTexts.Nav",
+   "value": "გადამზღვევლის საკომისიო",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.title",
+   "cs": "RiCommissionTexts.Title",
+   "value": "მისაღები საკომისიო გადამზღვევლისგან",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.note",
+   "cs": "RiCommissionTexts.Note",
+   "value": "100%-ით გადაზღვეულ პოლისებზე გადამზღვევლის საკომისიო (ხელშეკრულების პროცენტი პრემიიდან) პრემიასთან ერთად ირიცხება და მოთხოვნად რჩება, სანამ გადამზღვევლთან არ ჩავითვლით ან არ ჩაგვირიცხავს. ჯამი ლარში, საანგარიშო თარიღის კურსით, ფორმა N1-4-ის 00140-ში („სხვა მოთხოვნები გადაზღვევიდან“) იწერება.",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.date",
+   "cs": "RiCommissionTexts.Date",
+   "value": "საანგარიშო თარიღი",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.show",
+   "cs": "RiCommissionTexts.Show",
+   "value": "ჩვენება",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.none",
+   "cs": "RiCommissionTexts.None",
+   "value": "ამ თარიღისთვის 100%-ით გადაზღვეულ ხელშეკრულებებზე საკომისიო არ არის",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.columns.treaty",
+   "cs": "RiCommissionTexts.Columns.Treaty",
+   "value": "ხელშეკრულება",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.columns.reinsurer",
+   "cs": "RiCommissionTexts.Columns.Reinsurer",
+   "value": "გადამზღვეველი",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.columns.currency",
+   "cs": "RiCommissionTexts.Columns.Currency",
+   "value": "ვალუტა",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.columns.accrued",
+   "cs": "RiCommissionTexts.Columns.Accrued",
+   "value": "დარიცხული",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.columns.settled",
+   "cs": "RiCommissionTexts.Columns.Settled",
+   "value": "ანგარიშსწორება",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.columns.balance",
+   "cs": "RiCommissionTexts.Columns.Balance",
+   "value": "მისაღები",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.columns.date",
+   "cs": "RiCommissionTexts.Columns.Date",
+   "value": "თარიღი",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.columns.kind",
+   "cs": "RiCommissionTexts.Columns.Kind",
+   "value": "სახე",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.columns.amount",
+   "cs": "RiCommissionTexts.Columns.Amount",
+   "value": "თანხა",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.columns.reference",
+   "cs": "RiCommissionTexts.Columns.Reference",
+   "value": "საფუძველი",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.columns.note",
+   "cs": "RiCommissionTexts.Columns.Note",
+   "value": "შენიშვნა",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "map",
+   "ts": "riCommissionTexts.columns",
+   "cs": "RiCommissionTexts.Columns.ByKey",
+   "entries": [
+    [
+     "treaty",
+     "ხელშეკრულება"
+    ],
+    [
+     "reinsurer",
+     "გადამზღვეველი"
+    ],
+    [
+     "currency",
+     "ვალუტა"
+    ],
+    [
+     "accrued",
+     "დარიცხული"
+    ],
+    [
+     "settled",
+     "ანგარიშსწორება"
+    ],
+    [
+     "balance",
+     "მისაღები"
+    ],
+    [
+     "date",
+     "თარიღი"
+    ],
+    [
+     "kind",
+     "სახე"
+    ],
+    [
+     "amount",
+     "თანხა"
+    ],
+    [
+     "reference",
+     "საფუძველი"
+    ],
+    [
+     "note",
+     "შენიშვნა"
+    ]
+   ],
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.total",
+   "cs": "RiCommissionTexts.Total",
+   "value": "სულ ლარში (N1-4 00140)",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.ratesUsed",
+   "cs": "RiCommissionTexts.RatesUsed",
+   "value": "კურსი საანგარიშო თარიღისთვის",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.overSettled",
+   "cs": "RiCommissionTexts.OverSettled",
+   "value": "ამ ხელშეკრულებებზე ანგარიშსწორება დარიცხულს აღემატება (მაგ. პოლისის გაუქმების შემდეგ). 00140-ში ისინი არ ჯამდება; რა ვუყოთ ზედმეტს — მფლობელის გადასაწყვეტია.",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "map",
+   "ts": "riCommissionTexts.kinds",
+   "cs": "RiCommissionTexts.Kinds",
+   "entries": [
+    [
+     "offset",
+     "ჩათვლა"
+    ],
+    [
+     "receipt",
+     "ჩარიცხვა"
+    ]
+   ],
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.settlementsTitle",
+   "cs": "RiCommissionTexts.SettlementsTitle",
+   "value": "ანგარიშსწორებები",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.record.title",
+   "cs": "RiCommissionTexts.Record.Title",
+   "value": "ანგარიშსწორების ჩაწერა",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.record.submit",
+   "cs": "RiCommissionTexts.Record.Submit",
+   "value": "ჩაწერა",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.record.reverse",
+   "cs": "RiCommissionTexts.Record.Reverse",
+   "value": "შებრუნება",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.record.reversedMark",
+   "cs": "RiCommissionTexts.Record.ReversedMark",
+   "value": "შებრუნებულია",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.record.reversalMark",
+   "cs": "RiCommissionTexts.Record.ReversalMark",
+   "value": "შებრუნება",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "map",
+   "ts": "riCommissionTexts.record",
+   "cs": "RiCommissionTexts.Record.ByKey",
+   "entries": [
+    [
+     "title",
+     "ანგარიშსწორების ჩაწერა"
+    ],
+    [
+     "submit",
+     "ჩაწერა"
+    ],
+    [
+     "reverse",
+     "შებრუნება"
+    ],
+    [
+     "reversedMark",
+     "შებრუნებულია"
+    ],
+    [
+     "reversalMark",
+     "შებრუნება"
+    ]
+   ],
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "map",
+   "ts": "riCommissionTexts.outcomes",
+   "cs": "RiCommissionTexts.Outcomes",
+   "entries": [
+    [
+     "ok",
+     "ჩაიწერა"
+    ],
+    [
+     "reversed",
+     "შებრუნდა"
+    ],
+    [
+     "invalid",
+     "შეავსეთ ხელშეკრულება, თარიღი (არა მომავალი), სახე, ვალუტა და დადებითი თანხა"
+    ],
+    [
+     "exceeds",
+     "თანხა ამ თარიღისთვის დარჩენილ მისაღებ საკომისიოს აღემატება"
+    ],
+    [
+     "period-closed",
+     "ეს თვე დახურულია — აირჩიეთ ღია თვის თარიღი"
+    ],
+    [
+     "already",
+     "ეს ანგარიშსწორება უკვე შებრუნებულია"
+    ],
+    [
+     "state",
+     "ანგარიშსწორება ვერ მოიძებნა ან თვითონ შებრუნებაა"
+    ],
+    [
+     "not-allowed",
+     "ანგარიშსწორების ჩაწერის უფლება არ გაქვთ"
+    ]
+   ],
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "map",
+   "ts": "permissionTexts.permissions",
+   "cs": "PermissionTexts.Permissions",
+   "entries": [
+    [
+     "premium.receipt.create",
+     "პრემიის მიღება"
+    ],
+    [
+     "claim.recovery.receive",
+     "რეგრესის / გადარჩენილი ქონების თანხის მიღება"
+    ],
+    [
+     "claim.payment.record",
+     "ზარალის გადახდის შეყვანა"
+    ],
+    [
+     "claim.payment.reverse",
+     "ზარალის გადახდის შებრუნება"
+    ],
+    [
+     "claim.reserve.approve",
+     "რეზერვის ცვლილების დამტკიცება"
+    ],
+    [
+     "audit.log.view",
+     "ცვლილებების ჟურნალის ნახვა"
+    ],
+    [
+     "payment.large.authorize",
+     "ზღვარზე მეტი გადახდის ავტორიზაცია (ფინანსური დირექტორი)"
+    ],
+    [
+     "finance.panel.view",
+     "ფინანსური დირექტორის პანელის ნახვა"
+    ],
+    [
+     "policy.approve",
+     "პოლისის დამტკიცება"
+    ],
+    [
+     "accounting.period.close",
+     "თვის დახურვა"
+    ],
+    [
+     "reinsurance.commission.settle",
+     "გადამზღვევლის საკომისიოს ანგარიშსწორება"
+    ]
+   ],
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "map",
+   "ts": "permissionTexts.sections",
+   "cs": "PermissionTexts.Sections",
+   "entries": [
+    [
+     "premiums",
+     "პრემიები"
+    ],
+    [
+     "claims",
+     "ზარალები"
+    ],
+    [
+     "policies",
+     "პოლისები"
+    ],
+    [
+     "periods",
+     "საანგარიშო პერიოდები"
+    ],
+    [
+     "audit",
+     "აუდიტი"
+    ],
+    [
+     "finance",
+     "ფინანსები"
+    ],
+    [
+     "reinsurance",
+     "გადაზღვევა"
+    ]
+   ],
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "map",
+   "ts": "regulatoryTexts.n14Lines",
+   "cs": "RegulatoryTexts.N14Lines",
+   "entries": [
+    [
+     "E10",
+     "00010 სადაზღვევო მოთხოვნები"
+    ],
+    [
+     "E11",
+     "00020 გაუფასურება"
+    ],
+    [
+     "E13",
+     "00040 მოთხოვნები ბროკერებისგან"
+    ],
+    [
+     "E14",
+     "00050 გაუფასურება"
+    ],
+    [
+     "E16",
+     "00070 მოთხოვნები აგენტებისგან"
+    ],
+    [
+     "E17",
+     "00080 გაუფასურება"
+    ],
+    [
+     "E19",
+     "00100 სულ სადაზღვევო მოთხოვნები, წმინდა"
+    ],
+    [
+     "E26",
+     "00140 სხვა მოთხოვნები გადაზღვევიდან (გადამზღვევლის საკომისიო)"
+    ]
+   ],
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
   }
  ]
 }

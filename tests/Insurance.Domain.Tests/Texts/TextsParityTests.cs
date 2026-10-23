@@ -103,7 +103,9 @@ public class TextsParityTests
     public void NothingExtra()
     {
         var known = Items().Select(i => i.GetProperty("cs").Str()).ToHashSet(StringComparer.Ordinal);
-        var classes = Parity.Load(File).GetProperty("classes").Strings();
+        // The baseline's classes and those a later pull request added (the overlay's optional "classes", e.g. RiCommissionTexts of PR #362).
+        var later = Parity.Load(AfterBaseline).TryGetProperty("classes", out var added) ? added.Strings() : [];
+        var classes = Parity.Load(File).GetProperty("classes").Strings().Concat(later).Distinct(StringComparer.Ordinal).ToList();
         var extra = new List<string>();
         void Walk(Type type, string path)
         {

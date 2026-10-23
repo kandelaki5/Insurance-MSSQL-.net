@@ -149,20 +149,29 @@ public class CommonParityTests
         return Parity.Diff(Show(c.GetProperty("out")), Show(r));
     });
 
+    /// <summary>
+    /// Permissions the old program added to its catalogue after the baseline these cases were generated from, last in its order:
+    /// reinsurance.commission.settle (Insurance-Software PR #362, head 540e81a). The baseline's answers hold for the rest; the added
+    /// ones are checked against the old pull request's own tests (PermissionsTests, PermissionStorageTests).
+    /// </summary>
+    private static readonly string[] AfterBaseline = ["reinsurance.commission.settle"];
+
     [Fact(DisplayName = "parity: evaluateAll")]
     public void EvaluateAll() => Parity.All(Cases("evaluateAll"), c =>
     {
         var i = c.GetProperty("in");
         var r = Permissions.EvaluateAll(Subject(i.GetProperty("subject")), Overrides(i.GetProperty("overrides")), Groups(i.GetProperty("groups")));
-        return Parity.Diff(string.Join("\n", c.GetProperty("out").EnumerateArray().Select(Show)), string.Join("\n", r.Select(Show)));
+        if (!r.Skip(r.Count - AfterBaseline.Length).Select(x => x.Permission).SequenceEqual(AfterBaseline)) return "the permissions added after the baseline are not last";
+        return Parity.Diff(string.Join("\n", c.GetProperty("out").EnumerateArray().Select(Show)), string.Join("\n", r.SkipLast(AfterBaseline.Length).Select(Show)));
     });
 
     [Fact(DisplayName = "parity: catalogue")]
     public void Catalogue()
     {
         var expected = Cases("catalogue").Select(e => $"{e.GetProperty("key").Str()}|{e.GetProperty("name").Str()}|{e.GetProperty("section").Str()}|{string.Join(",", e.GetProperty("roles").Strings())}");
-        var actual = Permissions.Catalogue(PermissionTexts.Permissions, PermissionTexts.Sections).Select(i => $"{i.Key}|{i.Name}|{i.Section}|{string.Join(",", i.Roles)}");
-        Assert.Equal(expected, actual);
+        var actual = Permissions.Catalogue(PermissionTexts.Permissions, PermissionTexts.Sections).Select(i => $"{i.Key}|{i.Name}|{i.Section}|{string.Join(",", i.Roles)}").ToList();
+        Assert.Equal(AfterBaseline, actual.TakeLast(AfterBaseline.Length).Select(a => a.Split('|')[0]));
+        Assert.Equal(expected, actual.SkipLast(AfterBaseline.Length));
     }
 
     [Fact(DisplayName = "parity: hashes made by the old code verify here, and only for their own password")]

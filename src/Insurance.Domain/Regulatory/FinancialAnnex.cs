@@ -7,7 +7,10 @@ namespace Insurance.Domain.Regulatory;
 ///     totals (buildPremiumReport), the same figures as form 11's total. Life rows: not kept, empty.
 ///   - N1-4 (sheet BS-IR &amp; RR), insurance receivables direct / from brokers / from agents and their impairment — the impairment report's
 ///     totals per receivable type (owner 19.10.2026), exactly from the stored amounts (buildImpairmentTotalsExact; Codex
-///     PR351_N14_SOURCE_DECIMAL_PRECISION_20261019). Reinsurance receivables: not kept, empty.
+///     PR351_N14_SOURCE_DECIMAL_PRECISION_20261019). Of the reinsurance receivables only 00140 („სხვა მოთხოვნები გადაზღვევიდან"):
+///     the reinsurer's commission on 100% reinsured policies not yet offset or received (owner, 20.10.2026, docs/05 3ე;
+///     Insurance-Software PR #362, Insurance.Application.Services.RiCommissionLedger); the rest — claims-related, their impairment,
+///     brokers and agents — not kept, empty.
 ///   - Info: the company's name, address, phone and e-mail from the settings, and the reporting date; the rest is not kept.
 ///   - The printed headers of the three sheets filled (BS, BS-IR &amp; RR, BS-R): the company's name beside „მზღვეველი:" (D1) and the date
 ///     after „ანგარიშგების თარიღი:" (B2:F2) (Codex PR351_FORM1_PRINT_HEADERS_MISSING_20261019); merges and styles as they are.
@@ -26,6 +29,8 @@ public static class FinancialAnnex
     public static readonly IReadOnlyList<string> N17Inputs = ["E10", "E11", "E12", "E16", "E17"];
     /// <summary>N1-4's input cells this program fills: direct, brokers, agents — each gross and its impairment.</summary>
     public static readonly IReadOnlyList<string> N14Inputs = ["E10", "E11", "E13", "E14", "E16", "E17"];
+    /// <summary>N1-4 00140, other receivables from reinsurance: the reinsurer's commission receivable (PR #362).</summary>
+    public const string N14RiCommission = "E26";
     /// <summary>The sheets whose printed header gets the company and the date.</summary>
     public static readonly IReadOnlyList<string> HeaderSheets = [BalanceSheet, ReceivablesSheet, ReservesSheet];
     /// <summary>Info's cells filled from the settings and the date.</summary>
@@ -49,8 +54,12 @@ public static class FinancialAnnex
     public static IReadOnlyList<(string Ref, decimal Tetri)> N17Figures(PremiumReport report) =>
         [("E10", report.Totals.UnearnedGel), ("E11", report.ClaimsTotals.RbnsGel), ("E12", report.ClaimsTotals.IbnrGel), ("E16", report.Totals.CededUnearnedGel), ("E17", report.ClaimsTotals.ReinsurerRbnsGel)];
 
-    /// <summary>The annex filled for a month: N1-7, N1-4 and Info; nothing else is written. Both reports must be of the same day.</summary>
-    public static TemplateWorkbook FillFinancialAnnex(byte[] template, PremiumReport report, ImpairmentForN14 impairment, IReadOnlyDictionary<string, string?> settings)
+    /// <summary>
+    /// The annex filled for a month: N1-7, N1-4 and Info; nothing else is written. Both reports must be of the same day. The reinsurer's
+    /// commission receivable of that day (tetri) goes to N1-4 00140 when given.
+    /// </summary>
+    public static TemplateWorkbook FillFinancialAnnex(byte[] template, PremiumReport report, ImpairmentForN14 impairment, IReadOnlyDictionary<string, string?> settings,
+        decimal? riCommissionTetri = null)
     {
         var hash = ReservesPlacement.TemplateHash(template);
         if (hash != N1TemplateSha256) throw new InvalidOperationException($"The financial annex template is not the confirmed one ({hash})");
@@ -58,6 +67,7 @@ public static class FinancialAnnex
         var wb = TemplateWorkbook.Open(template);
         foreach (var (reference, tetri) in N17Figures(report)) wb.SetNumber(ReservesSheet, reference, Tetri.AmountText(tetri));
         foreach (var (reference, tetri) in N14Figures(impairment)) wb.SetNumber(ReceivablesSheet, reference, Tetri.AmountText(tetri));
+        if (riCommissionTetri is { } rc) wb.SetNumber(ReceivablesSheet, N14RiCommission, Tetri.AmountText(rc));
         string? Setting(string key) => settings.TryGetValue(key, out var v) ? v : null;
         (string, string?)[] info =
         [

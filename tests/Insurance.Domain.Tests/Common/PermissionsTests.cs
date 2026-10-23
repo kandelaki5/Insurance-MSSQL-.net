@@ -34,7 +34,9 @@ public class PermissionsTests
 
     private static void Same(PermissionResult expected, PermissionResult actual) => Assert.Equal(Show(expected), Show(actual));
 
-    private static readonly string[] Rest = ["claim.recovery.receive", "claim.payment.record", "policy.approve", "accounting.period.close", "claim.payment.reverse", "claim.reserve.approve", "audit.log.view", "payment.large.authorize", "finance.panel.view"];
+    private static readonly string[] Rest = ["claim.recovery.receive", "claim.payment.record", "policy.approve", "accounting.period.close", "claim.payment.reverse", "claim.reserve.approve", "audit.log.view", "payment.large.authorize", "finance.panel.view",
+        // Insurance-Software PR #362 (src/lib/permissions.test.ts, head 540e81a): the reinsurer's commission settlement, last.
+        "reinsurance.commission.settle"];
 
     // ── the starting set by role (no overrides) ──
 
@@ -135,6 +137,8 @@ public class PermissionsTests
             new("audit.log.view", "ცვლილებების ჟურნალის ნახვა", "აუდიტი", ["admin"]),
             new("payment.large.authorize", "ზღვარზე მეტი გადახდის ავტორიზაცია (ფინანსური დირექტორი)", "ფინანსები", ["admin"]),
             new("finance.panel.view", "ფინანსური დირექტორის პანელის ნახვა", "ფინანსები", ["admin"]),
+            // Insurance-Software PR #362 (src/lib/permissions.test.ts L131, head 540e81a).
+            new("reinsurance.commission.settle", "გადამზღვევლის საკომისიოს ანგარიშსწორება", "გადაზღვევა", ["accountant", "admin"]),
         ];
         static string ShowItem(CatalogueItem i) => $"{i.Key}|{i.Name}|{i.Section}|{string.Join(",", i.Roles)}";
         Assert.Equal(expected.Select(ShowItem), Permissions.Catalogue(PermissionTexts.Permissions, PermissionTexts.Sections).Select(ShowItem));

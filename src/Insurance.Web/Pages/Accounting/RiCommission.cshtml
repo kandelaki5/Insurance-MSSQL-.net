@@ -1,0 +1,128 @@
+@page "/accounting/ri-commission"
+@model Insurance.Web.Pages.Accounting.RiCommissionModel
+@{
+    ViewData["Title"] = RiCommissionTexts.Title;
+    var r = Model.Report;
+    string M(System.Numerics.BigInteger v) => ReportMath.Grouped(v);
+    var asOf = Fmt.Iso(Model.AsOfDate);
+}
+<h1>@RiCommissionTexts.Title</h1>
+<p class="note">@RiCommissionTexts.Note</p>
+@if (Model.Message is { } message)
+{
+    <p class="note"><strong>@message</strong></p>
+}
+<form class="toolbar">
+    <div>
+        <label for="date">@RiCommissionTexts.Date</label>
+        <date-input id="date" name="date" value="@asOf" style="width: 170px" />
+    </div>
+    <button class="btn secondary" style="align-self: flex-end">@RiCommissionTexts.Show</button>
+    @if (r.Rates.Count > 0)
+    {
+        <span class="hint" style="align-self: flex-end">@RiCommissionTexts.RatesUsed: @string.Join(", ", r.Rates.Select(x => $"{x.Currency} {Fmt.Plain(x.Rate)} ({Fmt.Date(x.Date)})"))</span>
+    }
+</form>
+
+@if (r.Positions.Count == 0)
+{
+    <div class="card empty">@RiCommissionTexts.None</div>
+}
+else
+{
+    <table>
+        <thead>
+        <tr><th>@RiCommissionTexts.Columns.Treaty</th><th>@RiCommissionTexts.Columns.Reinsurer</th><th>@RiCommissionTexts.Columns.Currency</th><th class="num">@RiCommissionTexts.Columns.Accrued</th><th class="num">@RiCommissionTexts.Columns.Settled</th><th class="num">@RiCommissionTexts.Columns.Balance</th></tr>
+        </thead>
+        <tbody>
+        @foreach (var p in r.Positions)
+        {
+            <tr>
+                <td>@p.Number @p.Name</td><td>@p.Reinsurer</td><td>@p.Currency</td>
+                <td class="num">@M(p.Accrued)</td><td class="num">@M(p.Settled)</td><td class="num">@M(p.Balance)</td>
+            </tr>
+        }
+        <tr class="total-row"><td colspan="5"><strong>@RiCommissionTexts.Total</strong></td><td class="num"><strong>@M(r.ReceivableGel) ₾</strong></td></tr>
+        </tbody>
+    </table>
+}
+@if (r.OverSettled.Count > 0)
+{
+    <p class="note"><strong>@RiCommissionTexts.OverSettled</strong> @string.Join(", ", r.OverSettled.Select(p => $"{p.Number} ({p.Currency} {M(p.Balance)})"))</p>
+}
+
+@if (Model.Settles && r.Positions.Count > 0)
+{
+    <form method="post" asp-page-handler="Record" class="card">
+        <h2 class="section">@RiCommissionTexts.Record.Title</h2>
+        <div class="field">
+            <label for="treaty_id">@RiCommissionTexts.Columns.Treaty</label>
+            <select id="treaty_id" name="treaty_id" required>
+                @foreach (var p in r.Positions.DistinctBy(p => p.TreatyId))
+                {
+                    <option value="@Uuid.Text(p.TreatyId)">@p.Number @p.Name</option>
+                }
+            </select>
+        </div>
+        <div class="field"><label for="settled_on">@RiCommissionTexts.Columns.Date</label><date-input id="settled_on" name="settled_on" value="@asOf" style="width: 170px" /></div>
+        <div class="field">
+            <label for="kind">@RiCommissionTexts.Columns.Kind</label>
+            <select id="kind" name="kind">
+                @foreach (var (key, text) in RiCommissionTexts.Kinds)
+                {
+                    <option value="@key">@text</option>
+                }
+            </select>
+        </div>
+        <div class="field">
+            <label for="currency">@RiCommissionTexts.Columns.Currency</label>
+            <select id="currency" name="currency">
+                @foreach (var c in r.Positions.Select(p => p.Currency).Distinct(StringComparer.Ordinal))
+                {
+                    <option value="@c">@c</option>
+                }
+            </select>
+        </div>
+        <div class="field"><label for="amount">@RiCommissionTexts.Columns.Amount</label><input id="amount" name="amount" inputmode="decimal" required /></div>
+        <div class="field"><label for="reference">@RiCommissionTexts.Columns.Reference</label><input id="reference" name="reference" /></div>
+        <div class="field"><label for="note">@RiCommissionTexts.Columns.Note</label><input id="note" name="note" /></div>
+        <button class="btn">@RiCommissionTexts.Record.Submit</button>
+    </form>
+}
+
+@if (r.Settlements.Count > 0)
+{
+    <h2 class="section">@RiCommissionTexts.SettlementsTitle</h2>
+    <table>
+        <thead>
+        <tr><th>@RiCommissionTexts.Columns.Date</th><th>@RiCommissionTexts.Columns.Treaty</th><th>@RiCommissionTexts.Columns.Kind</th><th>@RiCommissionTexts.Columns.Currency</th><th class="num">@RiCommissionTexts.Columns.Amount</th><th>@RiCommissionTexts.Columns.Reference</th><th>@RiCommissionTexts.Columns.Note</th><th></th></tr>
+        </thead>
+        <tbody>
+        @foreach (var s in r.Settlements)
+        {
+            <tr>
+                <td>@Fmt.Date(s.SettledOn)</td><td>@Model.TreatyLabel(s.TreatyId)</td><td>@(RiCommissionTexts.Kinds.TryGetValue(s.Kind, out var kind) ? kind : s.Kind)</td><td>@s.Currency</td>
+                <td class="num">@M(s.Amount)</td><td>@(s.Reference ?? "")</td><td>@(s.Note ?? "")</td>
+                <td>
+                    @if (s.ReversesId is not null)
+                    {
+                        @RiCommissionTexts.Record.ReversalMark
+                    }
+                    else if (s.Reversed)
+                    {
+                        @RiCommissionTexts.Record.ReversedMark
+                    }
+                    else if (Model.Settles)
+                    {
+                        <form method="post" asp-page-handler="Reverse" style="display: flex; gap: 6px">
+                            <input type="hidden" name="settlement_id" value="@Uuid.Text(s.Id)" />
+                            <date-input name="reversed_on" value="@asOf" style="width: 150px" />
+                            <button class="btn secondary">@RiCommissionTexts.Record.Reverse</button>
+                        </form>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}

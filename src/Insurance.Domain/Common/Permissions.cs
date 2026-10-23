@@ -86,6 +86,8 @@ public static class Permissions
     ///   yet carried out (owner, 17.10.2026, docs/05 ვ8). For the test configuration the admin by role; the financial director
     ///   is given it by a group or personally — the company's own mapping comes after its meeting. Seeing is not authorising:
     ///   it does not give payment.large.authorize, nor does that give it.
+    /// reinsurance.commission.settle — recording the settlement of a reinsurer's commission (offset or receipt, per treaty) and
+    ///   its reversal (accounting/ri-commission): the accountant (owner, 20.10.2026, docs/05 3ე; Insurance-Software PR #362).
     /// </summary>
     public static readonly IReadOnlyDictionary<string, CatalogueEntry> All = Ordered(
         ("premium.receipt.create", new CatalogueEntry("premiums", ["accountant", "admin"])),
@@ -97,7 +99,8 @@ public static class Permissions
         ("claim.reserve.approve", new CatalogueEntry("claims", ["admin"])),
         ("audit.log.view", new CatalogueEntry("audit", ["admin"])),
         ("payment.large.authorize", new CatalogueEntry("finance", ["admin"])),
-        ("finance.panel.view", new CatalogueEntry("finance", ["admin"])));
+        ("finance.panel.view", new CatalogueEntry("finance", ["admin"])),
+        ("reinsurance.commission.settle", new CatalogueEntry("reinsurance", ["accountant", "admin"])));
 
     private static IReadOnlyDictionary<string, CatalogueEntry> Ordered(params (string Key, CatalogueEntry Entry)[] entries)
     {

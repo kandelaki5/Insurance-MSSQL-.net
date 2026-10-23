@@ -80,6 +80,21 @@ public class FinancialAnnexTests
         Assert.Equal("ანგარიშგების თარიღი: 31.10.2026", Text(blank, ReservesSheet, "B2"));
     }
 
+    // Insurance-Software PR #362 (head 540e81a) scripts/integration/ri-commission.test.ts L160–170: N1-4 00140 (BS-IR & RR E26), an input
+    // cell of the template, filled with the reinsurer's commission receivable when given (300.00 USD × 2.7015 = 810.45); empty when not.
+    [Fact(DisplayName = "form 1: 00140 (BS-IR & RR E26) filled with the reinsurer's commission receivable; left empty when none is given")]
+    public void RiCommission00140()
+    {
+        Assert.Equal("E26", N14RiCommission);
+        var template = TemplateWorkbook.Open(Template);
+        Assert.True(template.HasCell(ReceivablesSheet, N14RiCommission));
+        Assert.False(template.IsFormula(ReceivablesSheet, N14RiCommission));
+        Assert.Equal("00140", template.TemplateText(ReceivablesSheet, "B26"));
+        Assert.Equal("810.45", Text(FillFinancialAnnex(Template, Report(), Impairment(), Settings, 81045m), ReceivablesSheet, N14RiCommission));
+        Assert.Equal("0", Text(FillFinancialAnnex(Template, Report(), Impairment(), Settings, 0m), ReceivablesSheet, N14RiCommission));
+        Assert.Null(Text(FillFinancialAnnex(Template, Report(), Impairment(), Settings), ReceivablesSheet, N14RiCommission));
+    }
+
     [Fact(DisplayName = "filled for a month: the subforms' totals and the balance's insurance lines, by the template's formulas, equal the sums made here")]
     public void SubformTotals()
     {

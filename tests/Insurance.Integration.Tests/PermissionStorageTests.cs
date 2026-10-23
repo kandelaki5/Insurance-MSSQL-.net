@@ -69,6 +69,17 @@ public sealed class PermissionStorageTests(TestDatabase db) : IClassFixture<Test
         Assert.Equal(Permissions.All.Keys, all.Select(r => r.Permission));
         Assert.All(all, r => Assert.Equal((false, PermissionSource.NotInRole), (r.Allowed, r.Source)));
         Same(Result(true, PermissionSource.Role), await ReadAsync(w.Cara, "accountant"));
+        // Insurance-Software PR #362 (permission-storage.test.ts L50, permission-actions.test.ts L152, head 540e81a): the reinsurer's
+        // commission settlement is last in the catalogue; the accountant has it by role, the underwriter and the viewer do not.
+        Assert.Equal("reinsurance.commission.settle", all[^1].Permission);
+        const string Settle = "reinsurance.commission.settle";
+        var accountant = await ReadAsync(w.Cara, "accountant", Settle);
+        Assert.Equal((true, PermissionSource.Role), (accountant.Allowed, accountant.Source));
+        foreach (var role in new[] { "underwriter", "viewer" })
+        {
+            var other = await ReadAsync(w.Anna, role, Settle);
+            Assert.Equal((false, PermissionSource.NotInRole), (other.Allowed, other.Source));
+        }
     }
 
     [Fact]

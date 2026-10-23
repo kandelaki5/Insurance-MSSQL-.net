@@ -77,7 +77,8 @@ public static class RegulatoryTexts
         ("E14", "00050 გაუფასურება"),
         ("E16", "00070 მოთხოვნები აგენტებისგან"),
         ("E17", "00080 გაუფასურება"),
-        ("E19", "00100 სულ სადაზღვევო მოთხოვნები, წმინდა"));
+        ("E19", "00100 სულ სადაზღვევო მოთხოვნები, წმინდა"),
+        ("E26", "00140 სხვა მოთხოვნები გადაზღვევიდან (გადამზღვევლის საკომისიო)"));
 
     public static readonly global::System.Collections.Generic.IReadOnlyDictionary<string, string> BalanceLines = global::Insurance.Application.Texts.TextMap.Of(
         ("00060", "სადაზღვევო მოთხოვნები, წმინდა"),
