@@ -254,4 +254,38 @@ public sealed class ClaimGelOnForeignPolicyTests(TestDatabase db) : IClassFixtur
             select coalesce(sum(a.amount), 0), coalesce(sum(a.amount_gel), 0) from core.payment_allocation a join core.installment i on i.id = a.installment_id where i.policy_id = @id
             """, new { id = x.Policy.Id })));
     }
+    /// <summary>
+    /// Codex R005-03 as the application role (core_app, which may update core.claim): the occurrence day's snapshot of a GEL claim on a
+    /// USD policy cannot be wiped with its currency kept — all four fields to NULL satisfy the snapshot's check (its all-null branch),
+    /// so only a NULL-safe trigger catches it — nor one field to NULL, nor be given to a claim that had none (a GEL policy's).
+    /// </summary>
+    [Fact]
+    public async Task The_snapshot_is_neither_wiped_nor_given_nor_nulled_field_by_field_by_the_application_role_its_currency_kept()
+    {
+        var x = await WorldAsync();
+        Assert.Equal(("GEL", 26000m, 260m, 2.6m, x.Occurred), await SnapshotAsync(x.Claim));
+        foreach (var set in new[]
+        {
+            "limit_gel = null, deductible_gel = null, limit_rate = null, limit_rate_on = null",
+            "limit_gel = null", "deductible_gel = null",
+        })
+        {
+            var e = await Assert.ThrowsAnyAsync<Exception>(() => w.ExecAsync($"update core.claim set {set} where id = @c", new { c = x.Claim }));
+            Assert.Contains("CL001", e.Message);
+            Assert.Equal(("GEL", 26000m, 260m, 2.6m, x.Occurred), await SnapshotAsync(x.Claim));
+        }
+        // A GEL policy's claim has no snapshot; none can be given to it afterwards (NULL to a value).
+        var y = Interlocked.Increment(ref year);
+        var claims = await w.UserAsync("claims");
+        var gel = await w.PolicyAsync(claims.Id, new DateOnly(y, 1, 1), [new ClaimWorld.Line("damage", 10000m, 100m, 100m)], [(new DateOnly(y, 1, 1), 100m)]);
+        db.Clock.SetToday(new DateOnly(y, 3, 2));
+        var plain = (await w.RegisterAsync(claims, gel, new DateOnly(y, 3, 1), new DateOnly(y, 3, 2), ("damage", "1000")))[0];
+        Assert.Equal(("GEL", (decimal?)null, (decimal?)null, (decimal?)null, (DateOnly?)null), await SnapshotAsync(plain));
+        var given = await Assert.ThrowsAnyAsync<Exception>(() => w.ExecAsync(
+            "update core.claim set limit_gel = 1, deductible_gel = 0, limit_rate = 1, limit_rate_on = occurred_on where id = @c", new { c = plain }));
+        Assert.Contains("CL001", given.Message);
+        Assert.Equal(("GEL", (decimal?)null, (decimal?)null, (decimal?)null, (DateOnly?)null), await SnapshotAsync(plain));
+        // What the claim's own actions change still goes through (the guard looks only at the currency and the snapshot).
+        await w.ExecAsync("update core.claim set description = N'განახლებული აღწერა' where id = @c", new { c = x.Claim });
+    }
 }
