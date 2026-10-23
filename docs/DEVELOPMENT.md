@@ -41,3 +41,7 @@ How the old TypeScript/PostgreSQL program (Insurance-Software, commit `17c1f1fb4
 Keep the four kinds of evidence apart: source review, unit tests (`Insurance.Domain.Tests`), real database (`Insurance.Integration.Tests`, a fresh `ins_it_*` database per test class), browser/HTTP (`Insurance.Web.Tests`). A test that proves a fix must fail without it (negative control). A check that could not run is reported as SKIP or NOT TESTED with the reason; SKIP never counts as PASS.
 
 Local test server: copy `.env.test.example` to `.env.test` (git-ignored) and point it at a local SQL Server.
+
+### Browser tests
+
+`tests/Insurance.Web.Tests/BrowserApp.cs` serves the real application with Kestrel on a free local port, on a fresh test database, and drives a headless Chromium with Playwright (`SignedInPageAsync(role)` signs in through the login form). The browser is the one installed for Playwright (`pwsh bin/…/playwright.ps1 install chromium`, done by CI); `PLAYWRIGHT_CHROMIUM_EXECUTABLE` points at another build (this container's `/opt/pw-browsers`).

@@ -23,20 +23,23 @@ public sealed class TestDatabase : IAsyncLifetime
 
     public Db App => new(new DbOptions { ConnectionString = AppConnection });
 
-    public static string MasterFromEnvironment()
+    public static string MasterFromEnvironment() =>
+        Setting("INSURANCE_TEST_SQL_MASTER")
+        ?? throw new InvalidOperationException("INSURANCE_TEST_SQL_MASTER is not set: these tests need a local SQL Server (see .env.test.example)");
+
+    /// <summary>A test setting from the environment or, failing that, from .env.test (git-ignored).</summary>
+    public static string? Setting(string name)
     {
-        var value = Environment.GetEnvironmentVariable("INSURANCE_TEST_SQL_MASTER");
+        var value = Environment.GetEnvironmentVariable(name);
         if (string.IsNullOrWhiteSpace(value))
         {
             var file = FindUp(".env.test");
             if (file is not null)
                 foreach (var line in File.ReadAllLines(file))
-                    if (line.StartsWith("INSURANCE_TEST_SQL_MASTER=", StringComparison.Ordinal))
-                        value = line["INSURANCE_TEST_SQL_MASTER=".Length..].Trim('"');
+                    if (line.StartsWith(name + "=", StringComparison.Ordinal))
+                        value = line[(name.Length + 1)..].Trim('"');
         }
-        return string.IsNullOrWhiteSpace(value)
-            ? throw new InvalidOperationException("INSURANCE_TEST_SQL_MASTER is not set: these tests need a local SQL Server (see .env.test.example)")
-            : value;
+        return string.IsNullOrWhiteSpace(value) ? null : value;
     }
 
     private static string? FindUp(string fileName)

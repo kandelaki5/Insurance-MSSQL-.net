@@ -42,7 +42,7 @@ public sealed class Reconcile(string postgresConnection, string sqlServerConnect
             "select kind + '|' + method + '|' + format(received_on, 'yyyy-MM') as k, convert(nvarchar(50), sum(amount_gel)) + '|' + convert(nvarchar(20), count(*)) as v from core.payment group by kind + '|' + method + '|' + format(received_on, 'yyyy-MM')"),
         new("advance (unallocated) per client",
             "select coalesce(p.payer_party_id::text, '-') as k, sum(p.amount_gel - coalesce((select sum(a.amount_gel) from core.payment_allocation a where a.payment_id = p.id), 0))::text as v from core.payment p group by 1",
-            "select coalesce(lower(convert(nchar(36), p.payer_party_id)), '-') as k, convert(nvarchar(50), sum(p.amount_gel - coalesce((select sum(a.amount_gel) from core.payment_allocation a where a.payment_id = p.id), 0))) as v from core.payment p group by coalesce(lower(convert(nchar(36), p.payer_party_id)), '-')"),
+            "select coalesce(lower(convert(nchar(36), p.payer_party_id)), '-') as k, convert(nvarchar(50), sum(p.amount_gel - coalesce(a.allocated, 0))) as v from core.payment p outer apply (select sum(x.amount_gel) as allocated from core.payment_allocation x where x.payment_id = p.id) a group by coalesce(lower(convert(nchar(36), p.payer_party_id)), '-')"),
         new("reserve level per claim",
             "select claim_id::text as k, sum(change)::text as v from core.claim_reserve group by claim_id",
             "select lower(convert(nchar(36), claim_id)) as k, convert(nvarchar(50), sum(change)) as v from core.claim_reserve group by claim_id"),
