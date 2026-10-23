@@ -8,4 +8,10 @@ namespace Insurance.Application.Data;
 public sealed class DbOptions
 {
     public required string ConnectionString { get; init; }
+
+    /// <summary>
+    /// Tests only: called before every command on the connections this Db opens (see <see cref="ICommandInterceptor"/>), to
+    /// make one read fail or to change something between two statements. Null in production — Program.cs and the tools never set it.
+    /// </summary>
+    public ICommandInterceptor? Interceptor { get; init; }
 }

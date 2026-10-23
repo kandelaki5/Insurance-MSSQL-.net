@@ -23,11 +23,13 @@ public sealed class NoNetwork : IHttpClientFactory
 
 /// <summary>
 /// Fictional policies, users and claims for the claim tests, written through the application role. Claims are registered and
-/// decided through the real ClaimActions, as the old tests drove the real actions.
+/// decided through the real ClaimActions, as the old tests drove the real actions. With an <paramref name="interceptor"/>
+/// (FailureInjection.Faults), every command the actions send through <see cref="App"/> passes it; the readers below use
+/// their own connections and are never intercepted.
 /// </summary>
-public sealed class ClaimWorld(TestDatabase db)
+public sealed class ClaimWorld(TestDatabase db, ICommandInterceptor? interceptor = null)
 {
-    public Db App { get; } = db.App;
+    public Db App { get; } = interceptor is null ? db.App : new(new DbOptions { ConnectionString = db.AppConnection, Interceptor = interceptor });
     public NoNetwork Network { get; } = new();
     public Rates Rates => new(App, Network);
     public TestDatabase Database => db;

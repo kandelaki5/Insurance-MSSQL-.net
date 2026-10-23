@@ -42,6 +42,15 @@ Keep the four kinds of evidence apart: source review, unit tests (`Insurance.Dom
 
 Local test server: copy `.env.test.example` to `.env.test` (git-ignored) and point it at a local SQL Server.
 
+### Failure injection (DbOptions.Interceptor)
+
+The legacy offline tests proved two things on their in-memory stores that a real database cannot show by itself: an action's binding permission check refuses when the right is taken away between the quick check and the writing transaction, and a read that fails once comes out as that same error (never "no right", "nothing stored" or zeros), writes nothing, and the retry succeeds. The test seam for both is `DbOptions.Interceptor` (`src/Insurance.Application/Data/CommandInterceptor.cs`):
+
+- An `ICommandInterceptor` is called before every command sent on a connection that a `Db` with it opened — `Tx`, `Db.ReadAsync`, Dapper on `tx.Connection`, the transaction's own `set xact_abort on` — with the SQL text, the transaction's isolation level (null outside a transaction; `Snapshot` for `Db.SnapshotAsync`, i.e. the quick permission check and the pages' permission reads; `ReadCommitted` for `Db.AsUserAsync`) and the parameters. It may throw (the command is never sent; the exception leaves the execute call unchanged, a transaction rolls back) or run an action first (e.g. revoke a grant on another connection) and let the command proceed.
+- It is reached through SqlClient's own diagnostic event (`Microsoft.Data.SqlClient.WriteCommandBefore`), only for connections registered by a `Db` with an interceptor; the subscription is made the first time one is registered. Production never sets it (`Program.cs` builds `DbOptions` from the connection string only; `PageFaultTests.The_application_as_configured_has_no_interceptor`), so it costs one null check per connection.
+- Tests use `tests/Insurance.Integration.Tests/FailureInjection/Faults.cs`: `FailOnce(match, error)`, `BeforeOnce(match, action)`, a log of every command, and matchers by a stable fragment of a statement's SQL (`Faults.Overrides`, `Memberships`, `Grants`; `Quick(...)` / `Binding(...)` by isolation level) rather than by call count. Web tests use `tests/Insurance.Web.Tests/FailureInjection/FaultSite.cs`, the application with `Faults` in its `DbOptions`; in Development an error that leaves a page is answered 500 with its message.
+- The legacy case each test ports is listed in `docs/legacy-tests-gaps-a.md`.
+
 ### Browser tests
 
 `tests/Insurance.Web.Tests/BrowserApp.cs` serves the real application with Kestrel on a free local port, on a fresh test database, and drives a headless Chromium with Playwright (`SignedInPageAsync(role)` signs in through the login form). The browser is the one installed for Playwright (`pwsh bin/…/playwright.ps1 install chromium`, done by CI); `PLAYWRIGHT_CHROMIUM_EXECUTABLE` points at another build (this container's `/opt/pw-browsers`).
