@@ -169,9 +169,9 @@ public static class ImpairmentReport
 
     /// <summary>
     /// Totals per receivable type of form N1-4. A policy whose instalments are owed by different debtors is counted under the first in
-    /// the order client, broker, agent (owner, 04.10.2026).
+    /// the order client, broker, agent (owner, 04.10.2026), whatever the order of its debtor kinds on the row.
     /// </summary>
-    private static List<Totals> TotalsOf(IReadOnlyList<Row> rows) =>
+    public static List<Totals> TotalsOf(IReadOnlyList<Row> rows) =>
         TotalKinds.Select(kind =>
         {
             var of = rows.Where(r => kind == "all" || r.PrimaryKind == kind).ToList();
