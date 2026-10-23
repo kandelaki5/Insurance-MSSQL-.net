@@ -1,0 +1,141 @@
+{
+  "TreatyId": "84799ae0-d6ff-4ab4-9534-a5e966d83dea",
+  "TreatyNumber": "RI000001",
+  "Name": "\u10D3\u10D4\u10DB\u10DD QS 40% \u2014 \u10D0\u10D5\u10E2\u10DD\u10D3\u10D0\u10D6\u10E6\u10D5\u10D4\u10D5\u10D0",
+  "SharePercent": 40,
+  "From": "2026-10-01",
+  "To": "2026-10-31",
+  "ExpectedTotalsGel": {
+    "GrossPremium": 9000,
+    "CededPremium": 3600,
+    "RetainedPremium": 5400,
+    "GrossClaimsPaid": 2000,
+    "ReinsurerPaidShare": 800,
+    "GrossOutstandingReserve": 5000,
+    "ReinsurerReserveShare": 2000,
+    "BordereauBalance": 2800
+  },
+  "VerifiedTotalsTetri": {
+    "CededGel": 360000,
+    "CommissionGel": 0,
+    "BrokerageGel": 0,
+    "ClaimsPaidGel": 80000,
+    "ReserveGel": 200000,
+    "BalanceGel": 280000
+  },
+  "Policies": [
+    {
+      "id": "2098565c-5daf-4b4d-b569-548744061569",
+      "number": "CAS000013",
+      "status": "active",
+      "description": "Toyota DEMO \u2014 \u10D2\u10D0\u10D3\u10D0\u10D6\u10E6\u10D5\u10D4\u10D5\u10D8\u10E1 \u10DB\u10D0\u10D2\u10D0\u10DA\u10D8\u10D7\u10D8 RI-DEMO-01",
+      "premium_gel": 6000.00
+    },
+    {
+      "id": "ef5acee7-6851-4fd2-81f8-a57b2ffea5ad",
+      "number": "CAS000014",
+      "status": "active",
+      "description": "Toyota DEMO \u2014 \u10D2\u10D0\u10D3\u10D0\u10D6\u10E6\u10D5\u10D4\u10D5\u10D8\u10E1 \u10DB\u10D0\u10D2\u10D0\u10DA\u10D8\u10D7\u10D8 RI-DEMO-02",
+      "premium_gel": 3000.00
+    }
+  ],
+  "Claims": [
+    {
+      "id": "d5cd9711-60ae-486f-bbb3-3c2091ab0f68",
+      "number": "CLM000005",
+      "policy_id": "2098565c-5daf-4b4d-b569-548744061569",
+      "status": "approved",
+      "approved_amount": 5000.00
+    },
+    {
+      "id": "14c0abd8-7702-4231-aca0-cd73f16bc8a3",
+      "number": "CLM000006",
+      "policy_id": "ef5acee7-6851-4fd2-81f8-a57b2ffea5ad",
+      "status": "registered",
+      "approved_amount": null
+    }
+  ],
+  "Bordereau": {
+    "Treaty": {
+      "Id": "84799ae0-d6ff-4ab4-9534-a5e966d83dea",
+      "Number": "RI000001",
+      "Name": "\u10D3\u10D4\u10DB\u10DD QS 40% \u2014 \u10D0\u10D5\u10E2\u10DD\u10D3\u10D0\u10D6\u10E6\u10D5\u10D4\u10D5\u10D0",
+      "Reinsurer": "\u10D3\u10D4\u10DB\u10DD \u10D2\u10D0\u10D3\u10D0\u10DB\u10D6\u10E6\u10D5\u10D4\u10D5\u10D4\u10DA\u10D8 \u2014 QS40",
+      "Broker": null,
+      "Kind": "quota_share",
+      "Currency": "GEL",
+      "BrokerPercent": 0.0000
+    },
+    "From": "2026-10-01",
+    "To": "2026-10-31",
+    "Premiums": [
+      {
+        "PolicyNumber": "CAS000013",
+        "Policyholder": "\u10D3\u10D4\u10DB\u10DD \u10DB\u10DD\u10D2\u10D6\u10D0\u10E3\u10E0\u10D8",
+        "Object": "Toyota DEMO \u2014 \u10D2\u10D0\u10D3\u10D0\u10D6\u10E6\u10D5\u10D4\u10D5\u10D8\u10E1 \u10DB\u10D0\u10D2\u10D0\u10DA\u10D8\u10D7\u10D8 RI-DEMO-01",
+        "ClassCode": "5.1",
+        "CoverFrom": "2026-10-23",
+        "CoverTo": "2027-10-23",
+        "SumInsured": 60000.00,
+        "Currency": "GEL",
+        "SharePercent": 40.0000,
+        "CededPremium": 240000,
+        "CededPremiumGel": 240000,
+        "CommissionGel": 0,
+        "BookedOn": "2026-10-23",
+        "IsCancellation": false
+      },
+      {
+        "PolicyNumber": "CAS000014",
+        "Policyholder": "\u10D3\u10D4\u10DB\u10DD \u10E1\u10D0\u10D5\u10D0\u10ED\u10E0\u10DD \u10EF\u10D2\u10E3\u10E4\u10D8",
+        "Object": "Toyota DEMO \u2014 \u10D2\u10D0\u10D3\u10D0\u10D6\u10E6\u10D5\u10D4\u10D5\u10D8\u10E1 \u10DB\u10D0\u10D2\u10D0\u10DA\u10D8\u10D7\u10D8 RI-DEMO-02",
+        "ClassCode": "5.1",
+        "CoverFrom": "2026-10-23",
+        "CoverTo": "2027-10-23",
+        "SumInsured": 60000.00,
+        "Currency": "GEL",
+        "SharePercent": 40.0000,
+        "CededPremium": 120000,
+        "CededPremiumGel": 120000,
+        "CommissionGel": 0,
+        "BookedOn": "2026-10-23",
+        "IsCancellation": false
+      }
+    ],
+    "Claims": [
+      {
+        "ClaimNumber": "CLM000005",
+        "PolicyNumber": "CAS000013",
+        "OccurredOn": "2026-10-23",
+        "ReportedOn": "2026-10-23",
+        "Status": "approved",
+        "Currency": "GEL",
+        "PaidShare": 80000,
+        "PaidShareGel": 80000,
+        "ReserveShare": 120000,
+        "ReserveShareGel": 120000
+      },
+      {
+        "ClaimNumber": "CLM000006",
+        "PolicyNumber": "CAS000014",
+        "OccurredOn": "2026-10-23",
+        "ReportedOn": "2026-10-23",
+        "Status": "registered",
+        "Currency": "GEL",
+        "PaidShare": 0,
+        "PaidShareGel": 0,
+        "ReserveShare": 80000,
+        "ReserveShareGel": 80000
+      }
+    ],
+    "Totals": {
+      "CededGel": 360000,
+      "CommissionGel": 0,
+      "BrokerageGel": 0,
+      "ClaimsPaidGel": 80000,
+      "ReserveGel": 200000,
+      "BalanceGel": 280000
+    }
+  },
+  "PriorDemoHistoryHash": "FA75B890A3CD71DD8430847B4B8608F8D3E0F53E3F31E68FD0B847337DCD784C"
+}
