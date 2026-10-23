@@ -1,7 +1,7 @@
 using Insurance.Application.Texts;
 using Insurance.Application.Services;
 using static Insurance.Integration.Tests.ReportWorld;
-using static Insurance.Integration.Tests.Reports.PolicyPremiumWorld;
+using static Insurance.Integration.Tests.PolicyPremiumWorld;
 
 namespace Insurance.Integration.Tests.Reports;
 

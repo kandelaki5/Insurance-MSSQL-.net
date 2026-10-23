@@ -16,6 +16,9 @@
   <ItemGroup>
     <!-- The same fresh-database fixture as the integration tests. -->
     <Compile Include="..\Insurance.Integration.Tests\TestDatabase.cs" Link="TestDatabase.cs" />
+    <!-- The report worlds of the integration tests, for the pages over the same rows. -->
+    <Compile Include="..\Insurance.Integration.Tests\Fixtures.cs" Link="Worlds\Fixtures.cs" />
+    <Compile Include="..\Insurance.Integration.Tests\Worlds\*.cs" LinkBase="Worlds" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

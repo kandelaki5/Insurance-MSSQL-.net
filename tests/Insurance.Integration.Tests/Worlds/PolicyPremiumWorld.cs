@@ -1,6 +1,6 @@
 using static Insurance.Integration.Tests.ReportWorld;
 
-namespace Insurance.Integration.Tests.Reports;
+namespace Insurance.Integration.Tests;
 
 /// <summary>
 /// The fictional premium ledger of the premium report by policy (legacy scripts/integration/policy-premium-world.ts, owner 14.10.2026), as
