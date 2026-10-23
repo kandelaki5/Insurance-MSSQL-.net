@@ -42,7 +42,7 @@ public sealed class BrowserFlowTests(BrowserApp app) : IClassFixture<BrowserApp>
     private static string NewTaxId() => "0" + Random.Shared.NextInt64(1_000_000_000L, 9_999_999_999L).ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     [Fact]
-    public async Task Client_policy_approval_and_payment()
+    public async Task Client_policy_approval_payment_and_the_financial_figures()
     {
         // 1. A sales manager registers a client.
         var sales = await app.SignedInPageAsync("sales");
@@ -99,6 +99,16 @@ public sealed class BrowserFlowTests(BrowserApp app) : IClassFixture<BrowserApp>
             """, new { policyId }));
         var card = await accountant.InnerTextAsync("main");
         Assert.Contains("300.00", card);
+
+        // 5. The financial figures: the month's premium report shows the premium written this month, the policy's 600.00
+        // included (the other tests of this class write into the same database, so the total is read from the ledger).
+        var written = await W.ScalarAsync<decimal>(
+            "select sum(amount_gel) from core.premium_transaction where booked_on >= @first and booked_on < dateadd(month, 1, @first)",
+            new { first = new DateOnly(Today.Year, Today.Month, 1) });
+        Assert.True(written >= 600m);
+        await accountant.GotoAsync(app.BaseUrl + "/accounting/premium-report");
+        var report = await accountant.InnerTextAsync("main");
+        Assert.Contains(written.ToString("#,0.00", System.Globalization.CultureInfo.InvariantCulture), report);
     }
 
     [Fact]
@@ -200,6 +210,13 @@ public sealed class BrowserFlowTests(BrowserApp app) : IClassFixture<BrowserApp>
         await accountant.GotoAsync(app.BaseUrl + "/compliance/aml-report");
         var aml = await accountant.RunAndWaitForDownloadAsync(() => accountant.ClickAsync("main a[href*='/compliance/aml-report/xlsx']"));
         await AssertWorkbookAsync(aml);
+
+        // The accountant's report workbooks: premium by policy, and the regulator's form 1 and reserves placement.
+        await accountant.GotoAsync(app.BaseUrl + "/accounting/policy-premium");
+        await AssertWorkbookAsync(await accountant.RunAndWaitForDownloadAsync(() => accountant.ClickAsync("main a[href^='/accounting/policy-premium/xlsx']")));
+        await accountant.GotoAsync(app.BaseUrl + "/accounting/regulatory");
+        foreach (var form in new[] { "form1", "reserves" })
+            await AssertWorkbookAsync(await accountant.RunAndWaitForDownloadAsync(() => accountant.ClickAsync($"main a[href^='/accounting/regulatory/{form}/xlsx']")));
 
         // The printed policy: its number, the policyholder, and the print button.
         await sales.GotoAsync(app.BaseUrl + $"/print/policies/{policy.Id}");
