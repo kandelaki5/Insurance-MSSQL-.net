@@ -208,3 +208,10 @@ ledgers' fingerprint is the same before and after.
 PASS 86 · N/A 12 · NOT TESTED 0 · OTHER GROUP 3 (one per table row above; rows marked "same" share a test but are counted as their own case).
 
 No defect was found: every case behaves on SQL Server as the legacy scripts expected.
+
+## OTHER GROUP rows after the accounting port
+
+| Row | Test | Verdict |
+|---|---|---|
+| answer-parallel-check.ts: parallel presses of the close-month form each show their own answer; periods unchanged | Web: Reports.LegacyPeriodsHttpTests.Presses_of_close_month_at_once_each_show_their_own_answer_whatever_answer_cookies_the_browser_holds (docs/legacy-db-checks-accounting.md) | PASS |
+| permissions-db-check.ts: the period close's month series (PR250) | Accounting.LegacyMonthCloseTests.PR250_a_first_policy_from_mid_month_cannot_step_over_a_month_that_is_still_open (docs/legacy-db-checks-accounting.md) | PASS |
