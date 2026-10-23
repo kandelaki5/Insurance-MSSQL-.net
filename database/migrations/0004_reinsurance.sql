@@ -6,7 +6,7 @@
 create table core.ri_treaty (
   id                 uniqueidentifier not null constraint ri_treaty_pkey primary key constraint ri_treaty_id_df default newid(),
   number             nvarchar(100) not null constraint ri_treaty_number_key unique,
-  name               nvarchar(400) not null,
+  name               nvarchar(max) not null,
   reinsurer_party_id uniqueidentifier not null constraint ri_treaty_reinsurer_party_id_fkey references core.party (id),
   broker_party_id    uniqueidentifier null constraint ri_treaty_broker_party_id_fkey references core.party (id),
   kind               nvarchar(20) not null constraint ri_treaty_kind_check check (kind in (N'quota_share', N'surplus', N'excess_of_loss', N'facultative')),

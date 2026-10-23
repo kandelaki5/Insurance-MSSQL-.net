@@ -14,6 +14,6 @@ public sealed class IndexModel : AppPageModel
             select i.id as Id, p.display_name as PartyName, coalesce(p.tax_id, p.foreign_id) as IdNumber, i.kind as Kind, i.contract_no as ContractNo,
                    format(i.valid_to, 'dd.MM.yyyy') as ValidTo, i.commission_percent as CommissionPercent, i.status as Status, p.phone as Phone
             from core.intermediary i join core.party p on p.id = i.party_id
-            order by p.display_name_lower, i.id
+            order by p.display_name_sort, p.display_name_lower, i.id
             """))).ToList();
 }
