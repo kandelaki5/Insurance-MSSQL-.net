@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Playwright;
 
 namespace Insurance.Web.Tests;
@@ -24,6 +26,8 @@ public sealed class BrowserApp : IAsyncLifetime
         {
             builder.UseEnvironment("Development");
             builder.UseSetting("ConnectionStrings:Insurance", connection);
+            // No test reaches the network: the National Bank and the UN list refuse every request.
+            builder.ConfigureTestServices(s => s.AddSingleton<IHttpClientFactory>(new Insurance.Integration.Tests.RefusingNbg()));
         }
     }
 
