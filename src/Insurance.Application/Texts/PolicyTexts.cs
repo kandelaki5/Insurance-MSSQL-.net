@@ -15,6 +15,14 @@ public static class PolicyTexts
         ("active", "მოქმედი"),
         ("cancelled", "გაუქმებული"));
 
+    /// <summary>The card's coverage table: the premium a coverage was issued with, and what it carries today after approved corrections.</summary>
+    public static class CoverageColumns
+    {
+        public const string InitialPremium = "საწყისი პრემია (გაცემისას)";
+        public const string InitialPremiumGel = "საწყისი პრემია ლარში";
+        public const string CurrentPremium = "მიმდინარე პრემია (დამტკიცებული შესწორებებით)";
+    }
+
     public static class Sections
     {
         public const string Parties = "მხარეები და პროდუქტი";
@@ -187,7 +195,7 @@ public static class PolicyTexts
     {
         public const string Title = "პოლისის ცვლილება";
         public const string Button = "ცვლილება";
-        public const string Note = "ცვლილება ახალი პოლისის სახით ფორმდება იმავე ხელშეკრულების ქვეშ: იწყება ცვლილების თარიღიდან, მთავრდება ძირითად პოლისთან ერთად და ატარებს მხოლოდ პრემიის სხვაობას დარჩენილი ვადისთვის. კურსი ცვლილების თარიღისაა. ძალაში შედის დამტკიცების შემდეგ.";
+        public const string Note = "ცვლილება ფორმდება მოთხოვნად და ძალაში შედის დამტკიცების შემდეგ; ნომერი დამტკიცებისას ენიჭება. თუ ძირითადი პოლისის თვე ჯერ ღიაა, ცვლილება თავად პოლისს ასწორებს და მისი ნომერი არ იცვლება; თუ დახურულია — ცვლილება ცალკე პოლისია იმავე ხელშეკრულების ქვეშ, ნომრით „ძირითადი/1“, „ძირითადი/2“…: იწყება ცვლილების თარიღიდან, მთავრდება ძირითად პოლისთან ერთად და ატარებს მხოლოდ პრემიის სხვაობას დარჩენილი ვადისთვის.";
         public const string ChangeOn = "ცვლილების თარიღი";
         public const string DateHint = "ძირითადი პოლისის მოქმედების ფარგლებში.";
         public const string Reason = "ცვლილების შინაარსი";
@@ -207,7 +215,13 @@ public static class PolicyTexts
         public const string Changes = "ცვლილებები ამ ხელშეკრულებაზე";
         public const string ChangeNote = "ცვლილების შინაარსი";
         public const string ScheduleReason = "პრემიის შემცირება დამტკიცებული ცვლილებით";
+        public const string CorrectionReason = "გრაფიკი შესწორდა დამტკიცებული ცვლილებით";
+        /// <summary>A change's number until approved: ROOT/მოთხოვნა-1 (owner, 14.10.2026: the number is given on approval).</summary>
+        public const string RequestNumber = "მოთხოვნა";
+        /// <summary>The record of a change that corrected its original in an open month: ROOT/შესწორება-1, not a policy of its own.</summary>
+        public const string CorrectionNumber = "შესწორება";
         public const string ReductionExceeds = "ცვლილების შემცირება აღემატება ძირითადი პოლისის გრაფიკს — დამტკიცება შეუძლებელია; გააფორმეთ მცირე შემცირება ან დაბრუნება.";
+        public const string PeriodClosed = "ცვლილების თარიღი დახურულ პერიოდშია — დახურულ პერიოდში ცვლილების დამტკიცება შეუძლებელია; ცვლილება ღია პერიოდის თარიღით გააფორმეთ.";
 
         public static class Errors
         {
@@ -216,6 +230,7 @@ public static class PolicyTexts
             public const string Reason = "აღწერეთ ცვლილების შინაარსი";
             public const string Coverages = "მონიშნეთ მინიმუმ ერთი დაფარვა";
             public const string Rate = "ამ თარიღის ოფიციალური კურსი ვერ მოიძებნა";
+            public const string PeriodClosed = "დახურულ პერიოდში ცვლილების გაკეთება შეუძლებელია — აირჩიეთ ღია პერიოდის თარიღი";
 
             /// <summary>The texts above by their old keys, in their order, for a lookup by code.</summary>
             public static readonly global::System.Collections.Generic.IReadOnlyDictionary<string, string> ByKey = global::Insurance.Application.Texts.TextMap.Of(
@@ -223,7 +238,8 @@ public static class PolicyTexts
                 ("date", Date),
                 ("reason", Reason),
                 ("coverages", Coverages),
-                ("rate", Rate));
+                ("rate", Rate),
+                ("periodClosed", PeriodClosed));
         }
     }
 
@@ -334,7 +350,9 @@ public static class PolicyTexts
         ("already", "პოლისი უკვე დამტკიცებულია ან აღარ ელოდება დამტკიცებას — არაფერი შეცვლილა"),
         ("forbidden", "პოლისის დამტკიცების უფლება არ გაქვთ — არაფერი შეცვლილა"),
         ("own", "საკუთარი გაფორმებული პოლისის დამტკიცება არ შეიძლება; დაამტკიცებს სხვა თანამშრომელი — არაფერი შეცვლილა"),
-        ("invalid", "პოლისი ვერ მოიძებნა — არაფერი შეცვლილა"));
+        ("invalid", "პოლისი ვერ მოიძებნა — არაფერი შეცვლილა"),
+        // Owner, 13.10.2026: a policy cannot start in a closed period.
+        ("policy-period-closed", "შეუძლებელია პოლისის დამტკიცება, თვე დახურულია"));
 
     public const string AwaitingApproval = "პოლისი ელოდება საოპერაციო დეპარტამენტის უფროსის დამტკიცებას. პრემია აღირიცხება დამტკიცებისას.";
     public const string ApprovedBy = "დაამტკიცა";
@@ -388,6 +406,7 @@ public static class PolicyTexts
         public const string Year = "გამოშვების წელი არასწორია";
         public const string Value = "მიუთითეთ ავტომობილის ღირებულება";
         public const string Dates = "დასრულების თარიღი უნდა იყოს ძალაში შესვლის თარიღის შემდეგ";
+        public const string PeriodClosed = "დახურულ პერიოდში პოლისი ვერ დაიწყება — თვე დახურულია; აირჩიეთ ღია პერიოდის თარიღი";
         public const string Rate = "ამ თარიღის ოფიციალური კურსი ვერ მოიძებნა";
         public const string Coverages = "აირჩიეთ მინიმუმ ერთი დაფარვა და მიუთითეთ პრემია";
         public const string Premium = "მიუთითეთ პრემია";
@@ -408,6 +427,7 @@ public static class PolicyTexts
             ("year", Year),
             ("value", Value),
             ("dates", Dates),
+            ("periodClosed", PeriodClosed),
             ("rate", Rate),
             ("coverages", Coverages),
             ("premium", Premium),

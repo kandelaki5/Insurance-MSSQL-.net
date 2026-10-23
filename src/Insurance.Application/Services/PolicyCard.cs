@@ -92,6 +92,22 @@ public static class PolicyCard
     /// <summary>A premium ledger row as read for the card.</summary>
     public sealed record LedgerRow(Guid Id, Guid? CancelsId, decimal Amount, DateOnly BookedOn, DateOnly CoverFrom, DateOnly CoverTo);
 
+    public sealed record LineLedgerRow(Guid LineId, decimal Amount, DateOnly BookedOn);
+
+    /// <summary>
+    /// Each coverage line's current premium in tetri (legacy PR #211 currentPremiumByLine): its ledger rows booked up to
+    /// <paramref name="asOf"/>, added up — the issue, corrections booked on the line by an open-month change, cancellation
+    /// reversals — in the policy currency. Rows of other lines do not count; a line without rows is 0. Exact (the old code
+    /// summed Math.round(Number × 100)).
+    /// </summary>
+    public static Dictionary<Guid, BigInteger> CurrentPremiumByLine(IEnumerable<Guid> lines, IEnumerable<LineLedgerRow> ledger, DateOnly asOf)
+    {
+        var current = lines.Distinct().ToDictionary(l => l, _ => BigInteger.Zero);
+        foreach (var row in ledger)
+            if (row.BookedOn <= asOf && current.ContainsKey(row.LineId)) current[row.LineId] += PaymentActions.Exact(row.Amount);
+        return current;
+    }
+
     public sealed record Position(BigInteger Written, BigInteger Earned, BigInteger Unearned);
 
     private sealed class ExactTx(BigInteger amount, DateOnly bookedOn, DateOnly coverFrom, DateOnly coverTo, ExactTx? cancels = null)

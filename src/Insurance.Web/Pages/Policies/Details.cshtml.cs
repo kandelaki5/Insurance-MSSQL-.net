@@ -46,6 +46,8 @@ public sealed class DetailsModel(Rates rates) : AppPageModel
     public IReadOnlyList<Related> Changes { get; private set; } = [];
     public string Objects { get; private set; } = "";
     public IReadOnlyList<Line> Lines { get; private set; } = [];
+    /// <summary>Each line's current premium in tetri, as of the card's day (PolicyCard.CurrentPremiumByLine).</summary>
+    public IReadOnlyDictionary<Guid, BigInteger> CurrentByLine { get; private set; } = new Dictionary<Guid, BigInteger>();
     public IReadOnlyList<Payment> Payments { get; private set; } = [];
     public IReadOnlyList<IntermediaryRow> Intermediaries { get; private set; } = [];
     public IReadOnlyList<RefundRequestRow> RefundRequests { get; private set; } = [];
@@ -118,6 +120,10 @@ public sealed class DetailsModel(Rates rates) : AppPageModel
                 from core.premium_transaction t join core.policy_line l on l.id = t.policy_line_id
                 where l.policy_id = @id order by t.created_at
                 """, new { id })).ToList();
+            CurrentByLine = PolicyCard.CurrentPremiumByLine(Lines.Select(l => l.Id), await tx.QueryAsync<PolicyCard.LineLedgerRow>("""
+                select t.policy_line_id as LineId, t.amount as Amount, t.booked_on as BookedOn
+                from core.premium_transaction t join core.policy_line l on l.id = t.policy_line_id where l.policy_id = @id
+                """, new { id }), Today);
             // The card is as of today (Tbilisi): a schedule reduction booked for a later day counts only from that day (H23).
             var schedule = await Billing.LoadScheduleAsync(tx, id, Today);
             // One receipt may be split over several policies (Codex PR #17, item 5): the whole receipt, the part allocated
@@ -173,7 +179,7 @@ public sealed class DetailsModel(Rates rates) : AppPageModel
             AdvancesGel = advances.Aggregate(BigInteger.Zero, (s, r) => s + PaymentActions.Exact(r.AvailableGel));
             // Overpayments on the client's other policies that could pay this one (owner, 07.10.2026): shown from issue on.
             ReleasableGel = Me.CanWrite && policy.Status != "draft"
-                ? (await Billing.LoadReleasableAsync(tx, policy.PolicyholderId, Db.Today(), id)).Aggregate(BigInteger.Zero, (s, r) => s + PaymentActions.Exact(r.ExcessGel))
+                ? (await Billing.LoadReleasableAsync(tx, policy.PolicyholderId, Today, id)).Aggregate(BigInteger.Zero, (s, r) => s + PaymentActions.Exact(r.ExcessGel))
                 : 0;
             Cessions = (await tx.QueryAsync<Cession>("""
                 select c.id as Id, tr.id as TreatyId, tr.number as TreatyNumber, tr.name as TreatyName, tr.kind as Kind, l.class_code as ClassCode,

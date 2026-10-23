@@ -158,8 +158,15 @@ public sealed class ApprovalClosedMonthTests(TestDatabase db) : IClassFixture<Te
 {
     private readonly World w = new(db);
 
+    /// <summary>
+    /// Legacy PR #212 (L225:2880; owner, 13.10.2026): a policy entered while its month was open, the month then closed, is not
+    /// approved — „შეუძლებელია პოლისის დამტკიცება, თვე დახურულია“ — and nothing is written: no premium in the first open month
+    /// (where it used to go, financially November and statistically never counted — the defect the rule closes), the closed
+    /// month's report unchanged, the policy still pending. Negative control: before PR #212 this approval was "done" with
+    /// November written 40 000 and statistically 0.
+    /// </summary>
     [Fact]
-    public async Task A_late_approval_is_booked_on_the_first_open_day_and_the_closed_month_is_not_changed()
+    public async Task A_policy_whose_month_closed_before_approval_is_refused_and_nothing_is_written()
     {
         var head = await w.UserAsync("operations_head");
         var october = new DateOnly(2025, 10, 1);
@@ -169,20 +176,19 @@ public sealed class ApprovalClosedMonthTests(TestDatabase db) : IClassFixture<Te
         await w.PayAsync(head, q.Id, "120.00", october.AddDays(5));
         var p = await w.PendingPolicyAsync(holder, october.AddDays(10), premium: 400m, schedule: [(0, 100m), (91, 100m), (182, 100m), (273, 100m)]);
         await w.CloseMonthAsync(october, head.Id);
-        var reportBefore = await w.App.ReadTxAsync(tx => PremiumReport.BuildAsync(tx, w.Rates, "2025-10"));
-        Assert.Equal("done", (await PolicyActions.ApprovePolicyAsync(w.App, head, p.Id.ToString())).Outcome);
-        var row = Assert.Single(await w.PremiumRowsAsync(p.Id));
-        Assert.Equal((400m, new DateOnly(2025, 11, 1), october.AddDays(10)), (row.Amount, row.BookedOn, row.CoverFrom));
-        var reportAfter = await w.App.ReadTxAsync(tx => PremiumReport.BuildAsync(tx, w.Rates, "2025-10"));
-        Assert.Equal(reportBefore.Totals, reportAfter.Totals);
-        Assert.Equal(reportBefore.Receivables, reportAfter.Receivables);
-        // November: P's 400.00 written there (financial), statistically October's (its cover starts there).
-        var november = await w.App.ReadTxAsync(tx => PremiumReport.BuildAsync(tx, w.Rates, "2025-11"));
-        Assert.Equal(40000, (long)november.Totals.FinancialWrittenGel);
-        Assert.Equal(0, (long)november.Totals.StatisticalWrittenGel);
-        // Earned in November: nothing of P is earned before it is booked, so November takes its 51 days from 11.10 at
-        // once — 400 × 51/365 = 55.89 — and UPR at its end 400 − 55.89 = 344.11; Q 120 × 30/365 = 9.86, UPR 120 − 120 × 61/365 = 99.95.
-        Assert.Equal(5589 + 986, (long)november.Totals.EarnedGel);
-        Assert.Equal(34411 + 9995, (long)november.Totals.UnearnedGel);
+        var octoberBefore = await w.App.ReadTxAsync(tx => PremiumReport.BuildAsync(tx, w.Rates, "2025-10"));
+        var novemberBefore = await w.App.ReadTxAsync(tx => PremiumReport.BuildAsync(tx, w.Rates, "2025-11"));
+        var answer = await PolicyActions.ApprovePolicyAsync(w.App, head, p.Id.ToString());
+        Assert.Equal(("policy-period-closed", p.Number), (answer.Outcome, answer.Number));
+        Assert.Equal("შეუძლებელია პოლისის დამტკიცება, თვე დახურულია", PolicyActions.AnswerText(answer.Outcome));
+        Assert.Empty(await w.PremiumRowsAsync(p.Id));
+        Assert.Equal("pending_approval", await w.ScalarAsync<string>("select status from core.policy where id = @id", new { id = p.Id }));
+        var octoberAfter = await w.App.ReadTxAsync(tx => PremiumReport.BuildAsync(tx, w.Rates, "2025-10"));
+        var novemberAfter = await w.App.ReadTxAsync(tx => PremiumReport.BuildAsync(tx, w.Rates, "2025-11"));
+        Assert.Equal(octoberBefore.Totals, octoberAfter.Totals);
+        Assert.Equal(octoberBefore.Receivables, octoberAfter.Receivables);
+        Assert.Equal(novemberBefore.Totals, novemberAfter.Totals);
+        Assert.Equal(novemberBefore.Receivables, novemberAfter.Receivables);
+        Assert.Equal(0, (long)novemberAfter.Totals.FinancialWrittenGel);
     }
 }

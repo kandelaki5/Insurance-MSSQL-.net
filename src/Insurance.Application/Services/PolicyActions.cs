@@ -60,10 +60,14 @@ public static class PolicyActions
         if (context is null) return FormAnswer.Refused(PolicyTexts.Errors.Coverages);
         var today = db.Today();
         var (errors, input) = PolicyIssue.ValidateVehiclePolicy(values, included, context.Coverages, context.Holder, context.Product, today);
+        // A policy cannot start in a closed period (owner, 13.10.2026; legacy PR #212): the form says so at once; approval
+        // checks again, since a month may close in between.
+        if (input is not null && await db.ReadTxAsync(PolicyCancel.FirstOpenDayAsync) is { } firstOpen && input.From < firstOpen)
+            errors["effective_from"] = PolicyTexts.Errors.PeriodClosed;
         if (context.Holder is { } holder && await db.ReadTxAsync(tx => Aml.BlockingSuspensionAsync(tx, holder.Id)) is not null)
             errors["policyholder_id_number"] = AmlTexts.Suspension.Blocked;
         decimal? rate = null;
-        if (input is not null)
+        if (input is not null && !errors.ContainsKey("effective_from"))
         {
             rate = await rates.RateOnAsync(input.Currency.ToString(), input.From);
             if (rate is null) errors["currency"] = PolicyTexts.Errors.Rate;
@@ -98,12 +102,21 @@ public static class PolicyActions
     private sealed record PendingPolicy(Guid Id, string Number, string Status, DateOnly EffectiveFrom, DateOnly EffectiveTo, Guid? ReplacesPolicyId, string PremiumCurrency, Guid? CreatedBy);
 
     /// <summary>
-    /// Approval puts the policy in force: the premium ledger rows are written now, dated on the effective date or on the
-    /// first day of the earliest open month when that date lies in a closed period. Who may approve is policy.approve,
-    /// for the user of the session — a quick check, the binding one first in the transaction. No one but the admin
-    /// approves a policy they created (docs/05 ვ4, ვ8). A change that reduces the premium lowers the original's schedule
-    /// in the same transaction, in the company's chosen order (owner, 07.10.2026); a reduction larger than the whole
-    /// schedule is refused. A treaty combination that would cede more than the premium rolls the approval back (H08).
+    /// Approval puts the policy in force: the premium ledger rows are written now, dated on the effective date. A policy or
+    /// change whose effective date lies in a closed period is not approved (owner, 13.10.2026; legacy PR #207/#212): closed
+    /// months are never changed, and the policy or change is entered again with a date in an open period. The check runs
+    /// here, in the writing transaction, under the period lock, so a month closed since entry (or closing right now) is
+    /// seen; a refusal writes nothing. Who may approve is policy.approve, for the user of the session — a quick check, the
+    /// binding one first in the transaction. No one but the admin approves a policy they created (docs/05 ვ4, ვ8).
+    ///
+    /// A change approved while the original's own reporting month is still open corrects the original itself (owner,
+    /// 13.10.2026; docs/04 r10, docs/05 a15/a16; PR #207/#218): its premium goes on the original's lines as new rows, from
+    /// the original's start and in its month, and the original's schedule is laid out again as if issued with the corrected
+    /// premium; an increase's own instalment goes to nothing. Otherwise a change stands as a policy of its own on its own
+    /// date, and one that reduces the premium lowers the original's schedule in the company's chosen order (owner,
+    /// 07.10.2026). A reduction larger than the whole schedule is refused. A change gets its number now (owner, 14.10.2026;
+    /// PR #225): ROOT/n as a policy of its own, ROOT/შესწორება-m as a correction (the original keeps its number). A treaty
+    /// combination that would cede more than the premium rolls the approval back (H08).
     /// </summary>
     public static async Task<ApproveAnswer> ApprovePolicyAsync(Db db, CurrentUser user, string? idText)
     {
@@ -134,14 +147,36 @@ public static class PolicyActions
                         Numbers: [policy.Number, h.ReplacesNumber])) is not null)
                     return "suspended";
 
+                // Read under the period lock: a month close in flight is waited for and then seen, never slipped past.
+                await tx.LockAsync("core.accounting_period", shared: true);
                 var firstOpen = await PolicyCancel.FirstOpenDayAsync(tx);
-                var bookedOn = firstOpen is { } last && last > policy.EffectiveFrom ? last : policy.EffectiveFrom;
+                if (firstOpen is { } open && policy.EffectiveFrom < open) return policy.ReplacesPolicyId is null ? "policy-period-closed" : "period-closed";
                 var lines = (await tx.QueryAsync<(Guid Id, decimal Premium, decimal PremiumGel)>(
                     "select id, premium, premium_gel from core.policy_line where policy_id = @id", new { id })).ToList();
 
                 var currency = Billing.ParseCurrency(policy.PremiumCurrency);
                 var totalMinor = lines.Sum(l => Billing.Tetri(l.Premium));
-                if (policy.ReplacesPolicyId is { } originalId && totalMinor < 0)
+                var correction = policy.ReplacesPolicyId is { } replaced && totalMinor != 0 && currency == Currency.GEL
+                    ? await OpenMonthCorrectionAsync(tx, replaced, id, firstOpen)
+                    : null;
+                var bookedOn = correction?.BookedOn ?? policy.EffectiveFrom;
+                var number = policy.Number;
+                if (policy.ReplacesPolicyId is { } root)
+                {
+                    var (rootNumber, taken) = await ChangeNumber.NumberingAsync(tx, root);
+                    number = ChangeNumber.Next(rootNumber, taken, correction is null ? null : PolicyTexts.Endorse.CorrectionNumber);
+                }
+
+                if (correction is not null && policy.ReplacesPolicyId is { } correctedId)
+                {
+                    await tx.ExecuteAsync("select id from core.policy with (updlock, rowlock, holdlock) where id = @correctedId", new { correctedId });
+                    var scheduled = Billing.ToInstallments(await Billing.LoadScheduleAsync(tx, correctedId), currency).Sum(i => i.Amount.Minor);
+                    if (scheduled + totalMinor < 0) return "reduction-exceeds";
+                    var reason = $"{PolicyTexts.Endorse.CorrectionReason} {number}";
+                    await Billing.RebuildScheduleAsync(tx, correctedId, currency, scheduled + totalMinor, bookedOn, reason, user.Id);
+                    if (totalMinor > 0) await Billing.RebuildScheduleAsync(tx, id, currency, 0, bookedOn, reason, user.Id);
+                }
+                else if (policy.ReplacesPolicyId is { } originalId && totalMinor < 0)
                 {
                     await tx.ExecuteAsync("select id from core.policy with (updlock, rowlock, holdlock) where id = @originalId", new { originalId });
                     var scheduled = Billing.ToInstallments(await Billing.LoadScheduleAsync(tx, originalId), currency).Sum(i => i.Amount.Minor);
@@ -149,7 +184,7 @@ public static class PolicyActions
                     var chosen = await tx.QuerySingleOrDefaultAsync<string>("select value from core.setting where [key] = N'policy.reduction_order'");
                     var choices = Ka.Settings.Choices["policy.reduction_order"].Keys.ToList();
                     var order = Codes.Parse<ReductionOrder>(chosen is not null && choices.Contains(chosen) ? chosen : choices[0]);
-                    await Billing.ReduceScheduleByAsync(tx, originalId, currency, -totalMinor, order, bookedOn, $"{PolicyTexts.Endorse.ScheduleReason} {policy.Number}", user.Id);
+                    await Billing.ReduceScheduleByAsync(tx, originalId, currency, -totalMinor, order, bookedOn, $"{PolicyTexts.Endorse.ScheduleReason} {number}", user.Id);
                 }
 
                 foreach (var line in lines)
@@ -158,9 +193,14 @@ public static class PolicyActions
                     await tx.ExecuteAsync("""
                         insert into core.premium_transaction (id, policy_line_id, kind, amount, amount_gel, booked_on, cover_from, cover_to, created_by)
                         values (@booked, @lineId, N'issue', @premium, @premiumGel, @bookedOn, @from, @to, @userId)
-                        """, new { booked, lineId = line.Id, premium = line.Premium, premiumGel = line.PremiumGel, bookedOn, from = policy.EffectiveFrom, to = policy.EffectiveTo, userId = user.Id });
+                        """, new
+                    {
+                        booked, lineId = correction?.LineOf[line.Id] ?? line.Id, premium = line.Premium, premiumGel = line.PremiumGel, bookedOn,
+                        from = correction?.CoverFrom ?? policy.EffectiveFrom, to = correction?.CoverTo ?? policy.EffectiveTo, userId = user.Id,
+                    });
                     await ReinsuranceStore.CedeIssuedPremiumAsync(tx, booked, user.Id);
                 }
+                if (number != policy.Number) await tx.ExecuteAsync("update core.policy set number = @number where id = @id", new { number, id });
                 await tx.ExecuteAsync("update core.policy set status = N'active', approved_at = sysdatetimeoffset(), approved_by = @userId where id = @id",
                     new { userId = user.Id, id });
                 return "approved";
@@ -176,10 +216,39 @@ public static class PolicyActions
         return Answer(outcome == "approved" ? "done" : outcome == "skipped" ? "already" : outcome, number);
     }
 
+    private sealed record Correction(DateOnly BookedOn, DateOnly CoverFrom, DateOnly CoverTo, IReadOnlyDictionary<Guid, Guid> LineOf);
+
+    /// <summary>
+    /// Where a change approved now goes, if it corrects the original (owner, 13.10.2026; legacy PR #207 openMonthCorrection):
+    /// the original's own reporting month — the day its issue premium was first booked — must not be closed yet, and every line
+    /// of the change must have its one line of the same coverage on the original. Returns the original's booking day and cover,
+    /// and for each line of the change the original's line; null when the change takes effect as a policy of its own.
+    /// </summary>
+    private static async Task<Correction?> OpenMonthCorrectionAsync(Tx tx, Guid originalId, Guid changeId, DateOnly? firstOpen)
+    {
+        var origin = await tx.QuerySingleOrDefaultAsync<(DateOnly? BookedOn, DateOnly From, DateOnly To)?>("""
+            select min(t.booked_on), p.effective_from, p.effective_to
+            from core.policy p join core.policy_line l on l.policy_id = p.id join core.premium_transaction t on t.policy_line_id = l.id
+            where p.id = @originalId and t.kind = N'issue' group by p.effective_from, p.effective_to
+            """, new { originalId });
+        if (origin is not { BookedOn: { } bookedOn } o || (firstOpen is { } open && bookedOn < open)) return null;
+        var pairs = (await tx.QueryAsync<(Guid Id, Guid OriginalLineId)>("""
+            select c.id, o.id from core.policy_line c
+            join core.policy_line o on o.product_coverage_id = c.product_coverage_id and o.policy_id = @originalId
+            where c.policy_id = @changeId
+            """, new { originalId, changeId })).ToList();
+        var count = await tx.ExecuteScalarAsync<int>("select count(*) from core.policy_line where policy_id = @changeId", new { changeId });
+        var lineOf = new Dictionary<Guid, Guid>();
+        foreach (var (lineId, originalLineId) in pairs) lineOf[lineId] = originalLineId;
+        if (pairs.Count != count || lineOf.Count != count) return null;
+        return new Correction(bookedOn, o.From, o.To, lineOf);
+    }
+
     /// <summary>The text for an approval answer (legacy approve-answer.tsx answerText), or null for an unknown outcome.</summary>
     public static string? AnswerText(string outcome) =>
         PolicyTexts.ApproveOutcomes.TryGetValue(outcome, out var text) ? text
         : outcome == "reduction-exceeds" ? PolicyTexts.Endorse.ReductionExceeds
+        : outcome == "period-closed" ? PolicyTexts.Endorse.PeriodClosed
         : outcome == "suspended" ? AmlTexts.Suspension.Blocked
         : outcome.StartsWith("ri-", StringComparison.Ordinal) && ReinsuranceTexts.Problems.TryGetValue(outcome[3..], out var ri) ? ri
         : null;
@@ -218,7 +287,7 @@ public static class PolicyActions
     // ---------------------------------------------------------------- endorse
 
     private sealed record OriginalPolicy(Guid Id, Guid ContractId, string Status, DateOnly EffectiveFrom, DateOnly EffectiveTo, string PremiumCurrency,
-        Guid? ProductId, string? ProductCode, string Segment, int? CancelGraceDays);
+        Guid? ProductId, string Segment, int? CancelGraceDays);
 
     /// <summary>JavaScript's Number(value.replace(',', '.')) for a filled field, NaN for an empty or missing one.</summary>
     private static double Amount(string? value)
@@ -229,10 +298,12 @@ public static class PolicyActions
     }
 
     /// <summary>
-    /// A change to an active policy is issued as a new policy under the same contract (docs/04 rule რ10): it starts on
-    /// the change date, ends with the original, carries only the premium difference for the remaining term (per
-    /// coverage, possibly negative) and fixes its own exchange rate. It awaits approval like any policy. A positive
-    /// difference is due on the change date; a negative one reduces the original's schedule only on approval (H01).
+    /// A change to an active policy is entered as a request under the same contract (docs/04 rule რ10), numbered
+    /// ROOT/მოთხოვნა-k until approved: it starts on the change date (never in a closed period), ends with the original,
+    /// carries only the premium difference for the remaining term (per coverage, possibly negative) and fixes its own
+    /// exchange rate. It awaits approval like any policy, which decides whether it corrects the original or stands as a
+    /// policy of its own. A positive difference is due on the change date; a negative one changes the original's schedule
+    /// only on approval (H01).
     /// </summary>
     public static async Task<FormAnswer> EndorsePolicyAsync(Db db, Rates rates, CurrentUser user, IReadOnlyDictionary<string, string> values, Func<string, bool> included)
     {
@@ -240,8 +311,8 @@ public static class PolicyActions
         if (!Uuid.TryParse(V(values, "policy_id"), out var originalId)) return FormAnswer.Refused(PolicyTexts.Endorse.Errors.NotActive);
         var original = await db.ReadTxAsync(tx => tx.QuerySingleOrDefaultAsync<OriginalPolicy>("""
             select p.id as Id, p.contract_id as ContractId, p.status as Status, p.effective_from as EffectiveFrom, p.effective_to as EffectiveTo,
-                   p.premium_currency as PremiumCurrency, p.product_id as ProductId, pr.code as ProductCode, p.segment as Segment, p.cancel_grace_days as CancelGraceDays
-            from core.policy p left join core.product pr on pr.id = p.product_id where p.id = @originalId
+                   p.premium_currency as PremiumCurrency, p.product_id as ProductId, p.segment as Segment, p.cancel_grace_days as CancelGraceDays
+            from core.policy p where p.id = @originalId
             """, new { originalId }));
         if (original is not { Status: "active", ProductId: { } productId }) return FormAnswer.Refused(PolicyTexts.Endorse.Errors.NotActive);
         var coverages = await db.ReadTxAsync(tx => CoveragesAsync(tx, productId));
@@ -251,6 +322,9 @@ public static class PolicyActions
         DateOnly changeOn = default;
         if (!Dates.IsIsoDate(changeText) || (changeOn = Dates.ParseIsoDate(changeText)) < original.EffectiveFrom || changeOn >= original.EffectiveTo)
             errors["change_on"] = PolicyTexts.Endorse.Errors.Date;
+        // No change in a closed period (owner, 13.10.2026; legacy PR #207): the form says so; approval checks again.
+        else if (await db.ReadTxAsync(PolicyCancel.FirstOpenDayAsync) is { } firstOpen && changeOn < firstOpen)
+            errors["change_on"] = PolicyTexts.Endorse.Errors.PeriodClosed;
         var reason = V(values, "reason");
         if (string.IsNullOrEmpty(reason)) errors["reason"] = PolicyTexts.Endorse.Errors.Reason;
 
@@ -278,14 +352,12 @@ public static class PolicyActions
         var today = db.Today();
         var totalDelta = lines.Sum(l => l.DeltaMinor);
 
-        Guid newId;
-        try
-        {
-            newId = await db.AsUserAsync(user.Id, async tx =>
+        var newId = await db.AsUserAsync(user.Id, async tx =>
             {
-                await tx.ExecuteAsync("select id from core.policy with (updlock, rowlock, holdlock) where id = @id", new { id = original.Id });
-                var number = await tx.NextNumberAsync("policy:" + original.ProductCode)
-                    ?? throw new InvalidOperationException($"number series policy:{original.ProductCode} does not exist");
+                // A request until approved, ROOT/მოთხოვნა-k: a change takes no number of the series (owner, 14.10.2026: the
+                // number is given on approval; legacy PR #225), so a run-out series cannot stop it.
+                var (root, taken) = await ChangeNumber.NumberingAsync(tx, original.Id);
+                var number = ChangeNumber.Next(root, taken, PolicyTexts.Endorse.RequestNumber);
                 var policyId = Guid.NewGuid();
                 await tx.ExecuteAsync("""
                     insert into core.policy (id, contract_id, number, issued_on, replaces_policy_id, effective_from, effective_to, status,
@@ -340,11 +412,6 @@ public static class PolicyActions
                     """, new { policyId, id = original.Id });
                 return policyId;
             });
-        }
-        catch (Exception e) when (SeriesExhausted(e))
-        {
-            return FormAnswer.Refused(Ka.Common.SeriesExhausted);
-        }
         return FormAnswer.GoTo($"/policies/{Uuid.Text(newId)}?issued=1");
     }
 

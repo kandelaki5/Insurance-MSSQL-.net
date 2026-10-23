@@ -84,8 +84,12 @@ public sealed class PaymentConcurrencyTests(TestDatabase db) : IClassFixture<Tes
     }
 
     [Fact]
-    public async Task An_approval_waits_for_a_month_close_in_flight_is_then_refused_and_a_retry_books_the_first_open_day()
+    public async Task An_approval_waits_for_a_month_close_in_flight_and_is_then_refused_as_the_month_is_closed()
     {
+        // Owner, 13.10.2026 (legacy PR #212): nothing is approved into a closed period, and no longer booked on the first
+        // open day. The approval reads the closed months under the period lock, so it waits for the close in flight and then
+        // sees it: the owner's answer, nothing written — before PR #212's rule the insert itself was refused (23514) and a
+        // retry booked the first open day.
         var user = await w.UserAsync();
         var month = new DateOnly(2024, 6, 1);
         var p = await w.PendingPolicyAsync(await w.ClientAsync(), month.AddDays(3));
@@ -95,12 +99,13 @@ public sealed class PaymentConcurrencyTests(TestDatabase db) : IClassFixture<Tes
         var approving = PolicyActions.ApprovePolicyAsync(w.App, user, p.Id.ToString());
         await WaitingAsync(approving);
         await close.Transaction.CommitAsync();
-        var error = await Record.ExceptionAsync(() => approving);
-        Assert.Equal((DbError.CheckViolation, null), (DbError.From(error)?.Code, DbError.From(error)?.Constraint));
+        var answer = await approving;
+        Assert.Equal(("policy-period-closed", p.Number), (answer.Outcome, answer.Number));
+        Assert.Equal("შეუძლებელია პოლისის დამტკიცება, თვე დახურულია", PolicyActions.AnswerText(answer.Outcome));
         Assert.Empty(await w.PremiumRowsAsync(p.Id));
         Assert.Equal("pending_approval", await w.ScalarAsync<string>("select status from core.policy where id = @id", new { id = p.Id }));
-        Assert.Equal("done", (await PolicyActions.ApprovePolicyAsync(w.App, user, p.Id.ToString())).Outcome);
-        Assert.Equal(month.AddMonths(1), (await w.PremiumRowsAsync(p.Id)).Single().BookedOn);
+        Assert.Equal("policy-period-closed", (await PolicyActions.ApprovePolicyAsync(w.App, user, p.Id.ToString())).Outcome);
+        Assert.Empty(await w.PremiumRowsAsync(p.Id));
     }
 
     [Theory]

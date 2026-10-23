@@ -283,6 +283,42 @@ public static class Receivable
     }
 
     /// <summary>
+    /// The schedule laid out again for a new total, as if the policy had been issued with it (owner, 13.10.2026: a change
+    /// approved while the policy's own month is open corrects the policy, and its schedule with it: 4 × 100.00 becomes
+    /// 4 × 125.00 on the same dates; legacy PR #218 rebuildInstallments). Every instalment keeps its date and its share of
+    /// the schedule, rounded down; the last takes the rounding remainder. What was already paid is not looked at: an
+    /// instalment may end above it (owed, overdue if its date has passed) or below it (the client's credit). Returns the new
+    /// amount of every instalment by id. The shares are those of <paramref name="laidOut"/>, the instalments as first
+    /// scheduled, when given: a second correction is laid out as the policy was issued, not by the first correction's
+    /// rounded amounts (review PR218-F2: 400 → 333.33 → 500 is 4 × 125.00), and a schedule corrected to nothing keeps its
+    /// shape (PR218-F1: 400 → 0 → 100 is 4 × 25.00). Without them the current amounts are the shares. A negative total, or
+    /// no shares to lay a total out by, is refused (ArgumentOutOfRangeException, legacy RangeError). Share × target is
+    /// exact (the old code multiplied in floating point, exact below 2^53 only).
+    /// </summary>
+    public static Dictionary<string, long> RebuildInstallments(IReadOnlyList<Installment> installments, long targetMinor, IReadOnlyList<Installment>? laidOut = null)
+    {
+        var sorted = installments.OrderBy(i => DayNumber(i.DueOn)).ToList();
+        if (targetMinor < 0) throw new ArgumentOutOfRangeException(null, $"a schedule cannot be laid out for {JsMath.Text(targetMinor)}");
+        if (targetMinor == 0) return sorted.ToDictionary(i => i.Id, _ => 0L);
+        var current = sorted.Sum(i => i.Amount.Minor);
+        var first = (laidOut ?? []).ToDictionary(i => i.Id, i => i.Amount.Minor);
+        long Share(Installment i) => laidOut is { Count: > 0 } ? first.GetValueOrDefault(i.Id) : i.Amount.Minor;
+        var total = sorted.Sum(Share);
+        if (total <= 0) throw new ArgumentOutOfRangeException(null, $"a schedule of {JsMath.Text(current)} has no shares to lay {JsMath.Text(targetMinor)} out by");
+        // Math.floor of share × target / total, the product exact in 128 bits.
+        static long FloorDiv(Int128 a, long b)
+        {
+            var q = a / b;
+            if (a % b != 0 && (a < 0) != (b < 0)) q--;
+            return (long)q;
+        }
+        var amounts = sorted.ToDictionary(i => i.Id, i => FloorDiv((Int128)Share(i) * targetMinor, total));
+        var last = sorted[^1];
+        amounts[last.Id] = targetMinor - sorted.Take(sorted.Count - 1).Sum(i => amounts[i.Id]);
+        return amounts;
+    }
+
+    /// <summary>
     /// Schedule after the premium changes to `targetMinor` (e.g. the retained premium after a
     /// cancellation): instalments keep their dates and order, the last ones are reduced or
     /// removed so the schedule adds up to the target. Nothing is added when the target is

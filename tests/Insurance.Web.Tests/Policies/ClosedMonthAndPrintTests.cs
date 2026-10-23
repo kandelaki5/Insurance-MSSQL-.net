@@ -10,16 +10,21 @@ namespace Insurance.Web.Tests.Policies;
 public sealed class ClosedMonthWebTests(PolicyWebApp app) : IClassFixture<PolicyWebApp>
 {
     [Fact]
-    public async Task A_receipt_in_a_closed_month_is_refused_and_a_late_approval_is_booked_in_the_first_open_month()
+    public async Task A_receipt_in_a_closed_month_is_refused_and_a_late_approval_is_refused_with_the_owners_words()
     {
         var (accountant, _) = await app.SignedInAsync("accountant");
         var (head, headId) = await app.SignedInAsync("operations_head");
         var december = new DateOnly(2025, 12, 1);
+        // Approved while December is open.
         var p = await app.W.PendingPolicyAsync(await app.W.ClientAsync(), december.AddDays(3));
+        var done = WebUtility.HtmlDecode(await (await WebApp.PostFormAsync(head, "/policies/pending?handler=Approve", new() { ["id"] = p.Id.ToString() }, "/policies/pending")).Content.ReadAsStringAsync());
+        Assert.Contains($"{p.Number}: {PolicyTexts.ApproveOutcomes["done"]}", done);
+        // Entered in December, December then closed: not approved (owner, 13.10.2026; legacy PR #212), nothing written.
+        var late = await app.W.PendingPolicyAsync(await app.W.ClientAsync(), december.AddDays(10));
         await app.W.CloseMonthAsync(december, headId);
-        var answer = WebUtility.HtmlDecode(await (await WebApp.PostFormAsync(head, "/policies/pending?handler=Approve", new() { ["id"] = p.Id.ToString() }, "/policies/pending")).Content.ReadAsStringAsync());
-        Assert.Contains($"{p.Number}: {PolicyTexts.ApproveOutcomes["done"]}", answer);
-        Assert.Equal(new DateOnly(2026, 1, 1), (await app.W.PremiumRowsAsync(p.Id)).Single().BookedOn);
+        var answer = WebUtility.HtmlDecode(await (await WebApp.PostFormAsync(head, "/policies/pending?handler=Approve", new() { ["id"] = late.Id.ToString() }, "/policies/pending")).Content.ReadAsStringAsync());
+        Assert.Contains($"{late.Number}: შეუძლებელია პოლისის დამტკიცება, თვე დახურულია", answer);
+        Assert.Empty(await app.W.PremiumRowsAsync(late.Id));
 
         // The allocation would be booked today (open), so the closed month is reached by closing today's month too.
         await app.W.CloseMonthAsync(World.Today, headId);

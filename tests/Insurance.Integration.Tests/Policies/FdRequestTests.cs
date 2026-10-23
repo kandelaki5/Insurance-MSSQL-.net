@@ -200,6 +200,8 @@ public sealed class FdRequestClosedMonthTests(TestDatabase db) : IClassFixture<T
         Assert.Equal($"/policies/{p.Id}?reversal=requested", await PaymentActions.ReversePaymentAsync(w.App, admin, receipt.ToString(), p.Id.ToString(), "x"));
         var refund = await w.ScalarAsync<Guid>("select id from core.premium_refund_request where policy_id = @p", new { p = p.Id });
         var reversal = await w.ScalarAsync<Guid>("select id from core.receipt_reversal_request where policy_id = @p", new { p = p.Id });
+        // Approved before the close: a policy starting in a closed month is no longer approved (legacy PR #212).
+        var owing = await w.ActivePolicyAsync(admin, await w.ClientAsync(), start);
 
         await w.CloseMonthAsync(World.Today, admin.Id);
         Assert.Equal($"/policies/{p.Id}?refund=period-closed", await PaymentActions.ApprovePremiumRefundRequestAsync(w.App, w.Rates, admin, p.Id.ToString(), refund.ToString()));
@@ -207,7 +209,6 @@ public sealed class FdRequestClosedMonthTests(TestDatabase db) : IClassFixture<T
         Assert.Equal(0, await w.ScalarAsync<int>("select count(*) from core.payment where refund_request_id = @refund or reversal_request_id = @reversal", new { refund, reversal }));
 
         // A receipt dated in the closed month is refused on its date, with nothing written.
-        var owing = await w.ActivePolicyAsync(admin, await w.ClientAsync(), start);
         var r = await w.PayAsync(admin, owing.Id, "10.00", World.Today);
         Assert.Equal(Insurance.Application.Texts.BillingTexts.Payment.Errors.PeriodClosed, r.Errors["received_on"]);
         Assert.Equal(0m, await w.PaidAsync(owing.Id));

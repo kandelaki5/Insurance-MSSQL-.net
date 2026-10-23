@@ -142,12 +142,40 @@ public sealed class PaymentRegressionTests(TestDatabase db) : IClassFixture<Test
     }
 
     [Fact]
+    public async Task H23_a_cancellation_from_a_past_day_counts_today()
+    {
+        var user = await w.UserAsync();
+        var client = await w.ClientAsync();
+        var p4 = await w.ActivePolicyAsync(user, client, AsOfStart);
+        await w.PayAsync(user, p4.Id, "91.25", PaidOn);
+        Assert.NotNull((await w.CancelAsync(user, p4.Id, AsOfStart.AddDays(182), "past")).Redirect);
+        var change = await w.ScalarAsync<decimal>("select sum(j.change) from core.installment_adjustment j join core.installment i on i.id = j.installment_id where i.policy_id = @id", new { id = p4.Id });
+        Assert.Equal(-183m, change);
+        Assert.Equal(90.75m, await w.OwedOnAsync(p4.Id, World.Today));
+    }
+}
+
+/// <summary>
+/// Legacy H23 for a reduction approved from a future day: it counts from that day in the card, the payment form and the report.
+/// Its own database: the original's month is closed so that the change stands as a policy of its own (legacy PR #207).
+/// </summary>
+public sealed class PaymentRegressionOwnChangeTests(TestDatabase db) : IClassFixture<TestDatabase>
+{
+    private readonly World w = new(db);
+    private static readonly DateOnly AsOfStart = World.Today.AddDays(-200);
+    private static readonly DateOnly CancelOn = AsOfStart.AddDays(274);
+    private static readonly DateOnly PaidOn = AsOfStart.AddDays(4);
+
+    [Fact]
     public async Task H23_an_approved_reduction_from_a_future_day_counts_from_that_day_in_card_payment_and_report()
     {
         var user = await w.UserAsync();
         var client = await w.ClientAsync();
         var p5 = await w.ActivePolicyAsync(user, client, AsOfStart);
         await w.PayAsync(user, p5.Id, "91.25", PaidOn);
+        // The original's own month closed: the change stands as a policy of its own on its date (legacy PR #207); in an open
+        // month it would correct the original from its start instead (EndorsementTests).
+        await w.CloseMonthAsync(new DateOnly(AsOfStart.Year, AsOfStart.Month, 1), user.Id);
         async Task<System.Numerics.BigInteger> ReceivableGel(DateOnly day) =>
             (await w.App.ReadTxAsync(tx => PremiumReport.BuildAsync(tx, w.Rates, day.ToString("yyyy-MM")))).Receivables.FirstOrDefault(r => r.Currency == "GEL")?.Outstanding ?? 0;
         var before = (await ReceivableGel(World.Today), await ReceivableGel(CancelOn));
@@ -176,18 +204,5 @@ public sealed class PaymentRegressionTests(TestDatabase db) : IClassFixture<Test
         Assert.Equal("0", World.Param(paid.Redirect, "paid"));
         Assert.Equal(0m, await w.OwedOnAsync(p5.Id, World.Today));
         Assert.Equal(-50m, await w.OwedOnAsync(p5.Id, CancelOn));
-    }
-
-    [Fact]
-    public async Task H23_a_cancellation_from_a_past_day_counts_today()
-    {
-        var user = await w.UserAsync();
-        var client = await w.ClientAsync();
-        var p4 = await w.ActivePolicyAsync(user, client, AsOfStart);
-        await w.PayAsync(user, p4.Id, "91.25", PaidOn);
-        Assert.NotNull((await w.CancelAsync(user, p4.Id, AsOfStart.AddDays(182), "past")).Redirect);
-        var change = await w.ScalarAsync<decimal>("select sum(j.change) from core.installment_adjustment j join core.installment i on i.id = j.installment_id where i.policy_id = @id", new { id = p4.Id });
-        Assert.Equal(-183m, change);
-        Assert.Equal(90.75m, await w.OwedOnAsync(p4.Id, World.Today));
     }
 }

@@ -222,6 +222,27 @@ public static class Billing
         """;
 
     /// <summary>
+    /// Lays the policy's schedule out again for <paramref name="targetMinor"/>, as if the policy had been issued with it
+    /// (Receivable.RebuildInstallments; owner, 13.10.2026; legacy PR #218 rebuildSchedule), by booking dated adjustments:
+    /// dates are kept, each instalment keeps its share as first scheduled (review PR218-F1/F2). Nothing is ever deleted or
+    /// rewritten; what was paid stays allocated.
+    /// </summary>
+    public static async Task RebuildScheduleAsync(Tx tx, Guid policyId, Currency currency, long targetMinor, DateOnly bookedOn, string reason, Guid userId)
+    {
+        var installments = ToInstallments(await LoadScheduleAsync(tx, policyId), currency);
+        var laidOut = targetMinor > 0
+            ? ToInstallments(await tx.QueryAsync<InstallmentRow>("select id as Id, due_on as DueOn, amount as Amount from core.installment where policy_id = @policyId order by due_on", new { policyId }), currency)
+            : [];
+        var target = Receivable.RebuildInstallments(installments, targetMinor, laidOut);
+        foreach (var i in installments)
+        {
+            var change = target[i.Id] - i.Amount.Minor;
+            if (change == 0) continue;
+            await tx.ExecuteAsync(InsertAdjustment, new { installmentId = Guid.Parse(i.Id), bookedOn, change = FromTetri(change), reason, userId });
+        }
+    }
+
+    /// <summary>
     /// Takes an approved reduction off the schedule in the company's chosen order (finance ReduceInstallments; owner,
     /// 07.10.2026), booking dated adjustments. Nothing is ever deleted or rewritten. Refused (ArgumentOutOfRangeException,
     /// legacy RangeError) when the reduction exceeds the whole schedule.

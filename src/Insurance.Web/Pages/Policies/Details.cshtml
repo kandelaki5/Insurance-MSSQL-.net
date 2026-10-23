@@ -144,8 +144,9 @@
         <th>@F.InsuranceClass</th>
         <th class="num">@F.SumInsured</th>
         <th class="num">@F.Deductible</th>
-        <th class="num">@F.Premium, @currency</th>
-        <th class="num">@F.PremiumGel</th>
+        <th class="num">@PolicyTexts.CoverageColumns.InitialPremium, @currency</th>
+        <th class="num">@PolicyTexts.CoverageColumns.InitialPremiumGel</th>
+        <th class="num">@PolicyTexts.CoverageColumns.CurrentPremium, @currency</th>
     </tr>
     </thead>
     <tbody>
@@ -158,6 +159,7 @@
             <td class="num">@(line.Deductible is { } d ? Stored(d) : "")</td>
             <td class="num">@Stored(line.Premium)</td>
             <td class="num">@Stored(line.PremiumGel)</td>
+            <td class="num">@Grouped(Model.CurrentByLine.GetValueOrDefault(line.Id))</td>
         </tr>
     }
     </tbody>

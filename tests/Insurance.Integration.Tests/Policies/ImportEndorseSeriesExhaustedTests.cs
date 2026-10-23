@@ -1,3 +1,4 @@
+using Insurance.Application.Services;
 using Dapper;
 using Insurance.Application.Texts;
 using Import = Insurance.Application.Services.PolicyImport;
@@ -78,8 +79,14 @@ public sealed class ImportEndorseSeriesExhaustedTests(TestDatabase db) : IClassF
         finally { await SetPolicySeriesAsync(saved, prefix); }
     }
 
+    /// <summary>
+    /// Since the old program's PR #225 (owner, 14.10.2026: a change's number is given on approval) a change takes no number of
+    /// the series: entered as ROOT/მოთხოვნა-1 and approved as ROOT/შესწორება-1 or ROOT/1, so a run-out series no longer stops it
+    /// (legacy L225:3424, scripts/number-limit-endorse.ts) and no counter moves. Negative control: before PR #225 this change was
+    /// refused with the series message.
+    /// </summary>
     [Fact]
-    public async Task EndorsePolicy_with_the_policy_series_run_out_issues_no_change_and_moves_no_counter()
+    public async Task EndorsePolicy_with_the_policy_series_run_out_is_entered_as_a_request_and_moves_no_counter()
     {
         var holder = await w.ClientAsync();
         var original = await w.ActivePolicyAsync(await w.UserAsync("operations_head"), holder, new DateOnly(2026, 10, 1));
@@ -91,14 +98,13 @@ public sealed class ImportEndorseSeriesExhaustedTests(TestDatabase db) : IClassF
         {
             var before = await SeriesStateAsync();
             var r = await w.EndorseAsync(user, original.Id, new DateOnly(2026, 10, 11), "10");
-            Assert.Equal((Ka.Common.SeriesExhausted, null), (r.Message, r.Redirect));
+            Assert.NotNull(r.Redirect);
+            var change = await w.ChangeOfAsync(original.Id);
+            Assert.Equal(($"{original.Number}/მოთხოვნა-1", "pending_approval"), (change!.Value.Number, change.Value.Status));
+            var approved = await PolicyActions.ApprovePolicyAsync(w.App, await w.UserAsync("operations_head"), change.Value.Id.ToString());
+            Assert.Equal(("done", $"{original.Number}/შესწორება-1"), (approved.Outcome, approved.Number));
             Assert.Equal(before, await SeriesStateAsync());
-            Assert.Null(await w.ChangeOfAsync(original.Id));
         }
         finally { await SetPolicySeriesAsync(saved); }
-        // Negative control of the fixture: with numbers left the same change is issued.
-        var issued = await w.EndorseAsync(user, original.Id, new DateOnly(2026, 10, 11), "10");
-        Assert.NotNull(issued.Redirect);
-        Assert.NotNull(await w.ChangeOfAsync(original.Id));
     }
 }

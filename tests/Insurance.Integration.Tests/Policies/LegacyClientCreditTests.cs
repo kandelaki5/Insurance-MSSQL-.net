@@ -152,11 +152,14 @@ public sealed class LegacyClientCreditTests(TestDatabase db) : IClassFixture<Tes
             select a.amount from core.payment_allocation a join core.installment i on i.id = a.installment_id
             where a.payment_id = @receipt and i.policy_id = @a and a.amount < 0 order by i.due_on
             """, new { receipt, a = a.Id });
-        Assert.Equal([-8.75m, -91.25m], negatives);
+        // The reduction corrected A in its open month (owner, 13.10.2026; legacy PR #218): its schedule was laid out again as
+        // 4 × 66.25, each instalment paid 91.25 — 25.00 over on each (the owner's „4 × 80, 20 over"). Before that rule the
+        // company's order took the 100.00 off the last instalments (−8.75, −91.25).
+        Assert.Equal([-25m, -25m, -25m, -25m], negatives);
         var (pa, pb, after) = (await PositionAsync(a.Id), await PositionAsync(b.Id), await ReceiptAsync(receipt));
         Assert.Equal((0m, 100m, 265m), (pa.Overpaid, pb.Settled, pb.Owed));
         Assert.Equal([91.25m, 8.75m, 0m, 0m], pb.Rows.Select(r => r.Settled));
-        Assert.Equal((365m, before.Lines + 4), after);
+        Assert.Equal((365m, before.Lines + 6), after);
 
         // C3
         Assert.Equal("nothing-left", Outcome(await Transfer(b.Id, receipt)));

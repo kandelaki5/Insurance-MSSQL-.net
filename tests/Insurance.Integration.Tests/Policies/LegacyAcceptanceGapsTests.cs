@@ -78,25 +78,29 @@ public sealed class LegacyAcceptanceGapsClosedMonthTests(TestDatabase db) : ICla
 {
     private readonly World w = new(db);
 
+    /// <summary>
+    /// Acceptance P5 under the rule of the old program's PR #212 (owner, 13.10.2026): a policy starting in a closed month is not
+    /// approved now — it used to be booked on the first open day with its cession — and nothing is written: no premium, no cession.
+    /// </summary>
     [Fact]
-    public async Task AG_P5_a_policy_starting_in_a_closed_month_approved_now_books_on_the_first_open_day_with_its_cover_unchanged()
+    public async Task AG_P5_a_policy_starting_in_a_closed_month_is_not_approved_and_cedes_nothing()
     {
         var admin = await w.UserAsync();
         var lastClosed = new DateOnly(2025, 6, 1);
         var start = lastClosed.AddMonths(1);
-        // An obligatory treaty on the class, so the approval also cedes: the cession is booked on the same open day.
+        // An obligatory treaty on the class: an approval would cede.
         await w.TreatyAsync("quota_share", 60m);
-        // The only instalment falls in the open month, so nothing is written into the closed one but the policy's own dates.
         var late = await w.PendingPolicyAsync(await w.ClientAsync(), lastClosed, schedule: [(start.DayNumber - lastClosed.DayNumber, 365m)]);
         await w.CloseMonthAsync(lastClosed, admin.Id);
-        Assert.Equal("done", (await PolicyActions.ApprovePolicyAsync(w.App, admin, late.Id.ToString())).Outcome);
-        var row = Assert.Single(await w.PremiumRowsAsync(late.Id));
-        Assert.Equal(("issue", 365m, start, lastClosed, lastClosed.AddDays(365)), (row.Kind, row.Amount, row.BookedOn, row.CoverFrom, row.CoverTo));
-        var cessions = await w.QueryAsync<DateOnly>("""
-            select c.booked_on from core.premium_cession c join core.premium_transaction t on t.id = c.premium_transaction_id
+        Assert.Equal("policy-period-closed", (await PolicyActions.ApprovePolicyAsync(w.App, admin, late.Id.ToString())).Outcome);
+        Assert.Empty(await w.PremiumRowsAsync(late.Id));
+        Assert.Equal(0, await w.ScalarAsync<int>("""
+            select count(*) from core.premium_cession c join core.premium_transaction t on t.id = c.premium_transaction_id
             join core.policy_line l on l.id = t.policy_line_id where l.policy_id = @id
-            """, new { id = late.Id });
-        Assert.NotEmpty(cessions);
-        Assert.All(cessions, d => Assert.Equal(start, d));
+            """, new { id = late.Id }));
+        // Approved on its first open day it is in force, with its cession booked on its own date.
+        var onTime = await w.PendingPolicyAsync(await w.ClientAsync(), start);
+        Assert.Equal("done", (await PolicyActions.ApprovePolicyAsync(w.App, admin, onTime.Id.ToString())).Outcome);
+        Assert.Equal(start, Assert.Single(await w.PremiumRowsAsync(onTime.Id)).BookedOn);
     }
 }

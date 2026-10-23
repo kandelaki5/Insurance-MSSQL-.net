@@ -478,7 +478,9 @@ public sealed class GapsCardStoredMoneyTests(PolicyWebApp app) : IClassFixture<P
         var (acc, _) = await app.SignedInAsync("accountant");
         var ledger = await Gaps.LedgerAsync(W);
         var html = await RawAsync(acc, $"/policies/{t.Id}");
-        Assert.Equal(new[] { "9,999,999,999,999,999.99|90,071,992,547,408.01|90,071,992,547,408.01|9,999,999,999,999,999.99", "|0.00|-0.01|-1,234,567.89" }.Order(StringComparer.Ordinal),
+        // The last cell is the coverage's current premium (legacy PR #211): line 1's issue and its cancellation, both booked on B,
+        // give exactly 0.00 (the old code summed them in floating point); line 2 has no ledger row.
+        Assert.Equal(new[] { "9,999,999,999,999,999.99|90,071,992,547,408.01|90,071,992,547,408.01|9,999,999,999,999,999.99|0.00", "|0.00|-0.01|-1,234,567.89|0.00" }.Order(StringComparer.Ordinal),
             TableWith(html, PolicyTexts.Fields.SumInsured).Select(r => string.Join("|", r[2..])).Order(StringComparer.Ordinal));
         // The card lists cessions by created_at; the two rows are written in one batch and may share it, so their order is not asserted.
         Assert.Equal(new[] { "90,071,992,547,408.01|9,999,999,999,999,999.99|0.01", "-90,071,992,547,408.01|-9,999,999,999,999,999.99|-0.01" }.Order(StringComparer.Ordinal),

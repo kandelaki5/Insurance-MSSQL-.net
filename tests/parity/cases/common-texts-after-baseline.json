@@ -14,6 +14,220 @@
    "cs": "SanctionsTexts.ReusedDecision",
    "value": "გამოყენებულია წინა გადაწყვეტილება",
    "origin": "rewrite, owner decision 23.10.2026 (false-positive reuse); wording proposed by Claude, not yet approved by the owner"
+  },
+  {
+   "kind": "text",
+   "ts": "policyTexts.coverageColumns.initialPremium",
+   "cs": "PolicyTexts.CoverageColumns.InitialPremium",
+   "value": "საწყისი პრემია (გაცემისას)",
+   "origin": "Insurance-Software PR #207/#212/#211/#218/#225, policy-texts state at #225 head f9b5a9a (owner 13.10.2026 and 14.10.2026, docs/05 a15/a16, PR #213/#226)"
+  },
+  {
+   "kind": "text",
+   "ts": "policyTexts.coverageColumns.initialPremiumGel",
+   "cs": "PolicyTexts.CoverageColumns.InitialPremiumGel",
+   "value": "საწყისი პრემია ლარში",
+   "origin": "Insurance-Software PR #207/#212/#211/#218/#225, policy-texts state at #225 head f9b5a9a (owner 13.10.2026 and 14.10.2026, docs/05 a15/a16, PR #213/#226)"
+  },
+  {
+   "kind": "text",
+   "ts": "policyTexts.coverageColumns.currentPremium",
+   "cs": "PolicyTexts.CoverageColumns.CurrentPremium",
+   "value": "მიმდინარე პრემია (დამტკიცებული შესწორებებით)",
+   "origin": "Insurance-Software PR #207/#212/#211/#218/#225, policy-texts state at #225 head f9b5a9a (owner 13.10.2026 and 14.10.2026, docs/05 a15/a16, PR #213/#226)"
+  },
+  {
+   "kind": "text",
+   "ts": "policyTexts.endorse.note",
+   "cs": "PolicyTexts.Endorse.Note",
+   "value": "ცვლილება ფორმდება მოთხოვნად და ძალაში შედის დამტკიცების შემდეგ; ნომერი დამტკიცებისას ენიჭება. თუ ძირითადი პოლისის თვე ჯერ ღიაა, ცვლილება თავად პოლისს ასწორებს და მისი ნომერი არ იცვლება; თუ დახურულია — ცვლილება ცალკე პოლისია იმავე ხელშეკრულების ქვეშ, ნომრით „ძირითადი/1“, „ძირითადი/2“…: იწყება ცვლილების თარიღიდან, მთავრდება ძირითად პოლისთან ერთად და ატარებს მხოლოდ პრემიის სხვაობას დარჩენილი ვადისთვის.",
+   "origin": "Insurance-Software PR #207/#212/#211/#218/#225, policy-texts state at #225 head f9b5a9a (owner 13.10.2026 and 14.10.2026, docs/05 a15/a16, PR #213/#226)"
+  },
+  {
+   "kind": "text",
+   "ts": "policyTexts.endorse.correctionReason",
+   "cs": "PolicyTexts.Endorse.CorrectionReason",
+   "value": "გრაფიკი შესწორდა დამტკიცებული ცვლილებით",
+   "origin": "Insurance-Software PR #207/#212/#211/#218/#225, policy-texts state at #225 head f9b5a9a (owner 13.10.2026 and 14.10.2026, docs/05 a15/a16, PR #213/#226)"
+  },
+  {
+   "kind": "text",
+   "ts": "policyTexts.endorse.requestNumber",
+   "cs": "PolicyTexts.Endorse.RequestNumber",
+   "value": "მოთხოვნა",
+   "origin": "Insurance-Software PR #207/#212/#211/#218/#225, policy-texts state at #225 head f9b5a9a (owner 13.10.2026 and 14.10.2026, docs/05 a15/a16, PR #213/#226)"
+  },
+  {
+   "kind": "text",
+   "ts": "policyTexts.endorse.correctionNumber",
+   "cs": "PolicyTexts.Endorse.CorrectionNumber",
+   "value": "შესწორება",
+   "origin": "Insurance-Software PR #207/#212/#211/#218/#225, policy-texts state at #225 head f9b5a9a (owner 13.10.2026 and 14.10.2026, docs/05 a15/a16, PR #213/#226)"
+  },
+  {
+   "kind": "text",
+   "ts": "policyTexts.endorse.periodClosed",
+   "cs": "PolicyTexts.Endorse.PeriodClosed",
+   "value": "ცვლილების თარიღი დახურულ პერიოდშია — დახურულ პერიოდში ცვლილების დამტკიცება შეუძლებელია; ცვლილება ღია პერიოდის თარიღით გააფორმეთ.",
+   "origin": "Insurance-Software PR #207/#212/#211/#218/#225, policy-texts state at #225 head f9b5a9a (owner 13.10.2026 and 14.10.2026, docs/05 a15/a16, PR #213/#226)"
+  },
+  {
+   "kind": "text",
+   "ts": "policyTexts.endorse.errors.periodClosed",
+   "cs": "PolicyTexts.Endorse.Errors.PeriodClosed",
+   "value": "დახურულ პერიოდში ცვლილების გაკეთება შეუძლებელია — აირჩიეთ ღია პერიოდის თარიღი",
+   "origin": "Insurance-Software PR #207/#212/#211/#218/#225, policy-texts state at #225 head f9b5a9a (owner 13.10.2026 and 14.10.2026, docs/05 a15/a16, PR #213/#226)"
+  },
+  {
+   "kind": "text",
+   "ts": "policyTexts.errors.periodClosed",
+   "cs": "PolicyTexts.Errors.PeriodClosed",
+   "value": "დახურულ პერიოდში პოლისი ვერ დაიწყება — თვე დახურულია; აირჩიეთ ღია პერიოდის თარიღი",
+   "origin": "Insurance-Software PR #207/#212/#211/#218/#225, policy-texts state at #225 head f9b5a9a (owner 13.10.2026 and 14.10.2026, docs/05 a15/a16, PR #213/#226)"
+  },
+  {
+   "kind": "map",
+   "ts": "policyTexts.endorse.errors",
+   "cs": "PolicyTexts.Endorse.Errors.ByKey",
+   "entries": [
+    [
+     "notActive",
+     "ცვლილება მხოლოდ მოქმედ პოლისზეა შესაძლებელი"
+    ],
+    [
+     "date",
+     "ცვლილების თარიღი პოლისის მოქმედების ფარგლებში უნდა იყოს"
+    ],
+    [
+     "reason",
+     "აღწერეთ ცვლილების შინაარსი"
+    ],
+    [
+     "coverages",
+     "მონიშნეთ მინიმუმ ერთი დაფარვა"
+    ],
+    [
+     "rate",
+     "ამ თარიღის ოფიციალური კურსი ვერ მოიძებნა"
+    ],
+    [
+     "periodClosed",
+     "დახურულ პერიოდში ცვლილების გაკეთება შეუძლებელია — აირჩიეთ ღია პერიოდის თარიღი"
+    ]
+   ],
+   "origin": "Insurance-Software PR #207/#212/#211/#218/#225, policy-texts state at #225 head f9b5a9a (owner 13.10.2026 and 14.10.2026, docs/05 a15/a16, PR #213/#226)"
+  },
+  {
+   "kind": "map",
+   "ts": "policyTexts.errors",
+   "cs": "PolicyTexts.Errors.ByKey",
+   "entries": [
+    [
+     "policyholder",
+     "ამ ნომრით კლიენტი ვერ მოიძებნა. ჯერ დაამატეთ იგი კლიენტებში."
+    ],
+    [
+     "policyholderRisk",
+     "კლიენტს რისკის დონე არ აქვს მინიჭებული — ჯერ შეაფასეთ კლიენტის ბარათზე (AML კანონი, მუხ. 8)."
+    ],
+    [
+     "policyholderSanctioned",
+     "კლიენტს მომსახურება შეჩერებული აქვს სანქციების სკრინინგის შედეგად — პოლისის გაფორმება დაუშვებელია (AML კანონი, მუხ. 10.7)."
+    ],
+    [
+     "make",
+     "მარკა სავალდებულოა"
+    ],
+    [
+     "model",
+     "მოდელი სავალდებულოა"
+    ],
+    [
+     "vehicleId",
+     "მიუთითეთ სახელმწიფო ნომერი ან VIN"
+    ],
+    [
+     "vin",
+     "VIN უნდა შედგებოდეს 17 სიმბოლოსგან"
+    ],
+    [
+     "year",
+     "გამოშვების წელი არასწორია"
+    ],
+    [
+     "value",
+     "მიუთითეთ ავტომობილის ღირებულება"
+    ],
+    [
+     "dates",
+     "დასრულების თარიღი უნდა იყოს ძალაში შესვლის თარიღის შემდეგ"
+    ],
+    [
+     "periodClosed",
+     "დახურულ პერიოდში პოლისი ვერ დაიწყება — თვე დახურულია; აირჩიეთ ღია პერიოდის თარიღი"
+    ],
+    [
+     "rate",
+     "ამ თარიღის ოფიციალური კურსი ვერ მოიძებნა"
+    ],
+    [
+     "coverages",
+     "აირჩიეთ მინიმუმ ერთი დაფარვა და მიუთითეთ პრემია"
+    ],
+    [
+     "premium",
+     "მიუთითეთ პრემია"
+    ],
+    [
+     "installments",
+     "შენატანების რაოდენობა: 1, 4, 11 ან 12. სხვა გრაფიკი (მაგ. 2 გადახდა) ინდივიდუალურია"
+    ],
+    [
+     "installmentsEleven",
+     "11 გადახდა მხოლოდ ზუსტად 12-თვიან პოლისზეა შესაძლებელი"
+    ],
+    [
+     "mandatory",
+     "ეს დაფარვა სავალდებულოა"
+    ],
+    [
+     "commission",
+     "საკომისიო უნდა იყოს 0-დან 100-მდე"
+    ]
+   ],
+   "origin": "Insurance-Software PR #207/#212/#211/#218/#225, policy-texts state at #225 head f9b5a9a (owner 13.10.2026 and 14.10.2026, docs/05 a15/a16, PR #213/#226)"
+  },
+  {
+   "kind": "map",
+   "ts": "policyTexts.approveOutcomes",
+   "cs": "PolicyTexts.ApproveOutcomes",
+   "entries": [
+    [
+     "done",
+     "პოლისი დამტკიცდა და ძალაშია"
+    ],
+    [
+     "already",
+     "პოლისი უკვე დამტკიცებულია ან აღარ ელოდება დამტკიცებას — არაფერი შეცვლილა"
+    ],
+    [
+     "forbidden",
+     "პოლისის დამტკიცების უფლება არ გაქვთ — არაფერი შეცვლილა"
+    ],
+    [
+     "own",
+     "საკუთარი გაფორმებული პოლისის დამტკიცება არ შეიძლება; დაამტკიცებს სხვა თანამშრომელი — არაფერი შეცვლილა"
+    ],
+    [
+     "invalid",
+     "პოლისი ვერ მოიძებნა — არაფერი შეცვლილა"
+    ],
+    [
+     "policy-period-closed",
+     "შეუძლებელია პოლისის დამტკიცება, თვე დახურულია"
+    ]
+   ],
+   "origin": "Insurance-Software PR #207/#212/#211/#218/#225, policy-texts state at #225 head f9b5a9a (owner 13.10.2026 and 14.10.2026, docs/05 a15/a16, PR #213/#226)"
   }
  ]
 }
