@@ -48,7 +48,7 @@ public sealed partial class GapsCardDisplayTests(PolicyWebApp app) : IClassFixtu
         .Select(r => Regex.Matches(r.Groups[1].Value, @"<td\b[^>]*>([\s\S]*?)</td>").Select(c => Html.Text(c.Groups[1].Value)).ToArray()).ToList();
 
     /// <summary>The body rows of the table whose head contains the heading.</summary>
-    private static List<string[]> TableWith(string html, string heading)
+    internal static List<string[]> TableWith(string html, string heading)
     {
         var table = Regex.Matches(html, @"<table\b[^>]*>([\s\S]*?)</table>").Select(t => t.Groups[1].Value)
             .FirstOrDefault(t => Html.Text(Regex.Match(t, @"<thead>([\s\S]*?)</thead>").Groups[1].Value).Contains(heading, StringComparison.Ordinal));
@@ -58,7 +58,7 @@ public sealed partial class GapsCardDisplayTests(PolicyWebApp app) : IClassFixtu
 
     private static List<string> Alerts(string html, string kind) => Regex.Matches(html, $@"<div class=""alert {kind}"">([\s\S]*?)</div>").Select(m => Html.Text(m.Groups[1].Value)).ToList();
 
-    private static async Task<string> RawAsync(HttpClient client, string url)
+    internal static async Task<string> RawAsync(HttpClient client, string url)
     {
         var response = await client.GetAsync(url);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -408,7 +408,21 @@ public sealed partial class GapsCardDisplayTests(PolicyWebApp app) : IClassFixtu
             }
         }
     }
-    // ---------------------------------------------------------------- the card's stored money
+}
+
+/// <summary>
+/// The card's stored money to the tetri (legacy payment-shared-page.test.ts, POLICY_CARD_STORED_MONEY_DISPLAY_DECIMAL_PRECISION_). It has
+/// its own database: the reinsurance treaty it writes for class 5.1 would otherwise take a share of every policy the other
+/// card tests approve, and two such treaties cede more than 100 %.
+/// </summary>
+public sealed class GapsCardStoredMoneyTests(PolicyWebApp app) : IClassFixture<PolicyWebApp>
+{
+    private World W => app.W;
+    private static DateOnly B => Gaps.MonthStart;
+    private static DateOnly Today => World.Today;
+    private async Task<CurrentUser> AdminAsync() => await W.UserAsync();
+    private static List<string[]> TableWith(string html, string heading) => GapsCardDisplayTests.TableWith(html, heading);
+    private static Task<string> RawAsync(HttpClient client, string url) => GapsCardDisplayTests.RawAsync(client, url);
 
     [Theory]
     [InlineData("GEL")]
@@ -466,8 +480,9 @@ public sealed partial class GapsCardDisplayTests(PolicyWebApp app) : IClassFixtu
         var html = await RawAsync(acc, $"/policies/{t.Id}");
         Assert.Equal(new[] { "9,999,999,999,999,999.99|90,071,992,547,408.01|90,071,992,547,408.01|9,999,999,999,999,999.99", "|0.00|-0.01|-1,234,567.89" }.Order(StringComparer.Ordinal),
             TableWith(html, PolicyTexts.Fields.SumInsured).Select(r => string.Join("|", r[2..])).Order(StringComparer.Ordinal));
-        Assert.Equal(["90,071,992,547,408.01|9,999,999,999,999,999.99|0.01", "-90,071,992,547,408.01|-9,999,999,999,999,999.99|-0.01"],
-            TableWith(html, ReinsuranceTexts.Cessions.CededPremiumGel).Select(r => string.Join("|", r[^3..])));
+        // The card lists cessions by created_at; the two rows are written in one batch and may share it, so their order is not asserted.
+        Assert.Equal(new[] { "90,071,992,547,408.01|9,999,999,999,999,999.99|0.01", "-90,071,992,547,408.01|-9,999,999,999,999,999.99|-0.01" }.Order(StringComparer.Ordinal),
+            TableWith(html, ReinsuranceTexts.Cessions.CededPremiumGel).Select(r => string.Join("|", r[^3..])).Order(StringComparer.Ordinal));
         var related = Regex.Matches(Regex.Match(html, @"<ul class=""changes"">([\s\S]*?)</ul>").Groups[1].Value, @"<li>([\s\S]*?)</li>").Select(m => Html.Text(m.Groups[1].Value)).ToList();
         Assert.Contains($"· 90,071,992,547,408.02 {currency} ·", Assert.Single(related));
         Assert.Equal(ledger, await Gaps.LedgerAsync(W));
