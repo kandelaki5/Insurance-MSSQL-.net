@@ -90,9 +90,9 @@ public static class SanctionsScreening
             await tx.ExecuteAsync("""
                 merge core.sanction_list_version with (holdlock) as v
                 using (select N'un' as source) as s on v.source = s.source
-                when matched then update set generated_at = @generatedAt, loaded_at = sysdatetimeoffset(), entries = @entries
-                when not matched then insert (source, generated_at, loaded_at, entries) values (N'un', @generatedAt, sysdatetimeoffset(), @entries);
-                """, new { generatedAt, entries = list.Entries.Count });
+                when matched then update set generated_at = @generatedAt, loaded_at = sysdatetimeoffset(), entries = @entries, content_sha256 = @content
+                when not matched then insert (source, generated_at, loaded_at, entries, content_sha256) values (N'un', @generatedAt, sysdatetimeoffset(), @entries, @content);
+                """, new { generatedAt, entries = list.Entries.Count, content = ScreeningFingerprint.List("un", generatedAt, list.Entries) });
             return 0;
         });
         return new LoadResult(true, list.Entries.Count, list.GeneratedAt);
@@ -127,7 +127,10 @@ public static class SanctionsScreening
             r.ListedOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), Strings(r.Nationalities), Strings(r.BirthYears), Strings(r.Documents))).ToList(), generatedAt);
     }
 
-    private sealed record Subject(string SubjectKind, Guid SubjectId, Guid PartyId, ScreeningSubject Screening);
+    private sealed record Subject(string SubjectKind, Guid SubjectId, Guid PartyId, ScreeningSubject Screening, DateOnly? BirthDate)
+    {
+        public string Fingerprint => ScreeningFingerprint.Subject(SubjectKind, SubjectId, Screening, BirthDate);
+    }
 
     private sealed record PartySubjectRow(Guid Id, string Kind, string? DisplayName, DateOnly? BirthDate, string? TaxId, string? ForeignId, string? FirstName, string? LastName);
 
@@ -154,13 +157,13 @@ public static class SanctionsScreening
                 Kind: p.Kind == "person" ? SanctionKind.Individual : SanctionKind.Entity,
                 Aliases: p.Kind == "person" && !string.IsNullOrEmpty(p.FirstName) && !string.IsNullOrEmpty(p.LastName) ? [$"{p.FirstName} {p.LastName}"] : [],
                 BirthYear: Year(p.BirthDate),
-                Documents: new[] { p.TaxId, p.ForeignId }.Where(d => !string.IsNullOrEmpty(d)).Select(d => d!).ToList()))),
+                Documents: new[] { p.TaxId, p.ForeignId }.Where(d => !string.IsNullOrEmpty(d)).Select(d => d!).ToList()), p.BirthDate)),
             .. owners.Select(o => new Subject("owner", o.Id, o.PartyId, new ScreeningSubject(
                 Name: $"{o.LastName} {o.FirstName}",
                 Kind: SanctionKind.Individual,
                 Aliases: [$"{o.FirstName} {o.LastName}"],
                 BirthYear: Year(o.BirthDate),
-                Documents: new[] { o.PersonalNumber, o.DocumentNumber }.Where(d => !string.IsNullOrEmpty(d)).Select(d => d!).ToList()))),
+                Documents: new[] { o.PersonalNumber, o.DocumentNumber }.Where(d => !string.IsNullOrEmpty(d)).Select(d => d!).ToList()), o.BirthDate)),
         ];
     }
 
@@ -188,44 +191,73 @@ public static class SanctionsScreening
                 (n["reasons"] as JsonArray)?.Select(r => r?.ToString() ?? "").ToList() ?? [])).ToList()
             : [];
 
-    public sealed record ScreeningResult(int Screened, int Hits);
+    /// <param name="Reused">Subjects whose hits were closed by an earlier false-positive decision on the same data.</param>
+    public sealed record ScreeningResult(int Screened, int Hits, int Reused = 0);
+
+    private static Task LockSubjectAsync(Tx tx, Guid subjectId) => tx.LockAsync("core.sanctions_subject", Uuid.Text(subjectId));
 
     /// <summary>
     /// Screens every client and beneficial owner (or one client's) against the stored list and records a screening row
     /// each; a clear result marks the client or the owner checked today.
     ///
-    /// The legacy code meant to record a subject as clear again when the same hits had already been dismissed against the
-    /// same list version, but it compared the stored jsonb text (PostgreSQL writes it with spaces and its own key order)
-    /// with JSON.stringify of the new matches, which never equal: every screening with hits was recorded as possible.
-    /// That observable behaviour is kept until the owner decides (report, open question).
+    /// A subject with hits is recorded as possible, for a review, unless an authorised user already dismissed exactly
+    /// these hits as a false positive, with a reason, for the same subject with the same screening data against the same
+    /// list (date and whole content): then the row is a false positive that points to that decision (owner, 23.10.2026).
+    /// A changed name, identifier or birth date, a new list version or a changed entry, or a match more or less asks for
+    /// a new review; so does a later confirmation of the same hits. A reuse never lifts a client's sanctions block or an
+    /// FMS suspension, and it is recorded as its own row. (The legacy code meant something similar but compared the
+    /// stored jsonb text with JSON.stringify of the new matches, which never equal, and wrote a plain "clear".)
     /// </summary>
     public static async Task<ScreeningResult> ScreenPartiesAsync(Tx tx, Guid userId, Guid? partyId = null)
     {
         var (entries, generatedAt) = await LoadEntriesAsync(tx);
         if (entries.Count == 0) return new ScreeningResult(0, 0);
+        var listSha = ScreeningFingerprint.List("un", generatedAt, entries);
         var subjects = await SubjectsOfAsync(tx, partyId);
         var today = tx.Today();
-        var hits = 0;
+        var (hits, reused) = (0, 0);
         foreach (var s in subjects)
         {
             var matches = Sanctions.ScreenSubject(s.Screening, entries);
+            var (subjectSha, matchesSha) = (s.Fingerprint, ScreeningFingerprint.Matches(matches));
             var outcome = matches.Count > 0 ? "possible" : "clear";
+            Guid? reuses = null;
+            if (outcome == "possible")
+            {
+                await LockSubjectAsync(tx, s.SubjectId);
+                // The latest human decision on exactly these hits: reused only when it is a reasoned dismissal.
+                var last = await tx.QuerySingleOrDefaultAsync<(Guid Id, string Outcome, string? Decision, Guid? DecidedBy, string? Note)?>("""
+                    select top (1) id, outcome, decision, decided_by, note
+                    from core.sanctions_screening
+                    where subject_kind = @kind and subject_id = @subjectId and reuses_screening_id is null
+                      and subject_sha256 = @subjectSha and matches_sha256 = @matchesSha and list_sha256 = @listSha
+                      and ((list_generated_at is null and @generatedAt is null) or list_generated_at = @generatedAt)
+                      and outcome in (N'false_positive', N'confirmed') and decided_at is not null
+                    order by decided_at desc, id
+                    """, new { kind = s.SubjectKind, subjectId = s.SubjectId, subjectSha, matchesSha, listSha, generatedAt });
+                if (last is { Outcome: "false_positive", Decision: "dismiss", DecidedBy: not null } d && !string.IsNullOrWhiteSpace(d.Note))
+                    (outcome, reuses) = ("false_positive", d.Id);
+            }
             if (outcome == "possible") hits++;
+            if (reuses is not null) reused++;
             await tx.ExecuteAsync("""
-                insert into core.sanctions_screening (id, subject_kind, subject_id, party_id, list_generated_at, matches, outcome, created_by)
-                values (@id, @subjectKind, @subjectId, @partyId, @generatedAt, @matches, @outcome, @userId)
-                """, new { id = Guid.NewGuid(), subjectKind = s.SubjectKind, subjectId = s.SubjectId, partyId = s.PartyId, generatedAt, matches = MatchesJson(matches), outcome, userId });
-            if (outcome == "clear" && s.SubjectKind == "party")
+                insert into core.sanctions_screening (id, subject_kind, subject_id, party_id, list_generated_at, matches, outcome, created_by,
+                                                      subject_sha256, matches_sha256, list_sha256, reuses_screening_id)
+                values (@id, @subjectKind, @subjectId, @partyId, @generatedAt, @matches, @outcome, @userId, @subjectSha, @matchesSha, @listSha, @reuses)
+                """, new { id = Guid.NewGuid(), subjectKind = s.SubjectKind, subjectId = s.SubjectId, partyId = s.PartyId, generatedAt, matches = MatchesJson(matches), outcome, userId,
+                           subjectSha, matchesSha, listSha, reuses });
+            // A reused dismissal dates the client checked, as the dismissal itself did; a clear owner dates the owner.
+            if ((outcome == "clear" && s.SubjectKind == "party") || reuses is not null)
                 await tx.ExecuteAsync("update core.party set sanctions_checked_at = @today where id = @id", new { today, id = s.PartyId });
             else if (outcome == "clear")
                 await tx.ExecuteAsync("update core.party_beneficial_owner set sanctions_checked_at = @today where id = @id", new { today, id = s.SubjectId });
         }
-        return new ScreeningResult(subjects.Count, hits);
+        return new ScreeningResult(subjects.Count, hits, reused);
     }
 
     public sealed record ScreeningRow(
         Guid Id, string SubjectKind, string? SubjectName, Guid PartyId, string PartyName, string ScreenedAt, string Matches, string Outcome,
-        string? Note, string? DecidedByName)
+        string? Note, string? DecidedByName, Guid? ReusesId = null, string? ReusedDecidedAt = null)
     {
         public IReadOnlyList<StoredMatch> MatchList => ParseMatches(Matches);
     }
@@ -238,10 +270,12 @@ public static class SanctionsScreening
                         else (select o.last_name + N' ' + o.first_name from core.party_beneficial_owner o where o.id = s.subject_id) end as SubjectName,
                    s.party_id as PartyId, p.display_name as PartyName,
                    format(switchoffset(s.screened_at, '+04:00'), 'dd.MM.yyyy HH:mm') as ScreenedAt,
-                   s.matches as Matches, s.outcome as Outcome, s.note as Note, u.full_name as DecidedByName
+                   s.matches as Matches, s.outcome as Outcome, coalesce(s.note, r.note) as Note, u.full_name as DecidedByName,
+                   s.reuses_screening_id as ReusesId, format(switchoffset(r.decided_at, '+04:00'), 'dd.MM.yyyy HH:mm') as ReusedDecidedAt
             from core.sanctions_screening s
             join core.party p on p.id = s.party_id
-            left join core.app_user u on u.id = s.decided_by
+            left join core.sanctions_screening r on r.id = s.reuses_screening_id
+            left join core.app_user u on u.id = coalesce(s.decided_by, r.decided_by)
             where (@partyId is null and s.outcome in (N'possible', N'confirmed')) or s.party_id = @partyId
             order by s.screened_at desc
             """, new { partyId })).ToList();
@@ -252,23 +286,32 @@ public static class SanctionsScreening
     /// </summary>
     public static async Task DecideAsync(Tx tx, Guid userId, Guid id, string decision, string note)
     {
-        var row = await tx.QuerySingleOrDefaultAsync<(Guid PartyId, string Outcome)?>("select party_id, outcome from core.sanctions_screening where id = @id", new { id });
+        var row = await tx.QuerySingleOrDefaultAsync<(Guid PartyId, Guid SubjectId, string Outcome)?>("select party_id, subject_id, outcome from core.sanctions_screening where id = @id", new { id });
         if (row is not { } r) return;
+        // The same lock as a re-screening of the subject: a decision and a reuse of it never cross.
+        await LockSubjectAsync(tx, r.SubjectId);
+        r = (await tx.QuerySingleOrDefaultAsync<(Guid PartyId, Guid SubjectId, string Outcome)?>("select party_id, subject_id, outcome from core.sanctions_screening where id = @id", new { id }))!.Value;
         var today = tx.Today();
         if (decision == "dismiss" && r.Outcome == "possible")
         {
-            await tx.ExecuteAsync("update core.sanctions_screening set outcome = N'false_positive', decided_by = @userId, decided_at = sysdatetimeoffset(), note = @note where id = @id", new { userId, note, id });
+            await tx.ExecuteAsync("update core.sanctions_screening set outcome = N'false_positive', decision = N'dismiss', decided_by = @userId, decided_at = sysdatetimeoffset(), note = @note where id = @id", new { userId, note, id });
             await tx.ExecuteAsync("update core.party set sanctions_checked_at = @today where id = @partyId", new { today, partyId = r.PartyId });
         }
         else if (decision == "confirm" && r.Outcome == "possible")
         {
-            await tx.ExecuteAsync("update core.sanctions_screening set outcome = N'confirmed', decided_by = @userId, decided_at = sysdatetimeoffset(), note = @note where id = @id", new { userId, note, id });
+            await tx.ExecuteAsync("update core.sanctions_screening set outcome = N'confirmed', decision = N'confirm', decided_by = @userId, decided_at = sysdatetimeoffset(), note = @note where id = @id", new { userId, note, id });
             await tx.ExecuteAsync("update core.party set sanctions_blocked = 1 where id = @partyId", new { partyId = r.PartyId });
         }
         else if (decision == "lift" && r.Outcome == "confirmed")
         {
-            await tx.ExecuteAsync("update core.sanctions_screening set outcome = N'false_positive', decided_by = @userId, decided_at = sysdatetimeoffset(), note = @note where id = @id", new { userId, note, id });
-            await tx.ExecuteAsync("update core.party set sanctions_blocked = 0, sanctions_checked_at = @today where id = @partyId", new { today, partyId = r.PartyId });
+            await tx.ExecuteAsync("update core.sanctions_screening set outcome = N'false_positive', decision = N'lift', decided_by = @userId, decided_at = sysdatetimeoffset(), note = @note where id = @id", new { userId, note, id });
+            // Lifting one confirmed hit does not lift another one of the same client (its own or an owner's) that still stands
+            // (owner, 23.10.2026: one false positive lifts no other confirmed hit).
+            await tx.ExecuteAsync("""
+                update core.party set sanctions_checked_at = @today,
+                       sanctions_blocked = case when exists (select 1 from core.sanctions_screening where party_id = @partyId and outcome = N'confirmed') then 1 else 0 end
+                where id = @partyId
+                """, new { today, partyId = r.PartyId });
         }
     }
 }

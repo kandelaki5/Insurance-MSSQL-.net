@@ -40,6 +40,9 @@ public static class SanctionsTexts
         public const string Screened = "შემოწმდა";
         public const string Hits = "დამთხვევა შესასწავლი";
         public const string NoList = "ჯერ ჩამოტვირთეთ სია";
+        // New in the rewrite (owner, 23.10.2026: a dismissed false positive is reused on an unchanged re-screening); the
+        // wording is a proposal awaiting the owner.
+        public const string Reused = "დაიხურა წინა გადაწყვეტილებით";
 
         /// <summary>The texts above by their old keys, in their order, for a lookup by code.</summary>
         public static readonly global::System.Collections.Generic.IReadOnlyDictionary<string, string> ByKey = global::Insurance.Application.Texts.TextMap.Of(
@@ -97,6 +100,9 @@ public static class SanctionsTexts
     public static readonly global::System.Collections.Generic.IReadOnlyDictionary<string, string> SubjectKinds = global::Insurance.Application.Texts.TextMap.Of(
         ("party", "კლიენტი"),
         ("owner", "ბენეფიციარი მესაკუთრე"));
+
+    /// <summary>A reused decision in the decision column (new in the rewrite; wording proposed, awaiting the owner).</summary>
+    public const string ReusedDecision = "გამოყენებულია წინა გადაწყვეტილება";
 
     public static readonly global::System.Collections.Generic.IReadOnlyDictionary<string, string> Outcomes = global::Insurance.Application.Texts.TextMap.Of(
         ("clear", "სუფთა"),

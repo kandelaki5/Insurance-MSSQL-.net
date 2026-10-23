@@ -18,6 +18,7 @@ public sealed class IndexModel(IHttpClientFactory httpClients, IOptions<Sanction
     public string? Loaded { get; private set; }
     public string? Screened { get; private set; }
     public string? Hits { get; private set; }
+    public string? Reused { get; private set; }
 
     public ScreeningTableView Table => new(Open, Me.CanWrite, "/compliance/sanctions", true);
 
@@ -26,6 +27,7 @@ public sealed class IndexModel(IHttpClientFactory httpClients, IOptions<Sanction
         Loaded = Query("loaded");
         Screened = Query("screened");
         Hits = Query("hits");
+        Reused = Query("reused");
         (Version, Open) = await Db.ReadTxAsync(async tx => (await SanctionsScreening.ListVersionAsync(tx), await SanctionsScreening.ScreeningsAsync(tx)));
     }
 
@@ -48,7 +50,7 @@ public sealed class IndexModel(IHttpClientFactory httpClients, IOptions<Sanction
     {
         if (!Me.CanWrite) return await ShowAsync();
         var result = await Db.AsUserAsync(Me.Id, tx => SanctionsScreening.ScreenPartiesAsync(tx, Me.Id));
-        return Redirect($"/compliance/sanctions?screened={result.Screened}&hits={result.Hits}");
+        return Redirect($"/compliance/sanctions?screened={result.Screened}&hits={result.Hits}&reused={result.Reused}");
     }
 
     public async Task<IActionResult> OnPostDecideScreeningAsync() =>

@@ -54,7 +54,7 @@ public sealed class SanctionsTests(WebApp app) : IClassFixture<WebApp>
         Assert.Contains("03.10.2026 03:00", page); // generated 23:00 UTC is 03:00 next day in Tbilisi
 
         var subjects = await c.ExecuteScalarAsync<int>("select (select count(*) from core.party) + (select count(*) from core.party_beneficial_owner where valid_to is null)");
-        Assert.Equal($"/compliance/sanctions?screened={subjects}&hits=2", Html.Location(await WebApp.PostFormAsync(client, "/compliance/sanctions?handler=ScreenAll", [], "/compliance/sanctions")));
+        Assert.Equal($"/compliance/sanctions?screened={subjects}&hits=2&reused=0", Html.Location(await WebApp.PostFormAsync(client, "/compliance/sanctions?handler=ScreenAll", [], "/compliance/sanctions")));
         var today = Rates.TodayInTbilisi().ToDateTime(TimeOnly.MinValue);
         Assert.Equal(today, await c.ExecuteScalarAsync<DateTime?>("select sanctions_checked_at from core.party where id = @clean", new { clean }));
         Assert.Null(await c.ExecuteScalarAsync<DateTime?>("select sanctions_checked_at from core.party where id = @hit", new { hit }));
@@ -76,11 +76,20 @@ public sealed class SanctionsTests(WebApp app) : IClassFixture<WebApp>
             "select outcome, decided_by, note from core.sanctions_screening where id = @id", new { id = screening.Id }));
         Assert.Equal(today, await c.ExecuteScalarAsync<DateTime?>("select sanctions_checked_at from core.party where id = @hit", new { hit }));
 
-        // Screening the client again from its card: as in the legacy program, the dismissed hit is flagged again.
+        // Screening the client again from its card, nothing changed: the dismissal is reused (owner, 23.10.2026). The legacy
+        // program meant to, but its comparison never matched, so it flagged the hit again (the negative control of this step).
         var card = $"/parties/{hit}";
-        Assert.Equal($"{card}?screened=1&hits=1", Html.Location(await WebApp.PostFormAsync(client, $"{card}?handler=Screen", new() { ["party_id"] = hit.ToString() }, card)));
+        Assert.Equal($"{card}?screened=1&hits=0&reused=1", Html.Location(await WebApp.PostFormAsync(client, $"{card}?handler=Screen", new() { ["party_id"] = hit.ToString() }, card)));
+        Assert.Equal(screening.Id, await c.ExecuteScalarAsync<Guid>("select top (1) reuses_screening_id from core.sanctions_screening where subject_id = @hit order by screened_at desc", new { hit }));
+        var reusedCard = Html.Text(await Html.GetAsync(client, $"{card}?screened=1&hits=0&reused=1"));
+        Assert.Contains($"{SanctionsTexts.Screen.Hits} 0, {SanctionsTexts.Screen.Reused} 1", reusedCard);
+        Assert.Contains($"{SanctionsTexts.ReusedDecision}", reusedCard);
+
+        // The client's birth date is corrected: the same hit asks for a new review.
+        await c.ExecuteAsync("update core.party set birth_date = '1980-05-02' where id = @hit", new { hit });
+        Assert.Equal($"{card}?screened=1&hits=1&reused=0", Html.Location(await WebApp.PostFormAsync(client, $"{card}?handler=Screen", new() { ["party_id"] = hit.ToString() }, card)));
         var again = await c.ExecuteScalarAsync<Guid>("select top (1) id from core.sanctions_screening where subject_id = @hit and outcome = N'possible'", new { hit });
-        Assert.Contains("alert warn", await Html.GetAsync(client, $"{card}?screened=1&hits=1"));
+        Assert.Contains("alert warn", await Html.GetAsync(client, $"{card}?screened=1&hits=1&reused=0"));
 
         // Confirmed: the client is blocked; then the block is lifted. A return address to another site is not followed.
         Assert.Equal(card, Html.Location(await WebApp.PostFormAsync(client, $"{card}?handler=DecideScreening",

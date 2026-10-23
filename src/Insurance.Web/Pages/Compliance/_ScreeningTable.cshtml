@@ -55,7 +55,11 @@
                 }
             </td>
             <td><span class="badge @Badge(r.Outcome)">@SanctionsTexts.Outcomes.GetValueOrDefault(r.Outcome)</span></td>
-            <td>@(r.Note ?? "—")@(r.DecidedByName is not null ? $" ({r.DecidedByName})" : "")</td>
+            <td>@if (r.ReusesId is not null)
+                {
+                    <span class="muted">@SanctionsTexts.ReusedDecision (@r.ReusedDecidedAt):</span>
+                }
+                @(r.Note ?? "—")@(r.DecidedByName is not null ? $" ({r.DecidedByName})" : "")</td>
             @if (Model.Writable)
             {
                 <td>

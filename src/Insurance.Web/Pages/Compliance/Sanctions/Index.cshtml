@@ -17,7 +17,7 @@
 }
 @if (!string.IsNullOrEmpty(Model.Screened))
 {
-    <div class="alert ok">@SanctionsTexts.Screen.Done: @SanctionsTexts.Screen.Screened @Model.Screened, @SanctionsTexts.Screen.Hits @Model.Hits</div>
+    <div class="alert ok">@SanctionsTexts.Screen.Done: @SanctionsTexts.Screen.Screened @Model.Screened, @SanctionsTexts.Screen.Hits @(Model.Hits)@if (Model.Reused is { Length: > 0 } reusedCount && reusedCount != "0") { @($", {SanctionsTexts.Screen.Reused} {reusedCount}") }</div>
 }
 
 <div class="card">

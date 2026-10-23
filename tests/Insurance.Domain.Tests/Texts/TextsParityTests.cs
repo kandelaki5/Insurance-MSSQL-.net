@@ -14,7 +14,20 @@ public class TextsParityTests
     private const string File = "common-texts.json";
     private static readonly Assembly TextsAssembly = typeof(TextMap).Assembly;
 
-    private static IReadOnlyList<JsonElement> Items() => Parity.Cases(File, "items");
+    /// <summary>
+    /// Texts changed or added after the baseline: from the old program's later pull requests that carry owner-confirmed rules,
+    /// or new in the rewrite for an owner decision. Each names its origin; an entry replaces the baseline's item of the same C#
+    /// name or adds one. The baseline file itself stays as the old program generated it.
+    /// </summary>
+    private const string AfterBaseline = "common-texts-after-baseline.json";
+
+    private static IReadOnlyList<JsonElement> Items()
+    {
+        var later = Parity.Cases(AfterBaseline, "items");
+        Assert.All(later, i => Assert.False(string.IsNullOrWhiteSpace(i.GetProperty("origin").GetString()), i.GetRawText()));
+        var replaced = later.Select(i => i.GetProperty("cs").GetString()).ToHashSet(StringComparer.Ordinal);
+        return [.. Parity.Cases(File, "items").Where(i => !replaced.Contains(i.GetProperty("cs").GetString())), .. later];
+    }
 
     private static MemberInfo Resolve(string csPath)
     {

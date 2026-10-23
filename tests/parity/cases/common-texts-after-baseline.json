@@ -1,0 +1,19 @@
+{
+ "source": "Texts after the baseline 17c1f1f: each item names its origin (an old-program pull request head with the owner's rule, or a rewrite text for an owner decision).",
+ "items": [
+  {
+   "kind": "text",
+   "ts": "(rewrite) sanctions screen: reused count",
+   "cs": "SanctionsTexts.Screen.Reused",
+   "value": "დაიხურა წინა გადაწყვეტილებით",
+   "origin": "rewrite, owner decision 23.10.2026 (false-positive reuse); wording proposed by Claude, not yet approved by the owner"
+  },
+  {
+   "kind": "text",
+   "ts": "(rewrite) sanctions table: reused decision",
+   "cs": "SanctionsTexts.ReusedDecision",
+   "value": "გამოყენებულია წინა გადაწყვეტილება",
+   "origin": "rewrite, owner decision 23.10.2026 (false-positive reuse); wording proposed by Claude, not yet approved by the owner"
+  }
+ ]
+}

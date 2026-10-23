@@ -30,6 +30,16 @@ public sealed class PostgresImport(string postgresConnection, string sqlServerAd
     /// <summary>Target tables that have no source counterpart.</summary>
     public static readonly IReadOnlySet<string> TargetOnly = new HashSet<string>(StringComparer.Ordinal) { "audit_config", "data_import", "schema_migration", "case_money_pass" };
 
+    /// <summary>
+    /// Nullable target columns the old database never had: left null on imported rows (sanctions fingerprints and the reuse
+    /// of a decision, migration 0010 — an imported screening has no fingerprint and is never reused).
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, IReadOnlySet<string>> TargetOnlyColumns = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal)
+    {
+        ["sanction_list_version"] = new HashSet<string>(StringComparer.Ordinal) { "content_sha256" },
+        ["sanctions_screening"] = new HashSet<string>(StringComparer.Ordinal) { "subject_sha256", "matches_sha256", "list_sha256", "decision", "reuses_screening_id" },
+    };
+
     /// <summary>Tables the migrations fill with reference rows, replaced by the source's on the first run (children first).</summary>
     public static readonly IReadOnlyList<string> Seeded =
         ["product_text", "product_coverage", "product", "number_sequence", "setting", "role", "branch", "insurance_class", "currency"];
@@ -107,7 +117,8 @@ public sealed class PostgresImport(string postgresConnection, string sqlServerAd
             from sys.columns c join sys.types t on t.user_type_id = c.user_type_id
             where c.object_id = object_id(@name) and c.is_computed = 0
             order by c.column_id
-            """, new { name = $"core.{table}" }, tx)).ToList();
+            """, new { name = $"core.{table}" }, tx))
+            .Where(c => !TargetOnlyColumns.TryGetValue(table, out var only) || !only.Contains(c.Name)).ToList();
         var sourceColumns = (await pg.QueryAsync<(string Name, string Type, string IsGenerated)>("""
             select column_name, data_type, is_generated from information_schema.columns where table_schema = 'core' and table_name = @table
             """, new { table }, pgTx)).ToDictionary(c => c.Name, StringComparer.Ordinal);

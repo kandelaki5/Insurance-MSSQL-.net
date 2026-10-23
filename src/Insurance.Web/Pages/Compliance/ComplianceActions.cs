@@ -116,7 +116,7 @@ public static partial class ComplianceActions
         var partyText = form("party_id") ?? "";
         if (!user.CanWrite || PermissionPanel.Uuid(partyText) is not { } partyId) return null;
         var result = await db.AsUserAsync(user.Id, tx => SanctionsScreening.ScreenPartiesAsync(tx, user.Id, partyId));
-        return $"/parties/{partyText}?screened={result.Screened}&hits={result.Hits}";
+        return $"/parties/{partyText}?screened={result.Screened}&hits={result.Hits}&reused={result.Reused}";
     }
 
     /// <summary>

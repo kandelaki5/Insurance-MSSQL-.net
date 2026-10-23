@@ -39,7 +39,9 @@ public static class ComplianceFixtures
     }
 
     /// <summary>A small UN consolidated list in the list's own XML format, written to a file of this run (never the network).</summary>
-    public static string UnListFile(string generated = "2026-10-02T23:00:05.487Z")
+    /// <param name="extraIndividuals">More INDIVIDUAL elements, after the list's own two.</param>
+    /// <param name="entityReference">The entity's reference number: another one is the same list date with other content.</param>
+    public static string UnListFile(string generated = "2026-10-02T23:00:05.487Z", string extraIndividuals = "", string entityReference = "CDe.001")
     {
         var path = Path.Combine(Path.GetTempPath(), $"un-list-{Guid.NewGuid():N}.xml");
         File.WriteAllText(path, $"""
@@ -66,13 +68,14 @@ public static class ComplianceFixtures
                   <INDIVIDUAL_ALIAS><QUALITY>Good</QUALITY><ALIAS_NAME>Zurabi Sanktsioneli</ALIAS_NAME></INDIVIDUAL_ALIAS>
                   <INDIVIDUAL_DATE_OF_BIRTH><DATE>1980-05-01</DATE></INDIVIDUAL_DATE_OF_BIRTH>
                 </INDIVIDUAL>
+                {extraIndividuals}
               </INDIVIDUALS>
               <ENTITIES>
                 <ENTITY>
                   <DATAID>6908402</DATAID>
                   <FIRST_NAME>ADF</FIRST_NAME>
                   <UN_LIST_TYPE>DRC</UN_LIST_TYPE>
-                  <REFERENCE_NUMBER>CDe.001</REFERENCE_NUMBER>
+                  <REFERENCE_NUMBER>{entityReference}</REFERENCE_NUMBER>
                   <ENTITY_ALIAS><QUALITY>a.k.a.</QUALITY><ALIAS_NAME>Allied Democratic Forces</ALIAS_NAME></ENTITY_ALIAS>
                 </ENTITY>
               </ENTITIES>

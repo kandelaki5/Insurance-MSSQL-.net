@@ -58,6 +58,7 @@ public sealed class CardModel : AppPageModel
     public string? SavedFlag { get; private set; }
     public string? Screened { get; private set; }
     public string? Hits { get; private set; }
+    public string? Reused { get; private set; }
     public bool TargetError { get; private set; }
 
     public PartyFormView PartyFormModel => PartyFormState ?? new PartyFormView(Kind, Initial, new Dictionary<string, string>(), null, !Me.CanWrite);
@@ -85,6 +86,7 @@ public sealed class CardModel : AppPageModel
         SavedFlag = Query("saved");
         Screened = Query("screened");
         Hits = Query("hits");
+        Reused = Query("reused");
         TargetError = Query("suspension") == "target";
         return await Db.ReadTxAsync(async tx =>
         {

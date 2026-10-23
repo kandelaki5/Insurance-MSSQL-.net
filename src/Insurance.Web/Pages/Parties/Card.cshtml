@@ -49,7 +49,7 @@
 }
 @if (!string.IsNullOrEmpty(Model.Screened))
 {
-    <div class="alert @(JsNumber.Parse(Model.Hits ?? "NaN") > 0 ? "warn" : "ok")">@SanctionsTexts.Screen.Done: @SanctionsTexts.Screen.Screened @Model.Screened, @SanctionsTexts.Screen.Hits @Model.Hits</div>
+    <div class="alert @(JsNumber.Parse(Model.Hits ?? "NaN") > 0 ? "warn" : "ok")">@SanctionsTexts.Screen.Done: @SanctionsTexts.Screen.Screened @Model.Screened, @SanctionsTexts.Screen.Hits @(Model.Hits)@if (Model.Reused is { Length: > 0 } reusedCount && reusedCount != "0") { @($", {SanctionsTexts.Screen.Reused} {reusedCount}") }</div>
 }
 <partial name="_PartyForm" model="Model.PartyFormModel" />
 
