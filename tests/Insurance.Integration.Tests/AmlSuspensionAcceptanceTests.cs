@@ -138,8 +138,9 @@ public sealed class AmlSuspensionAcceptanceTests(TestDatabase db) : IClassFixtur
 
     /// <summary>
     /// H13: a suspension aimed at one policy while a receipt on that policy holds its row and has not yet locked the client.
-    /// With the shared order (target first, then the client) neither side waits on the other in a cycle, and the receipt
-    /// can never commit after the suspension without having seen it.
+    /// With the shared order (target first, then the client) neither side waits on the other in a cycle: the suspension
+    /// waits for the receipt, the receipt commits first, then the suspension, and the next receipt is refused (legacy
+    /// scripts/db-acceptance.ts H13 expectation).
     /// </summary>
     [Fact]
     public async Task H13_a_suspension_of_one_policy_against_a_receipt_on_it_does_not_deadlock_and_no_receipt_slips_past_it()
@@ -175,11 +176,10 @@ public sealed class AmlSuspensionAcceptanceTests(TestDatabase db) : IClassFixtur
         });
         var outcome = await receipt;
         var suspendedAt = await suspension;
-        // No deadlock (either side would have thrown 1205). Here the suspension does not wait on the receipt's update lock
-        // of the policy (SQL Server's shared read of the target is compatible with it), so it commits first and the receipt,
-        // which locks the client after it, sees it and is refused. A receipt that had already checked would have committed first.
-        Assert.Equal("refused: suspended", outcome.Result);
-        Assert.True(suspendedAt <= outcome.At);
+        // No deadlock (either side would have thrown 1205): the suspension's update lock of the target waits for the
+        // receipt's, so the receipt commits first and the suspension after it.
+        Assert.Equal("committed", outcome.Result);
+        Assert.True(outcome.At <= suspendedAt);
         Assert.Equal("refused: suspended", (await ReceiptAsync(actor, p)).Result);
     }
 
@@ -228,8 +228,9 @@ public sealed class AmlSuspensionAcceptanceTests(TestDatabase db) : IClassFixtur
         });
         var paid = await payment;
         var changedAt = await change;
-        Assert.Equal("refused: suspended", paid.Result);
-        Assert.True(changedAt <= paid.At);
+        // No deadlock: the payment commits first, the suspension (or the attach) waits for it (legacy db-acceptance).
+        Assert.Equal("committed", paid.Result);
+        Assert.True(paid.At <= changedAt);
         Assert.Equal("refused: suspended", (await PayAsync()).Result);
         if (attach)
             Assert.False(await db.App.ReadTxAsync(tx => tx.ExecuteScalarAsync<bool>("select legacy_unmapped from core.fms_suspension where id = @legacy", new { legacy })));
