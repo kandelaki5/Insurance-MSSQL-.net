@@ -1,0 +1,50 @@
+@page "/compliance/sanctions"
+@model Insurance.Web.Pages.Compliance.Sanctions.IndexModel
+@{
+    var t = SanctionsTexts.List.ByKey;
+    ViewData["Title"] = SanctionsTexts.Title;
+    var loaded = Model.Loaded;
+}
+<h1>@SanctionsTexts.Title</h1>
+<p class="note">@SanctionsTexts.Note</p>
+@if (loaded == "failed")
+{
+    <div class="alert error">@SanctionsTexts.List.LoadFailed</div>
+}
+@if (!string.IsNullOrEmpty(loaded) && loaded != "failed")
+{
+    <div class="alert ok">@SanctionsTexts.List.Loaded: @loaded @SanctionsTexts.List.Entries.ToLowerInvariant()</div>
+}
+@if (!string.IsNullOrEmpty(Model.Screened))
+{
+    <div class="alert ok">@SanctionsTexts.Screen.Done: @SanctionsTexts.Screen.Screened @Model.Screened, @SanctionsTexts.Screen.Hits @Model.Hits</div>
+}
+
+<div class="card">
+    <h2>@SanctionsTexts.List.Title</h2>
+    <dl class="facts">
+        <div><dt>@SanctionsTexts.List.GeneratedAt</dt><dd>@(Model.Version?.GeneratedAt ?? SanctionsTexts.List.NotLoaded)</dd></div>
+        <div><dt>@SanctionsTexts.List.LoadedAt</dt><dd>@(Model.Version?.LoadedAt ?? "—")</dd></div>
+        <div><dt>@SanctionsTexts.List.Entries</dt><dd>@(Model.Version is { } v ? v.Entries.ToString(System.Globalization.CultureInfo.InvariantCulture) : "—")</dd></div>
+    </dl>
+    @if (Model.Me.CanWrite)
+    {
+        <div class="row-actions" style="margin-top: 14px">
+            <form method="post" asp-page-handler="Refresh"><button class="btn secondary">@SanctionsTexts.List.Load</button></form>
+            @if (Model.Version is not null)
+            {
+                <form method="post" asp-page-handler="ScreenAll"><button class="btn">@SanctionsTexts.Screen.All</button></form>
+            }
+        </div>
+    }
+</div>
+
+<h2 class="section">@SanctionsTexts.Open.Title</h2>
+@if (Model.Open.Count == 0)
+{
+    <div class="card empty">@SanctionsTexts.Open.None</div>
+}
+else
+{
+    <partial name="/Pages/Compliance/_ScreeningTable.cshtml" model="Model.Table" />
+}

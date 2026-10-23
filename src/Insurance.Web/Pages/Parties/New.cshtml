@@ -1,0 +1,8 @@
+@page "/parties/new"
+@model Insurance.Web.Pages.Parties.NewModel
+@{
+    var title = Model.PartyFormModel.Kind == "person" ? Ka.Party.NewPerson : Ka.Party.NewOrganization;
+    ViewData["Title"] = title;
+}
+<h1>@title</h1>
+<partial name="_PartyForm" model="Model.PartyFormModel" />

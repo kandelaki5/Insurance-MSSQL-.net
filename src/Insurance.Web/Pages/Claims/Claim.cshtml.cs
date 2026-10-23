@@ -76,7 +76,7 @@ public sealed class ClaimModel(Rates rates) : AppPageModel
 
     private async Task<IActionResult> RefusedAsync(Guid id, FormOutcome outcome, string form)
     {
-        KeepPostedValues();
+        KeepTrimmedForm();
         foreach (var (field, message) in outcome.Errors) Errors[field] = message;
         FormError = outcome.Message;
         PostedFormName = form;

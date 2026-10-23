@@ -1,0 +1,79 @@
+@page "/complaints/new"
+@model Insurance.Web.Pages.Complaints.NewModel
+@{
+    var f = ComplaintTexts.Fields.ByKey;
+    ViewData["Title"] = ComplaintTexts.New;
+    var channel = Model.Value("channel", "written");
+    var category = Model.Value("category");
+}
+@{
+    async Task Text(string name, string label, string type = "text", string? cls = null)
+    {
+        <div class="@cls">
+            <label for="@name">@label</label>
+            @if (type == "date")
+            {
+                <date-input id="@name" name="@name" value="@Model.Value(name)" />
+            }
+            else
+            {
+                <input id="@name" name="@name" type="@type" value="@Model.Value(name)" />
+            }
+            @if (Model.Error(name) is { } error)
+            {
+                <div class="field-error">@error</div>
+            }
+        </div>
+    }
+}
+<h1>@ComplaintTexts.New</h1>
+<form method="post">
+    @if (Model.FormError is not null)
+    {
+        <div class="alert error">@Model.FormError</div>
+    }
+    <div class="card">
+        <div class="grid">
+            @{ await Text("received_on", f["receivedOn"], "date"); }
+            <div>
+                <label for="channel">@f["channel"]</label>
+                <select id="channel" name="channel">
+                    @foreach (var (value, title) in ComplaintTexts.Channels)
+                    {
+                        <option value="@value" selected="@(value == channel)">@title</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label for="category">@f["category"]</label>
+                <select id="category" name="category">
+                    <option value="" selected="@(category == "")">—</option>
+                    @foreach (var (value, title) in ComplaintTexts.Categories)
+                    {
+                        <option value="@value" selected="@(value == category)">@value. @title</option>
+                    }
+                </select>
+                @if (Model.Error("category") is { } categoryError)
+                {
+                    <div class="field-error">@categoryError</div>
+                }
+            </div>
+            @{
+                await Text("party_id_number", f["partyIdNumber"], "text", "wide");
+                await Text("customer_name", f["customerName"]);
+                await Text("customer_contact", f["customerContact"]);
+                await Text("policy_number", f["policyNumber"]);
+                await Text("claim_number", f["claimNumber"]);
+                await Text("description", f["description"], "text", "wide");
+            }
+            <div class="check">
+                <input id="acknowledged" name="acknowledged" type="checkbox" checked="@(Model.Value("acknowledged") == "on")" />
+                <label for="acknowledged">@f["acknowledged"]</label>
+            </div>
+        </div>
+    </div>
+    <div class="toolbar">
+        <button class="btn">@ComplaintTexts.Register</button>
+        <a class="btn secondary" href="/complaints">@Ka.Common.Cancel</a>
+    </div>
+</form>

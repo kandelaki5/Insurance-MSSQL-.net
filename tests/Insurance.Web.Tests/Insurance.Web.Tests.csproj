@@ -20,6 +20,7 @@
     <Compile Include="..\Insurance.Integration.Tests\Fixtures.cs" Link="Fixtures.cs" />
     <Compile Include="..\Insurance.Integration.Tests\ClaimWorld.cs" Link="ClaimWorld.cs" />
     <Compile Include="..\Insurance.Integration.Tests\Policies\World.cs" Link="Policies\World.cs" />
+    <Compile Include="..\Insurance.Integration.Tests\ComplianceFixtures.cs" Link="ComplianceFixtures.cs" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

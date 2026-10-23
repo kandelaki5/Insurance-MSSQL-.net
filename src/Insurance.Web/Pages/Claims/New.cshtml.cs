@@ -29,7 +29,7 @@ public sealed class NewModel : AppPageModel
         var outcome = await ClaimActions.RegisterClaimAsync(Db, Me, Request.PostedForm());
         if (outcome.RedirectTo is { } to) return Redirect(to);
         if (!Me.CanWrite) return Redirect("/claims");
-        KeepPostedValues();
+        KeepTrimmedForm();
         foreach (var (field, message) in outcome.Errors) Errors[field] = message;
         FormError = outcome.Message;
         RequestKey = Value("request_key", RequestKey);

@@ -1,0 +1,96 @@
+@model Insurance.Web.Pages.Intermediaries.IntermediaryFormView
+@{
+    var t = Ka.Intermediary.Fields.ByKey;
+    var v = Model.Values;
+    var ro = Model.ReadOnly;
+    string Val(string name) => v.GetValueOrDefault(name) ?? "";
+    var isNew = Val("id") == "";
+}
+@functions {
+    private Microsoft.AspNetCore.Html.IHtmlContent Err(string name) =>
+        Model.Errors.TryGetValue(name, out var message) ? new Microsoft.AspNetCore.Html.HtmlString($"<div class=\"field-error\">{System.Net.WebUtility.HtmlEncode(message)}</div>") : Microsoft.AspNetCore.Html.HtmlString.Empty;
+}
+@{
+    async Task Text(string name, string label, string type = "text")
+    {
+        <div>
+            <label for="@name">@label</label>
+            @if (type == "date")
+            {
+                <date-input id="@name" name="@name" value="@Val(name)" disabled="@ro" />
+            }
+            else
+            {
+                <input id="@name" name="@name" type="@type" step="@(type == "number" ? "0.01" : null)" value="@Val(name)" disabled="@ro" />
+            }
+            @Err(name)
+        </div>
+    }
+    async Task Select(string name, string label, IReadOnlyDictionary<string, string> options, bool blank)
+    {
+        <div>
+            <label for="@name">@label</label>
+            <select id="@name" name="@name" disabled="@ro">
+                @if (blank)
+                {
+                    <option value="" selected="@(Val(name) == "")">—</option>
+                }
+                @foreach (var (value, title) in options)
+                {
+                    <option value="@value" selected="@(Val(name) == value)">@title</option>
+                }
+            </select>
+            @Err(name)
+        </div>
+    }
+}
+<form method="post" asp-page-handler="Save">
+    @if (Model.Message is not null)
+    {
+        <div class="alert error">@Model.Message</div>
+    }
+    <input type="hidden" name="id" value="@Val("id")" />
+    <div class="card">
+        <div class="grid">
+            @if (isNew)
+            {
+                <div class="wide">
+                    <label for="party_id_number">@t["partyIdNumber"]</label>
+                    <input id="party_id_number" name="party_id_number" type="text" value="@Val("party_id_number")" disabled="@ro" />
+                    @if (Model.Errors.TryGetValue("party_id_number", out var partyError))
+                    {
+                        <div class="field-error">@partyError</div>
+                    }
+                    else
+                    {
+                        <div class="hint">@Ka.Intermediary.PartyHint</div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="wide">
+                    <label>@t["party"]</label>
+                    <div class="static">
+                        <a href="/parties/@Val("party_id")">@Val("party_name")</a>
+                    </div>
+                </div>
+            }
+            @{
+                await Select("kind", t["kind"], Ka.Intermediary.Kind, true);
+                await Text("contract_no", t["contractNo"]);
+                await Text("contract_date", t["contractDate"], "date");
+                await Text("valid_to", t["validTo"], "date");
+                await Text("commission_percent", t["commissionPercent"], "number");
+                await Select("status", t["status"], Ka.Intermediary.Status, false);
+            }
+        </div>
+    </div>
+    <div class="toolbar">
+        @if (!ro)
+        {
+            <button class="btn">@Ka.Common.Save</button>
+        }
+        <a class="btn secondary" href="/intermediaries">@Ka.Common.Cancel</a>
+    </div>
+</form>

@@ -1,0 +1,153 @@
+@model Insurance.Web.Pages.Compliance.SuspensionSectionView
+@using Insurance.Application.Services
+@{
+    var s = AmlTexts.Suspension.Fields.ByKey;
+    var badge = new Dictionary<string, string> { ["active"] = "high", ["awaiting"] = "warn", ["unconfirmed"] = "high", ["lapsed"] = "low" };
+}
+@* Suspensions with the buttons to confirm and lift them; with a client, also the form to register a new one for that client (and a case, linked to it). *@
+<h2 class="section">@Model.Title</h2>
+<p class="note">@AmlTexts.Suspension.Note</p>
+@if (Model.TargetError)
+{
+    <div class="alert error">@AmlTexts.Suspension.TargetError</div>
+}
+@if (Model.Rows.Count == 0)
+{
+    <div class="card empty">@AmlTexts.Suspension.None</div>
+}
+else
+{
+    <table>
+        <thead>
+        <tr>
+            @if (Model.ShowParty)
+            {
+                <th>@AmlTexts.Suspension.Party</th>
+            }
+            <th>@s["instructedAt"]</th>
+            <th>@s["kind"]</th>
+            <th>@s["scope"]</th>
+            <th>@s["endsAt"]</th>
+            <th>@s["writtenConfirmedAt"]</th>
+            <th>@AmlTexts.Suspension.Case</th>
+            <th>@AmlTexts.Cases.Fields.Status</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var r in Model.Rows)
+        {
+            <tr>
+                @if (Model.ShowParty)
+                {
+                    <td><a href="/parties/@r.PartyId">@r.PartyName</a></td>
+                }
+                <td>@r.InstructedAt</td>
+                <td>@AmlTexts.Suspension.Kinds.GetValueOrDefault(r.Kind)</td>
+                <td>
+                    @AmlTexts.Suspension.Scopes.GetValueOrDefault(r.Scope)@(r.TransactionRef is { Length: > 0 } tr ? ": " + tr : "")
+                    @if (r.LegacyUnmapped)
+                    {
+                        <div><span class="badge warn">@AmlTexts.Suspension.LegacyUnmapped</span></div>
+                    }
+                </td>
+                <td>@r.EndsAt</td>
+                <td>@(r.WrittenConfirmedAt ?? (r.Kind == "oral" ? $"{s["confirmBy"]}: {r.ConfirmBy}" : "—"))</td>
+                <td>
+                    @if (r.CaseId is { } caseId)
+                    {
+                        <a href="/compliance/aml-cases/@caseId">@r.CaseNumber</a>
+                    }
+                    else
+                    {
+                        @("—")
+                    }
+                </td>
+                <td>
+                    <span class="badge @badge[r.State]">@AmlTexts.Suspension.States.GetValueOrDefault(r.State)</span>
+                    @if (r.State == "unconfirmed")
+                    {
+                        <div class="field-error">@AmlTexts.Suspension.UnconfirmedHint</div>
+                    }
+                    @if (r.LiftedAt is not null)
+                    {
+                        <div class="note">@s["liftedAt"]: @r.LiftedAt — @r.LiftReason</div>
+                    }
+                </td>
+                <td>
+                    @if (Model.Writable && r.LegacyUnmapped)
+                    {
+                        <form method="post" asp-page-handler="UpdateSuspension" class="row-actions">
+                            <input type="hidden" name="id" value="@r.Id" />
+                            <input type="hidden" name="back" value="@Model.Back" />
+                            <input name="attach_ref" placeholder="@AmlTexts.Suspension.AttachPlaceholder" style="width: 200px" />
+                            <button class="btn secondary" name="action" value="attach">@AmlTexts.Suspension.Attach</button>
+                        </form>
+                    }
+                    @if (Model.Writable && r.State != "lapsed")
+                    {
+                        <form method="post" asp-page-handler="UpdateSuspension" class="row-actions">
+                            <input type="hidden" name="id" value="@r.Id" />
+                            <input type="hidden" name="back" value="@Model.Back" />
+                            @if (r.State is "awaiting" or "unconfirmed")
+                            {
+                                <button class="btn secondary" name="action" value="confirm">@AmlTexts.Suspension.Confirm</button>
+                            }
+                            <input name="lift_reason" placeholder="@AmlTexts.Suspension.LiftReasonPlaceholder" style="width: 200px" />
+                            <button class="btn secondary" name="action" value="lift">@AmlTexts.Suspension.Lift</button>
+                        </form>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+@if (Model.Writable && Model.PartyId is { } partyId)
+{
+    <form method="post" asp-page-handler="CreateSuspension" class="card">
+        <h3>@AmlTexts.Suspension.Create</h3>
+        <input type="hidden" name="party_id" value="@partyId" />
+        @if (Model.CaseId is { } caseId)
+        {
+            <input type="hidden" name="case_id" value="@caseId" />
+        }
+        <input type="hidden" name="back" value="@Model.Back" />
+        <div class="grid">
+            <div>
+                <label for="instructed_at">@s["instructedAt"]</label>
+                <input id="instructed_at" name="instructed_at" type="datetime-local" value="@Aml.TbilisiNowLocal()" />
+            </div>
+            <div>
+                <label for="kind">@s["kind"]</label>
+                <select id="kind" name="kind">
+                    @foreach (var (value, title) in AmlTexts.Suspension.Kinds)
+                    {
+                        <option value="@value" selected="@(value == "written")">@title</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label for="scope">@s["scope"]</label>
+                <select id="scope" name="scope">
+                    @foreach (var (value, title) in AmlTexts.Suspension.Scopes)
+                    {
+                        <option value="@value" selected="@(value == "all")">@title</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label for="transaction_ref">@s["transactionRef"]</label>
+                <input id="transaction_ref" name="transaction_ref" type="text" />
+                <div class="hint">@AmlTexts.Suspension.TargetHint</div>
+            </div>
+            <div class="wide">
+                <label for="suspension_note">@s["note"]</label>
+                <input id="suspension_note" name="note" type="text" />
+            </div>
+        </div>
+        <div class="toolbar" style="margin-top: 14px; margin-bottom: 0">
+            <button class="btn">@AmlTexts.Suspension.Create</button>
+        </div>
+    </form>
+}

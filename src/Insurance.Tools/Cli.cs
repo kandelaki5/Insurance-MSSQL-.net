@@ -14,6 +14,10 @@ public static class Cli
                                                  INSURANCE_ADMIN_CONNECTION; the password is read from INSURANCE_APP_PASSWORD
           seed-admin <username> <full name>      creates (or resets the password of) an administrator; the password
                                                  is read from INSURANCE_ADMIN_PASSWORD
+          test-users [<env file>]                creates the missing claude.* test users on a test database
+                                                 (INSURANCE_ADMIN_CONNECTION); their passwords go to the env file (.env.uat)
+          users-inventory [<prefix>]             lists the users whose name starts with the prefix (reg-) with their sessions
+                                                 and the rows that point at them; writes nothing
           import-postgres                        copies the data of the old PostgreSQL database (see docs/MIGRATION.md)
           reconcile                              compares the old and the new database (see docs/MIGRATION.md)
         """;
@@ -36,6 +40,12 @@ public static class Cli
                     return 0;
                 case "seed-admin" when args.Length == 3:
                     await DatabaseCommands.SeedAdminAsync(Env("INSURANCE_ADMIN_CONNECTION"), args[1], args[2], Env("INSURANCE_ADMIN_PASSWORD"), output.WriteLine);
+                    return 0;
+                case "test-users" when args.Length <= 2:
+                    await TestUsers.RunAsync(Env("INSURANCE_ADMIN_CONNECTION"), args.Length == 2 ? args[1] : ".env.uat", output.WriteLine);
+                    return 0;
+                case "users-inventory" when args.Length <= 2:
+                    UsersInventory.Print(await UsersInventory.ReadAsync(Env("INSURANCE_ADMIN_CONNECTION"), args.Length == 2 ? args[1] : "reg-"), output.WriteLine);
                     return 0;
                 default:
                     if (args.FirstOrDefault() is "import-postgres" or "reconcile")

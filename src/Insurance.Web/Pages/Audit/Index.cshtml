@@ -1,0 +1,91 @@
+@page "/audit"
+@model Insurance.Web.Pages.Audit.IndexModel
+@using Insurance.Application.Services
+@{
+    ViewData["Title"] = AuditTexts.Title;
+    var f = Model.Filter;
+}
+<h1>@AuditTexts.Title</h1>
+@if (!Model.Allowed)
+{
+    <div class="alert error">@AuditTexts.NotAllowed</div>
+}
+else
+{
+    <p class="note">@AuditTexts.Note</p>
+    <form method="get" class="inline-form" style="margin-bottom: 12px">
+        <label>@AuditTexts.Filters.From <date-input name="from" value="@(f.From is { } from ? Fmt.Iso(from) : "")" /></label>
+        <label>@AuditTexts.Filters.To <date-input name="to" value="@(f.To is { } to ? Fmt.Iso(to) : "")" /></label>
+        <label>
+            @AuditTexts.Filters.Table
+            <select name="table">
+                <option value="" selected="@(f.Table is null)">@AuditTexts.Filters.Any</option>
+                @foreach (var (code, name) in Insurance.Web.Pages.Audit.IndexModel.Tables)
+                {
+                    <option value="@code" selected="@(f.Table == code)">@name</option>
+                }
+            </select>
+        </label>
+        <label>
+            @AuditTexts.Filters.User
+            <select name="user">
+                <option value="" selected="@(f.UserId is null)">@AuditTexts.Filters.Any</option>
+                @foreach (var u in Model.Users)
+                {
+                    <option value="@u.Id" selected="@(f.UserId == u.Id)">@u.FullName</option>
+                }
+            </select>
+        </label>
+        <button class="btn secondary">@AuditTexts.Filters.Apply</button>
+        <a href="/audit">@AuditTexts.Filters.Reset</a>
+    </form>
+    @if (Model.Rows.Count == 0)
+    {
+        <div class="card empty">@AuditTexts.Empty</div>
+    }
+    else
+    {
+        <table>
+            <thead>
+            <tr>
+                <th>@AuditTexts.Columns.At</th>
+                <th>@AuditTexts.Columns.Table</th>
+                <th>@AuditTexts.Columns.Row</th>
+                <th>@AuditTexts.Columns.Action</th>
+                <th>@AuditTexts.Columns.User</th>
+                <th>@AuditTexts.Columns.Changes</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var r in Model.Rows)
+            {
+                <tr>
+                    <td>@r.At</td>
+                    <td>@(AuditTexts.Tables.GetValueOrDefault(r.TableName) ?? r.TableName)</td>
+                    <td><code>@r.RowId</code></td>
+                    <td>@(Ka.Audit.Actions.GetValueOrDefault(r.Action) ?? r.Action)</td>
+                    <td>@(r.UserName ?? Ka.Audit.System)</td>
+                    <td>
+                        <ul class="changes">
+                            @foreach (var c in AuditLog.Changes(r.OldRow, r.NewRow))
+                            {
+                                <li><strong>@c.Field</strong>: @(r.Action == "insert" ? c.To : r.Action == "delete" ? c.From : $"{c.From} → {c.To}")</li>
+                            }
+                        </ul>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+    <div class="toolbar" style="margin-top: 12px">
+        @if (f.Before is not null)
+        {
+            <a href="@Model.Href(null)">@AuditTexts.First</a>
+        }
+        @if (Model.Next is { } next)
+        {
+            <a href="@Model.Href(next)">@AuditTexts.Next</a>
+        }
+    </div>
+}

@@ -1,0 +1,104 @@
+@page "/users"
+@model Insurance.Web.Pages.Users.IndexModel
+@{
+    var f = Ka.User.Fields.ByKey;
+    ViewData["Title"] = Ka.User.Title;
+    var role = Model.Value("role_code", "viewer");
+    var branch = Model.Value("branch_id", Model.Branches.FirstOrDefault()?.Value ?? "");
+}
+<h1>@Ka.User.Title</h1>
+<p><a href="/users/permissions">@PermissionTexts.Panel.Link</a></p>
+<form method="post" asp-page-handler="Create" class="card">
+    <h2>@Ka.User.New</h2>
+    @if (Model.Notice is not null)
+    {
+        <div class="alert ok">@Model.Notice</div>
+    }
+    <div class="grid">
+        <div>
+            <label for="username">@f["username"]</label>
+            <input id="username" name="username" type="text" autocomplete="off" value="@Model.Value("username")" />
+            @if (Model.Error("username") is { } e1) { <div class="field-error">@e1</div> }
+        </div>
+        <div>
+            <label for="full_name">@f["fullName"]</label>
+            <input id="full_name" name="full_name" type="text" value="@Model.Value("full_name")" />
+            @if (Model.Error("full_name") is { } e2) { <div class="field-error">@e2</div> }
+        </div>
+        <div>
+            <label for="password">@f["password"]</label>
+            <input id="password" name="password" type="password" autocomplete="new-password" />
+            @if (Model.Error("password") is { } e3) { <div class="field-error">@e3</div> }
+        </div>
+        <div>
+            <label for="role_code">@f["role"]</label>
+            <select id="role_code" name="role_code">
+                @foreach (var o in Model.Roles)
+                {
+                    <option value="@o.Value" selected="@(o.Value == role)">@o.Label</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label for="branch_id">@f["branch"]</label>
+            <select id="branch_id" name="branch_id">
+                @foreach (var o in Model.Branches)
+                {
+                    <option value="@o.Value" selected="@(o.Value == branch)">@o.Label</option>
+                }
+            </select>
+        </div>
+    </div>
+    <div class="toolbar" style="margin-top: 16px; margin-bottom: 0">
+        <button class="btn">@Ka.Common.Save</button>
+    </div>
+</form>
+<table>
+    <thead>
+    <tr>
+        <th>@f["username"]</th>
+        <th>@f["fullName"]</th>
+        <th>@f["role"]</th>
+        <th>@f["branch"]</th>
+        <th>@f["status"]</th>
+        <th></th>
+    </tr>
+    </thead>
+    <tbody>
+    @foreach (var u in Model.Users)
+    {
+        <tr>
+            <td>@u.Username</td>
+            <td>@u.FullName</td>
+            <td>@u.RoleName</td>
+            <td>@u.BranchName</td>
+            <td><span class="badge @(u.IsActive ? "low" : "high")">@(u.IsActive ? Ka.User.Active : Ka.User.Inactive)</span></td>
+            <td>
+                <div class="row-actions">
+                    <form method="post" asp-page-handler="ResetPassword" class="inline-form">
+                        <input type="hidden" name="id" value="@u.Id" />
+                        <input name="password" type="password" autocomplete="new-password" placeholder="@f["newPassword"]" />
+                        <button class="btn secondary">@Ka.User.ResetPassword</button>
+                        @if (Model.ResetFor == u.Id && Model.ResetError is not null)
+                        {
+                            <span class="field-error">@Model.ResetError</span>
+                        }
+                        @if (Model.ResetFor == u.Id && Model.ResetOk)
+                        {
+                            <span class="badge low">@Ka.Party.Saved</span>
+                        }
+                    </form>
+                    @if (u.Id != Model.Me.Id)
+                    {
+                        <form method="post" asp-page-handler="SetActive">
+                            <input type="hidden" name="id" value="@u.Id" />
+                            <input type="hidden" name="active" value="@(u.IsActive ? "false" : "true")" />
+                            <button class="btn secondary">@(u.IsActive ? Ka.User.Deactivate : Ka.User.Activate)</button>
+                        </form>
+                    }
+                </div>
+            </td>
+        </tr>
+    }
+    </tbody>
+</table>

@@ -38,7 +38,7 @@ public abstract class AppPageModel : PageModel
     protected string? Query(string name) => Request.Query.TryGetValue(name, out var v) && v.Count == 1 ? v[0] : null;
 
     /// <summary>Keeps every posted field so the form shows what was typed.</summary>
-    protected void KeepPostedValues()
+    protected void KeepTrimmedForm()
     {
         if (!Request.HasFormContentType) return;
         foreach (var (key, value) in Request.Form)

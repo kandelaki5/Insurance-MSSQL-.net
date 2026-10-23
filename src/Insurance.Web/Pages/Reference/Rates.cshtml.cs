@@ -18,7 +18,7 @@ public sealed class RatesModel(Rates rates) : AppPageModel
 
     public async Task<IActionResult> OnPostAsync()
     {
-        KeepPostedValues();
+        KeepTrimmedForm();
         if (!Me.CanWrite) FormError = Ka.Common.ReadOnly;
         else if (!DateOnly.TryParseExact(Form("date") ?? "", "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
                  || !await rates.LoadNbgRatesAsync(date))

@@ -1,0 +1,51 @@
+@page "/intermediaries"
+@model Insurance.Web.Pages.Intermediaries.IndexModel
+@using Insurance.Domain.Common
+@{
+    var t = Ka.Intermediary.Fields.ByKey;
+    ViewData["Title"] = Ka.Intermediary.Title;
+}
+<h1>@Ka.Intermediary.Title</h1>
+<div class="toolbar">
+    <div class="spacer"></div>
+    @if (Model.Me.CanWrite)
+    {
+        <a class="btn" href="/intermediaries/new">@Ka.Intermediary.New</a>
+    }
+</div>
+@if (Model.Rows.Count == 0)
+{
+    <div class="card empty">@Ka.Common.NoData</div>
+}
+else
+{
+    <table>
+        <thead>
+        <tr>
+            <th>@t["party"]</th>
+            <th>@Ka.Party.Fields["idNumber"]</th>
+            <th>@t["kind"]</th>
+            <th>@t["contractNo"]</th>
+            <th>@t["validTo"]</th>
+            <th class="num">@t["commissionPercent"]</th>
+            <th>@t["status"]</th>
+            <th>@Ka.Party.Fields["phone"]</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var row in Model.Rows)
+        {
+            <tr>
+                <td><a href="/intermediaries/@row.Id">@row.PartyName</a></td>
+                <td>@row.IdNumber</td>
+                <td>@Ka.Intermediary.Kind.GetValueOrDefault(row.Kind)</td>
+                <td>@row.ContractNo</td>
+                <td>@row.ValidTo</td>
+                <td class="num">@(row.CommissionPercent is { } c ? Fmt.Plain(c) : "")</td>
+                <td><span class="badge @(row.Status == "active" ? "low" : "")">@Ka.Intermediary.Status.GetValueOrDefault(row.Status)</span></td>
+                <td style="white-space: nowrap">@Phone.FormatPhone(row.Phone)</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
