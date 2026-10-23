@@ -26,7 +26,7 @@
 | ძველი ტესტ-ფაილები | 161 (1 598 შემთხვევა) | 135 PORTED, 26 N/A (ძველი სატესტო ინფრასტრუქტურა), 0 ნაწილობრივ, 0 აკლია |
 | ძველი რეალური ბაზის შემოწმების სკრიპტები | 45 | 43 ასახულია `docs/legacy-db-checks-*.md`-ში: PASS 364 (120 + 86 + 58 + 100; და 13 რიგი, რომელიც სხვა ნაწილის ტესტებით დამტკიცდა), N/A 43, NOT TESTED 1; 2 სკრიპტი N/A (PostgreSQL-ის ძველი სქემის განახლება) |
 | სხვა სკრიპტები (ადმინისტრირება, სატესტო გარემო, მტკიცებულებები, დამხმარეები) | 162 | იხ. პ. 6 |
-| ძველი პროგრამის ღია PR-ები (Codex INS-DOTNET-MSSQL-003) | 156 | PORTED 133, N/A 22, ნაწილობრივ ღია 1 (#363) — პ. 9 |
+| ძველი პროგრამის ღია PR-ები (Codex INS-DOTNET-MSSQL-003) | 156 | PORTED 134, N/A 22, ღია 0 — პ. 9 |
 
 დეტალური ჩანაწერები შემთხვევების მიხედვით:
 - `docs/legacy-db-checks-schema-claims.md`, `docs/legacy-db-checks-policies.md`, `docs/legacy-db-checks-accounting.md`, `docs/legacy-db-checks-regressions.md` — ძველი რეალური ბაზის სკრიპტები;
@@ -645,7 +645,7 @@ Known differences (documented, not gaps): `loadRates` answers "failed" for an im
 
 Codex-ის სიაში 156 ღია PR-ია: 69 საწყისი ვერსიის (`17c1f1f`) წინაპარია, 87 — არა. ქვემოთ თითოეულია: მოთხოვნა, საწყისი თუ არა, ზედ რაზე დგას, ახალი კოდი, ახალი ტესტი და სტატუსი. „წინაპარი“ ავტომატურად „გადატანილს“ არ ნიშნავს და „არაწინაპარი“ — „დაკარგულს“: თითოეული PR-ის საკუთარი diff-ი (წინა PR-ის head-თან) ცალკეა შემოწმებული. ცხრილის გადამოწმების სახე: კოდისა და ტესტების დათვალიერება (source review) + ქვემოთ დასახელებული ტესტები, რომლებიც სრულ გაშვებაში გადის.
 
-**სტატუსები (23.10.2026):** PORTED 133 (59 წინაპარი + 74 არაწინაპარი), N/A 22, ნაწილობრივ ღია 1 (#363 — ერთ წიგნზე კომბინირებული შემოწმების ნაწილი). წინა რუკის 21 ხარვეზი (ქცევა იყო, სცენარის ტესტი — არა) დაიხურა ტესტებით ნამდვილ SQL Server-ზე, საკონტროლო მუტაციებით.
+**სტატუსები (24.10.2026):** PORTED 134 (59 წინაპარი + 75 არაწინაპარი), N/A 22, ღია 0. #363-ის კომბინირებული შემოწმება 24.10-ს გადავიდა (`RegulatoryCombinedTests`, 26). წინა რუკის 21 ხარვეზი (ქცევა იყო, სცენარის ტესტი — არა) დაიხურა ტესტებით ნამდვილ SQL Server-ზე, საკონტროლო მუტაციებით.
 
 **გადახრები ძველისგან, რომლებიც განზრახ დარჩა:**
 - **#361** — ძველი კოდი JavaScript-ის რიცხვით ითვლიდა და ზოგ თანხას „არაზუსტად“ თვლიდა; ახალი ყველა თანხას ზუსტად (decimal/long თეთრი) ითვლის და გვერდზე აჩვენებს, Excel-ის ფაილს კი მხოლოდ 15 ციფრზე მეტ თანხაზე არ გასცემს (`ImpairmentPrecisionGuardTests`). „არაზუსტი“ რჩება მხოლოდ long-ის გადავსებისას.
@@ -671,7 +671,7 @@ Codex-ის სიაში 156 ღია PR-ია: 69 საწყისი �
 | #369 | docs: Zaza onboarding and architecture guide | N | docs | Onboarding/review guide docs/ZAZA-START-HERE.md (no behaviour) | on main e41199e | — | — | N/A (docs only) |
 | #366 | Fill form 1's profit and loss (IS, IS-COM, P&C(NL)) | N | feature | Form 1 income statement from the year's own figures; owner answers: quota deposit split by class, bank commission charged as it accrues, a loss on two classes = two cases, segment as fixed at issue | base a8e3fc9; merged into #363 | src/Insurance.Domain/Regulatory/IncomeStatement.cs, src/Insurance.Application/Services/IncomeStatementReader.cs, Pages/Accounting/Regulatory | D/Regulatory/IncomeStatementTests (15); I/Reports/IncomeStatementReaderTests (10, the 7 old negative controls as tests); W/Reports/IncomeStatementPageTests (3, incl. the late-read failure) | PORTED |
 | #364 | Record the demo database run of migration 0039 | N | docs | Evidence of a PostgreSQL demo run of 0039 (pg_dump/restore logs, rights JSON) | needs #362 (0039) | — | — | N/A (historical PG run / demo deployment evidence) |
-| #363 | Combined reporting head #361+#362+#358 (check only) | N | combined-check | Merge of #358+#361+#362+#366+#260 plus its own one-book test (regulatory-combined.test.ts): every real reader over one book; prior-year deposit key; prior-year ceded claims carried over; bank commission across the year; late commission read fails once; form 1 route parameters; USD ceded claims via claimSharesExact | stacked on #358; merges #361/#362/#366/#260 — not separate work | constituents: #361 ported; #362/#366 in progress | partly: W/Reports/IncomeStatementPageTests reads every real reader (#362 receivable, #366 reader, month report, impairment) over one fictional book through the page and the Form 1 file, with the late commission read failing once | OPEN (partly): the combined test's prior-year deposit key, prior-year ceded claims carried over and the bank's commission across the year are not asserted as one book |
+| #363 | Combined reporting head #361+#362+#358 (check only) | N | combined-check | Merge of #358+#361+#362+#366+#260 plus its own one-book test (regulatory-combined.test.ts): every real reader over one book; prior-year deposit key; prior-year ceded claims carried over; bank commission across the year; late commission read fails once; form 1 route parameters; USD ceded claims via claimSharesExact | stacked on #358; merges #361/#362/#366/#260 — not separate work | constituents: #361 ported; #362/#366 in progress | W/Reports/RegulatoryCombinedTests (26): six fictional books on SQL Server through the page and the Form 1 / Form 6 files — one book every reader + its 5 controls, the USD book with ceded claims + 3 controls, the prior year's ceded claims carried over + 2, the bank's commission across the year + 2, the deposit split and the prior-year deposit key + controls; every legacy figure unchanged; W/Reports/IncomeStatementPageTests (late commission read failing once) | PORTED (24.10.2026, `5bbd224`; the claim-class control adapted: one claim per event and line, so the 13 claim's money goes on K1) |
 | #362 | Keep the reinsurer's commission a receivable until settled | N | feature | RI commission stays a receivable until settled (0039 ledger, settlement page/actions, backdated settlement does not uncover a later one, 100%-ceded rows counted once) | base 7c02274; merged into #363 | src/Insurance.Domain/Finance/RiCommission.cs, src/Insurance.Application/Services/RiCommissionLedger.cs, database/migrations/0011, Pages/Accounting/RiCommission | D/Finance/RiCommissionTests; I/Reports/RiCommissionSettlementTests (11); W/Reports/RiCommissionPageTests (4) | PORTED |
 | #361 | Warn instead of showing impairment figures numbers cannot hold | N | fix | Impairment page/XLSX compare every figure with the exact report; beyond safe precision show a warning, never wrong figures | base 7c02274; merged into #363 | src/Insurance.Application/Services/ImpairmentReport.cs (BuildCheckedAsync) | W/Reports/ImpairmentPrecisionGuardTests: An_ordinary_date_shows_its_figures_and_gives_the_file, Fifteen_digits_exactly_are_given_as_a_file, A_sum_beyond_a_long_is_reported_inexact_never_an_error_page | PORTED (deviation: exact decimal figures are shown, a file is refused only beyond 15 digits; see §4) |
 | #358 | Fill statistical form 6 by quarter | Y | feature | Form 6 (reinsurers and brokers) by quarter, groups, rows below the grid | in baseline (head = baseline 17c1f1f) | src/Insurance.Domain/Regulatory/Form6.cs | D/Regulatory/Form6Tests (Quarters, RowsInTheirGroups, MoreThanSixClasses …); W/Reports/Form6FixesTests; W/Reports/RegulatoryPagesTests.Form_6_on_the_page_and_in_its_file_… | PORTED (baseline port) |
@@ -828,10 +828,10 @@ Codex-ის სიაში 156 ღია PR-ია: 69 საწყისი �
 
 | status | all | ancestor | non-ancestor |
 |---|---:|---:|---:|
-| PORTED | 133 | 59 | 74 |
+| PORTED | 134 | 59 | 75 |
 | BEHAVIOUR PRESENT – SCENARIO TEST NOT PORTED | 0 | 0 | 0 |
 | N/A | 22 | 10 | 12 |
-| OPEN (partly) | 1 | 0 | 1 |
+| OPEN | 0 | 0 | 0 |
 | **total** | 156 | 69 | 87 |
 
 Kinds: test-only 122, docs 11, feature 10, tooling 10, fix 2, combined-check 1.
@@ -853,10 +853,10 @@ Kinds: test-only 122, docs 11, feature 10, tooling 10, fix 2, combined-check 1.
 ### Open (named)
 
 - **#362** and **#366** are PORTED (above). **H46** (no open PR of its own) is implemented: migration 0012, I/ClaimGelOnForeignPolicyTests (9), W/ClaimGelCardTests (1).
-- **#363** combined reporting head — OPEN (partly): every real reader over one book is now read through the page and the Form 1 file (W/Reports/IncomeStatementPageTests), with the late commission read failing once; its prior-year deposit key, prior-year ceded claims carried over and the bank's commission across the year are not asserted as one book.
+- **#363** combined reporting head — PORTED (24.10.2026): `RegulatoryCombinedTests`, 26 tests over six books, each legacy control a data variant or a wrong-rule figure; five hand mutations of the reader each failed with the legacy figure (922.80, 67.53, 54.75/52.93, 334.50, the deposit key 18250).
 
 ### Notes
 
 - main moved 6 commits past the baseline (#367 CI concurrency, #368 = #260's M1 grandchild test fix, Zaza docs); none is a business rule.
-- The 69 ancestor PRs (#69–#137 except #82, plus #358): 57 test-only scenario PRs, each mapped to a named .NET test; 2 features (#358 form 6, #77 journal read-only), ported; 10 docs/tooling rows N/A. The 87 non-ancestor PRs: 74 PORTED (65 test-only, 8 features, 1 fix), 12 N/A, 1 open in part (#363) — so "87 non-ancestor" is not "87 lost".
+- The 69 ancestor PRs (#69–#137 except #82, plus #358): 57 test-only scenario PRs, each mapped to a named .NET test; 2 features (#358 form 6, #77 journal read-only), ported; 10 docs/tooling rows N/A. The 87 non-ancestor PRs: 75 PORTED (65 test-only, 8 features, 1 fix, 1 combined check), 12 N/A, 0 open — so "87 non-ancestor" is not "87 lost".
 
