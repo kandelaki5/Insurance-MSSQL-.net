@@ -15,6 +15,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\parity\cases\common.json" Link="parity\common.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The S3 report parity worlds (tests/parity/generate/reports.ts): rows and the old reports over them. -->
+    <None Include="..\parity\cases\reports.json" Link="parity\reports.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
