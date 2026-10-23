@@ -41,6 +41,12 @@ public static class LegacyDbCheck
         return new Held { Connection = c, Transaction = t };
     }
 
+    /// <summary>Rolls back unless the server already did (a refusal inside a trigger ends the transaction).</summary>
+    public static async Task RollbackQuietlyAsync(SqlTransaction t)
+    {
+        try { if (t.Connection is not null) await t.RollbackAsync(); } catch (InvalidOperationException) { } catch (SqlException) { }
+    }
+
     /// <summary>Each task is still running after <see cref="Blocked"/>: it waits for a lock someone else holds.</summary>
     public static async Task AssertWaitingAsync(params Task[] tasks)
     {
