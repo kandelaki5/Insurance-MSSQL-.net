@@ -99,7 +99,7 @@ public sealed partial class TreatyFormDateTests(WebApp app) : IClassFixture<WebA
             "/complaints/new", complaint, "/intermediaries/new", intermediary,
             "/compliance/aml-cases", "/compliance/aml-cases/new", amlCase,
             "/reinsurance/treaties/new", $"/reinsurance/treaties/{treaty}/bordereau",
-            "/reference/rates", "/accounting/impairment", "/accounting/policy-premium", "/audit",
+            "/reference/rates", "/accounting/impairment", "/accounting/policy-premium", "/accounting/ri-commission", "/audit",
         };
         var pages = new List<(string, string)>();
         foreach (var url in urls) pages.Add((url, await Html.GetAsync(client, url)));
@@ -175,6 +175,7 @@ public sealed partial class TreatyFormDateTests(WebApp app) : IClassFixture<WebA
         "/reference/rates: date",
         "/accounting/impairment: date",
         "/accounting/policy-premium: from,to",
+        "/accounting/ri-commission: date",
         "/audit: from,to",
     ];
 
@@ -212,6 +213,7 @@ public sealed partial class TreatyFormDateTests(WebApp app) : IClassFixture<WebA
     private static readonly string[] SharedFields = [
         "Accounting/Impairment.cshtml:1",
         "Accounting/PolicyPremium.cshtml:2",
+        "Accounting/RiCommission.cshtml:3",
         "Audit/Index.cshtml:2",
         "Claims/Claim.cshtml:6",
         "Claims/New.cshtml:2",
