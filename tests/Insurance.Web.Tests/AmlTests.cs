@@ -188,4 +188,87 @@ public sealed class AmlTests(WebApp app) : IClassFixture<WebApp>
         var html = await Html.GetAsync(client, page);
         Assert.Contains(AmlTexts.Suspension.States["active"], html);
     }
+
+    /// <summary>
+    /// Two sessions: a receipt in flight (it has checked the client inside its transaction, as the payment action does)
+    /// and the real "register suspension" form posted over HTTP. The registration waits for the receipt; a receipt that
+    /// starts after it sees the suspension.
+    /// </summary>
+    [Fact]
+    public async Task A_suspension_registered_on_the_card_waits_for_a_receipt_in_flight_and_a_later_receipt_sees_it()
+    {
+        var (client, userId) = await app.SignedInAsync("operations_head");
+        var policy = await app.Db.App.AsUserAsync(userId, tx => Fixtures.ActivePolicyAsync(tx, userId, new DateOnly(2026, 2, 1)));
+        var party = policy.PartyId;
+        var card = $"/parties/{party}";
+        var form = new Dictionary<string, string> { ["party_id"] = party.ToString(), ["back"] = card, ["instructed_at"] = "", ["kind"] = "written", ["scope"] = "all" };
+
+        await using var connection = await app.Db.OpenAppAsync();
+        await using var transaction = (Microsoft.Data.SqlClient.SqlTransaction)await connection.BeginTransactionAsync();
+        var receipt = new Insurance.Application.Data.Tx(connection, transaction);
+        await receipt.ExecuteAsync("select id from core.policy with (updlock, rowlock, holdlock) where id = @id", new { id = policy.PolicyId });
+        Assert.Null(await Aml.SuspensionInTransactionAsync(receipt, party));
+
+        var registering = WebApp.PostFormAsync(client, $"{card}?handler=CreateSuspension", form, card);
+        Assert.NotSame(registering, await Task.WhenAny(registering, Task.Delay(1500)));
+        await receipt.ExecuteAsync("insert core.payment (received_on, amount_gel, method, payer_party_id) values ('2026-10-02', 100, N'bank', @party)", new { party });
+        await transaction.CommitAsync();
+        Assert.Equal(card, Html.Location(await registering));
+
+        await using var c = await app.Db.OpenAdminAsync();
+        var (paymentAt, suspensionAt) = await c.QuerySingleAsync<(DateTimeOffset, DateTimeOffset)>("""
+            select (select max(created_at) from core.payment where payer_party_id = @party), (select created_at from core.fms_suspension where party_id = @party)
+            """, new { party });
+        Assert.True(paymentAt < suspensionAt);
+        var later = await app.Db.App.AsUserAsync(userId, tx => Aml.SuspensionInTransactionAsync(tx, party));
+        Assert.NotNull(later);
+        Assert.Equal("active", later.State);
+    }
+
+    [Fact]
+    public async Task The_AML_report_shows_the_period_and_downloads_its_workbook_for_the_compliance_roles()
+    {
+        var (client, userId) = await app.SignedInAsync("accountant");
+        await app.Db.App.AsUserAsync(userId, tx => Fixtures.ActivePolicyAsync(tx, userId, new DateOnly(2029, 8, 1), premium: 4321.5m));
+        var page = await Html.GetAsync(client, "/compliance/aml-report?year=2029&half=2");
+        Assert.Contains("2029 II ნახევარი: 2029-07-01 – 2029-12-31", page);
+        Assert.Contains("value=\"2029\"", page);
+        Assert.Contains("href=\"/compliance/aml-report/xlsx?year=2029&amp;half=2\"", page);
+        Assert.Contains("4,321.50", page);
+        Assert.Contains(AmlTexts.Forms.N9, page);
+        // A year that is not four digits is this year; an unknown half is the first.
+        Assert.Contains($"{Rates.TodayInTbilisi().Year} I ნახევარი", await Html.GetAsync(client, "/compliance/aml-report?year=20x9&half=3"));
+
+        var file = await client.GetAsync("/compliance/aml-report/xlsx?year=2029&half=2");
+        Assert.Equal(HttpStatusCode.OK, file.StatusCode);
+        Assert.Equal("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", file.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("aml-report-2029-07-01-2029-12-31.xlsx", file.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
+        var book = Insurance.Application.Excel.XlsxReader.Read(await file.Content.ReadAsByteArrayAsync());
+        Assert.Equal(["N2", "N3", "N4", "N5", "N6", "N8", "N9"], book.SheetNames);
+        var n3 = Insurance.Application.Excel.SheetToJson.ToArrays(book.Sheets["N3"]);
+        Assert.Contains(n3, row => row.Count > 3 && Equals(row[0], "GE") && Equals(row[3], 4321.5d));
+    }
+
+    [Fact]
+    public async Task A_run_out_case_series_says_so_and_writes_nothing()
+    {
+        var (client, _) = await app.SignedInAsync("admin");
+        var (_, taxId) = await ClientAsync();
+        await using var c = await app.Db.OpenAdminAsync();
+        var (next, padding) = await c.QuerySingleAsync<(long, int)>("select next_value, padding from core.number_sequence where code = N'aml_case'");
+        var before = await c.ExecuteScalarAsync<int>("select count(*) from core.aml_case");
+        await c.ExecuteAsync("update core.number_sequence set next_value = @v where code = N'aml_case'", new { v = (long)Math.Pow(10, padding) });
+        try
+        {
+            var html = await Html.BodyAsync(await WebApp.PostFormAsync(client, "/compliance/aml-cases/new",
+                new() { ["party_id_number"] = taxId, ["opened_on"] = Fmt.Iso(Rates.TodayInTbilisi()), ["source"] = "other", ["description"] = "x" }, "/compliance/aml-cases/new"));
+            Assert.Contains(Ka.Common.SeriesExhausted, html);
+            Assert.Equal(before, await c.ExecuteScalarAsync<int>("select count(*) from core.aml_case"));
+            Assert.Equal((long)Math.Pow(10, padding), await c.ExecuteScalarAsync<long>("select next_value from core.number_sequence where code = N'aml_case'"));
+        }
+        finally
+        {
+            await c.ExecuteAsync("update core.number_sequence set next_value = @next where code = N'aml_case'", new { next });
+        }
+    }
 }

@@ -103,7 +103,7 @@ public sealed class IndexModel : AppPageModel
         var refusal = await Db.AsUserAsync<(string Code, string Problem, string? Other)?>(Me.Id, async tx =>
         {
             var series = (await tx.QueryAsync<Series>("""
-                select code as Code, prefix as Prefix, padding as Padding, next_value as NextValue, null as Product
+                select code as Code, prefix as Prefix, padding as Padding, next_value as NextValue, convert(nvarchar(400), null) as Product
                 from core.number_sequence with (updlock, rowlock)
                 where code in @codes or code like N'policy:%'
                 order by code
