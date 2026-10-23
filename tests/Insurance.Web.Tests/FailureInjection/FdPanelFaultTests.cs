@@ -250,6 +250,38 @@ public sealed partial class FdPanelFaultTests
         Assert.Equal([p.Refund], Ids(h, "refund"));
     }
 
+    /// <summary>
+    /// Legacy readPendingQueue caught any error of a list read: "could not be read", never "nothing pending", never the page
+    /// failing. An error that is neither a SqlException nor an InvalidOperationException (here the test's own InjectedFault, an
+    /// ArgumentException, a timeout) is that too — before the fix it left the page as a 500.
+    /// </summary>
+    [Theory]
+    [InlineData("injected")]
+    [InlineData("argument")]
+    [InlineData("timeout")]
+    public async Task A_list_read_failing_with_any_other_error_is_could_not_be_read_too_the_other_lists_as_they_are(string kind)
+    {
+        await using var p = await PanelAsync();
+        var s = p.Site;
+        var (admin, _) = await s.SignedInAsync("admin");
+        Exception error = kind switch
+        {
+            "injected" => new InjectedFault("FD_PANEL_LIST_DOWN"),
+            "argument" => new ArgumentException("a value the reader could not take"),
+            _ => new TimeoutException("the list did not answer"),
+        };
+        s.Faults.FailOnce(c => Faults.Has(c, "from core.premium_refund_request q"), error);
+        var h = await GetAsync(s, admin);
+        Assert.True(s.Faults.AllFired);
+        Assert.Contains(FdPanelTexts.Failed, Section(h, "refund"));
+        Assert.DoesNotContain(FdPanelTexts.Empty, Section(h, "refund"));
+        Assert.Empty(Ids(h, "refund"));
+        Assert.Equal([p.Cq1, p.Cq2], Ids(h, "claim"));
+        Assert.Equal([p.Reversal], Ids(h, "reversal"));
+        // The next request reads it again: the refund request listed.
+        Assert.Equal([p.Refund], Ids(await GetAsync(s, admin), "refund"));
+    }
+
     [Fact]
     public async Task The_menu_the_admin_and_the_director_given_it_see_the_link_the_viewer_does_not_a_removal_hides_it_the_menu_reads_no_list()
     {

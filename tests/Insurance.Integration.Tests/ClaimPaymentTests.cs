@@ -387,6 +387,26 @@ public sealed class ClaimPaymentTests(TestDatabase db) : IClassFixture<TestDatab
         Assert.Equal(200m, (await PaymentsAsync(second)).Single().DeductibleWithheld);
     }
 
+    /// <summary>
+    /// Legacy loss-event-check.ts J1–J4 (Codex H51) with their numbers: deductible 200 on the 5.1 coverages of one event, each claim
+    /// approved and paid in full — J1 100 + 100: withheld 200, net 0; J2 50 + 50 + 50 on three coverages: withheld 150, net 0;
+    /// J3 a single 100: withheld 100, net 0; J4 a single 500: withheld 200, net 300.
+    /// </summary>
+    [Theory]
+    [InlineData("damage:100,equipment:100", 200, 0)]
+    [InlineData("damage:50,equipment:50,theft:50", 150, 0)]
+    [InlineData("damage:100", 100, 0)]
+    [InlineData("damage:500", 200, 300)]
+    public async Task J1_to_J4_small_and_single_payments_withhold_the_class_deductible_at_most_once(string paid, int withheld, int net)
+    {
+        var parts = paid.Split(',').Select(x => x.Split(':')).Select(x => (x[0], x[1])).ToArray();
+        var (x, c, a) = await EventAsync(200m, 200m, parts: parts);
+        foreach (var (claim, (_, amount)) in c.Zip(parts)) await w.ApproveAsync(x.Claims, claim, amount, x.Today);
+        foreach (var (claim, (_, amount)) in c.Zip(parts)) Assert.NotNull((await w.PayAsync(a, claim, amount, x.Today, x.Today)).RedirectTo);
+        Assert.Equal([(parts.Length, (decimal)withheld, (decimal)net)], await w.RowsAsync<(int, decimal, decimal)>(
+            "select count(*), sum(deductible_withheld), sum(net_paid) from core.claim_payment where claim_id in @c", new { c }));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

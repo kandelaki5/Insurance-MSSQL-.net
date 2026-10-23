@@ -99,8 +99,10 @@ public static class FdPanel
             // A table or a column that is not there: the migration of that list is not applied.
             return new QueueRead(ReadState.NotReady, [], null);
         }
-        catch (Exception e) when (e is SqlException or InvalidOperationException)
+        catch (Exception e) when (e is not OperationCanceledException)
         {
+            // Legacy readPendingQueue: any error of the read is "could not be read" (logged), never an empty list; only a
+            // cancelled request is let through.
             log?.Invoke(queue, e);
             return new QueueRead(ReadState.Failed, [], null);
         }

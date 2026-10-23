@@ -79,6 +79,29 @@ public sealed class ClaimConcurrencyTests(TestDatabase db) : IClassFixture<TestD
         Assert.Equal(150m, await w.ScalarAsync<decimal>("select sum(deductible_withheld) from core.claim_payment where claim_id in @ids", new { ids = e.Ids }));
     }
 
+    /// <summary>
+    /// Legacy loss-event-check.ts L1 / L2 with their own numbers: damage and equipment of one event (deductible 200 / 200), two
+    /// payments of 100 + 100 (L1) or 150 + 150 (L2) sent at the same moment while another connection holds the event — both wait;
+    /// once it lets go, 200 is withheld once: net 0 (L1), net 100 (L2).
+    /// </summary>
+    [Theory]
+    [InlineData("100", 0)]
+    [InlineData("150", 100)]
+    public async Task L1_L2_two_small_payments_at_the_same_moment_wait_for_the_held_event_then_withhold_200_once(string each, int net)
+    {
+        var e = await EventAsync(200m);
+        var eventId = await w.ScalarAsync<Guid>("select loss_event_id from core.claim where id = @id", new { id = e.Ids[0] });
+        await using var holder = await HoldAsync(e.Claims.Id);
+        await holder.Run("select id from core.loss_event with (updlock, rowlock, holdlock) where id = @eventId", new { eventId });
+        var payments = e.Ids.Select(id => w.PayAsync(e.Accountant, id, each, e.Today, e.Today)).ToArray();
+        await AssertWaitingAsync(payments);
+        Assert.Equal(0, await w.ScalarAsync<int>("select count(*) from core.claim_payment where claim_id in @ids", new { ids = e.Ids }));
+        await holder.CommitAsync();
+        foreach (var p in await Task.WhenAll(payments)) Assert.NotNull(p.RedirectTo);
+        Assert.Equal([(2, 200m, (decimal)net)], await w.RowsAsync<(int, decimal, decimal)>(
+            "select count(*), sum(deductible_withheld), sum(net_paid) from core.claim_payment where claim_id in @ids", new { ids = e.Ids }));
+    }
+
     [Fact]
     public async Task Negative_control_without_the_event_lock_two_payments_withhold_the_one_deductible_twice()
     {

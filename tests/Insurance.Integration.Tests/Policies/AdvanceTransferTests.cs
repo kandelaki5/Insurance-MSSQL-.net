@@ -141,7 +141,7 @@ public sealed class AdvanceTransferTests(TestDatabase db) : IClassFixture<TestDa
     }
 
     [Fact]
-    public async Task H_the_database_refuses_more_than_the_receipt_and_an_allocation_from_a_reversed_one()
+    public async Task H_the_database_refuses_more_than_the_receipt_an_allocation_from_a_reversed_one_and_one_booked_in_a_closed_month()
     {
         var user = await w.UserAsync();
         var holder = await w.ClientAsync();
@@ -150,11 +150,17 @@ public sealed class AdvanceTransferTests(TestDatabase db) : IClassFixture<TestDa
         var guard = await w.ReceiptAsync(holder, Received, 50m);
         var reversed = await w.ReceiptAsync(holder, Received, 100m);
         await PaymentActions.ReversePaymentAsync(w.App, user, reversed.ToString(), pol.Id.ToString(), "x");
-        async Task<string?> Insert(Guid payment, decimal amount) => DbError.From(await Record.ExceptionAsync(() => w.App.AsUserAsync(user.Id, tx =>
+        async Task<string?> Insert(Guid payment, decimal amount, DateOnly? on = null) => DbError.From(await Record.ExceptionAsync(() => w.App.AsUserAsync(user.Id, tx =>
             tx.ExecuteAsync("insert into core.payment_allocation (payment_id, installment_id, amount, amount_gel, rate, booked_on) values (@payment, @inst, @amount, @amount, 1, @today)",
-                new { payment, inst, amount, today = World.Today }))))?.Code;
+                new { payment, inst, amount, today = on ?? World.Today }))))?.Code;
         Assert.Equal("PA002", await Insert(guard, 60m));
         Assert.Equal("PA001", await Insert(reversed, 10m));
+        // An allocation booked in a closed month (the month before this class's policies, closed here; no row of this class is
+        // booked in it): refused 23514 by the period guard, the month not reopened.
+        var closed = new DateOnly(2025, 12, 1);
+        await w.CloseMonthAsync(closed, user.Id);
+        Assert.Equal("23514", await Insert(guard, 10m, closed.AddDays(14)));
+        Assert.Equal("closed", await w.ScalarAsync<string>("select status from core.accounting_period where period_start = @closed", new { closed }));
         Assert.Equal((50m, 365m), (await w.AvailableAsync(guard), await w.OwedAsync(pol.Id)));
     }
 

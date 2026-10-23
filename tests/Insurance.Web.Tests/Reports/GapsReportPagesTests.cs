@@ -82,6 +82,60 @@ public sealed class GapsReportPagesTests
         Assert.Empty(site.Nbg.Requests);
     }
 
+    private static DateOnly? DayOf(object? value) => value switch
+    {
+        DateOnly d => d,
+        DateTime t => DateOnly.FromDateTime(t),
+        _ => null,
+    };
+
+    /// <summary>
+    /// Legacy policy-cancel-asuser.test.ts "the real monthly page when the reinsurance ledger cannot be read, then again": the
+    /// writer's rows as above (cancelled 25.10, October closed, brought forward to 20.10); the cession ledger read for 31.10 fails
+    /// once — the page comes back as that error (500, its message, none of the page: no reinsurance column of zeros), after the
+    /// gross ledger was read, nothing written, no network; the next request on the same rows shows October's reinsurance
+    /// 6.00 / 3.00 / 9.00 and the whole premium table as on the healthy page. The site over the same database carries the
+    /// command interceptor (FaultSite.Over).
+    /// </summary>
+    [Fact]
+    public async Task The_monthly_page_when_the_cession_read_fails_once_is_that_error_with_nothing_written_the_next_request_shows_October_6_00_3_00_9_00()
+    {
+        var (site, cancel) = await ReinsuredAsync(0);
+        await using var _ = site;
+        await cancel("2026-10-25", false);
+        await site.World.ClosePeriodAsync("2026-10");
+        await cancel("2026-10-20", true);
+        await using var faulty = Insurance.Web.Tests.FailureInjection.FaultSite.Over(site.World.Database);
+        var (client, _) = await faulty.SignedInAsync("accountant");
+        const string url = "/accounting/premium-report?month=2026-10";
+        var healthy = await ReportSite.PageAsync(client, url);
+        var before = await site.World.FingerprintAsync();
+
+        static bool CessionLedger(Insurance.Application.Data.CommandEvent c) =>
+            Insurance.Integration.Tests.FailureInjection.Faults.Has(c, "c.cancels_cession_id as CancelsId") && Insurance.Integration.Tests.FailureInjection.Faults.Has(c, "from core.premium_cession c");
+        faulty.Faults.Reset();
+        var sentinel = new Insurance.Integration.Tests.FailureInjection.InjectedFault("MONTHLY_RI_LEDGER_UNAVAILABLE");
+        faulty.Faults.FailOnce(CessionLedger, sentinel);
+        var failed = await Insurance.Web.Tests.FailureInjection.FaultSite.FailedAsync(await client.GetAsync(url), sentinel);
+        Assert.DoesNotContain(RiHeadings[0], failed, StringComparison.Ordinal);
+        Assert.True(faulty.Faults.AllFired);
+        var log = faulty.Faults.Log.ToList();
+        var hit = log.FindIndex(CessionLedger);
+        Assert.Equal(new DateOnly(2026, 10, 31), DayOf(log[hit].Parameter("to")));
+        Assert.Contains(log.Take(hit), c => c.Sql.Contains("from core.premium_transaction t", StringComparison.Ordinal));
+        Assert.Equal(before, await site.World.FingerprintAsync());
+
+        var retry = await ReportSite.PageAsync(client, url);
+        var o = Ri(retry);
+        Assert.Equal(RiHeadings, o.Headings);
+        Assert.Equal([["5.1", "6.00", "0.00", "0.00"], [Liability, "3.00", "0.00", "0.00"], ["სულ", "9.00", "0.00", "0.00"]], o.Rows);
+        Assert.Equal(Tables(healthy, 0).Select(r => string.Join("|", r)), Tables(retry, 0).Select(r => string.Join("|", r)));
+        Assert.Matches(@"<input\b[^>]*\bid=""month""[^>]*\bvalue=""2026-10""|<input\b[^>]*\bvalue=""2026-10""[^>]*\bid=""month""", retry);
+        Assert.Equal(before, await site.World.FingerprintAsync());
+        Assert.Empty(faulty.Nbg.Requests);
+        Assert.Empty(site.Nbg.Requests);
+    }
+
     [Fact]
     public async Task The_premium_report_page_over_rows_written_by_the_real_import_and_approval_October_4360_written_1600_USD_owed_300_overdue_4800_November_earned_358_36_UPR_3674_31_IBNR_218()
     {

@@ -45,6 +45,8 @@ public sealed class PaymentRegressionTests(TestDatabase db) : IClassFixture<Test
         Assert.All(rows, r => Assert.Equal(("receipt", 1, World.Today), (r.Kind, r.Lines, r.BookedOn)));
         Assert.Equal([73m, 18.25m], rows.Select(r => r.AmountGel));
         Assert.Equal([Start.AddDays(4), Start.AddDays(5)], rows.Select(r => r.ReceivedOn));
+        // The approval is in the audit trail (the legacy "audit" check counts A's approval with B's two updates).
+        Assert.True(await w.ScalarAsync<int>("select count(*) from core.audit_log where table_name = N'policy' and row_id = @id and action = N'update'", new { id = a.Id.ToString() }) >= 1);
     }
 
     [Fact]

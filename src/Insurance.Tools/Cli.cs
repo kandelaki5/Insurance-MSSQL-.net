@@ -18,6 +18,8 @@ public static class Cli
                                                  (INSURANCE_ADMIN_CONNECTION); their passwords go to the env file (.env.uat)
           users-inventory [<prefix>]             lists the users whose name starts with the prefix (reg-) with their sessions
                                                  and the rows that point at them; writes nothing
+          fingerprint                            prints, per table of schema core, its row count and a SHA-256 of all its rows
+                                                 (order-independent) and one line over all; reads only (INSURANCE_ADMIN_CONNECTION)
           import-postgres                        copies the data of the old PostgreSQL database (see docs/MIGRATION.md)
           reconcile                              compares the old and the new database (see docs/MIGRATION.md)
         """;
@@ -46,6 +48,9 @@ public static class Cli
                     return 0;
                 case "users-inventory" when args.Length <= 2:
                     UsersInventory.Print(await UsersInventory.ReadAsync(Env("INSURANCE_ADMIN_CONNECTION"), args.Length == 2 ? args[1] : "reg-"), output.WriteLine);
+                    return 0;
+                case "fingerprint" when args.Length == 1:
+                    foreach (var line in Fingerprint.Lines(await Fingerprint.ReadAsync(Env("INSURANCE_ADMIN_CONNECTION")))) output.WriteLine(line);
                     return 0;
                 default:
                     if (args.FirstOrDefault() is "import-postgres" or "reconcile")
