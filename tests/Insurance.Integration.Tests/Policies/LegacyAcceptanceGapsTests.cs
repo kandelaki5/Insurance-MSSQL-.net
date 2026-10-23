@@ -45,7 +45,7 @@ public sealed class LegacyAcceptanceGapsTests(TestDatabase db) : IClassFixture<T
         Assert.NotNull((await w.PayAsync(admin, p.Id, "91.25", Paid)).Redirect);
         Assert.NotNull((await w.CancelAsync(admin, p.Id, Cancel)).Redirect);
         var line = await w.ScalarAsync<Guid>("select id from core.policy_line where policy_id = @id", new { id = p.Id });
-        Task<FormOutcome> Claim(DateOnly occurred) => ClaimActions.RegisterClaimAsync(w.App, admin, ClaimWorld.Form(("policy_number", p.Number),
+        Task<FormOutcome> Claim(DateOnly occurred) => ClaimActions.RegisterClaimAsync(w.App, w.Rates, admin, ClaimWorld.Form(("policy_number", p.Number),
             ("occurred_on", ClaimWorld.D(occurred)), ("reported_on", ClaimWorld.D(occurred)), ("description", "AG-C4"), ($"line:{line}", "on"), ($"reserve:{line}", "100")));
         var before = await Claim(Cancel.AddDays(-1));
         var onDay = await Claim(Cancel);

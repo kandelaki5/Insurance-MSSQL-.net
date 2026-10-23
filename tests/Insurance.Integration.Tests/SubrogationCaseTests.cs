@@ -40,6 +40,8 @@ public sealed class SubrogationCaseTests(TestDatabase db) : IClassFixture<TestDa
         var y = Interlocked.Increment(ref year);
         var actor = await w.UserAsync("admin");
         var from = new DateOnly(y, 1, 1);
+        // Claim "USD" is an old claim: the USD policy's claim in USD (H46 setting claim.currency = policy).
+        await w.OldClaimsAsync();
         var gel = await w.PolicyAsync(actor.Id, from, [new("damage", 99999m, 0m), new("equipment", 99999m, 0m), new("theft", 99999m, 0m), new("assistance", 99999m, 0m), new("accident", 99999m, 0m)]);
         await w.RateAsync("USD", from, 2.7m);
         var usd = await w.PolicyAsync(actor.Id, from, [new("damage", 99999m, 0m)], currency: "USD", rate: 2.7m);
@@ -48,7 +50,7 @@ public sealed class SubrogationCaseTests(TestDatabase db) : IClassFixture<TestDa
         var claims = new Dictionary<string, Guid>();
         async Task<Guid> One(ClaimWorld.Policy p, Guid line)
         {
-            var outcome = await ClaimActions.RegisterClaimAsync(w.App, actor, ClaimWorld.Form(("policy_number", p.Number), ("occurred_on", $"{y}-08-01"), ("reported_on", $"{y}-08-02"),
+            var outcome = await ClaimActions.RegisterClaimAsync(w.App, w.Rates, actor, ClaimWorld.Form(("policy_number", p.Number), ("occurred_on", $"{y}-08-01"), ("reported_on", $"{y}-08-02"),
                 ("description", "ავარია"), ($"line:{line}", "on"), ($"reserve:{line}", "1000")));
             return Guid.Parse(outcome.RedirectTo!.Split('/')[2].Split('?')[0]);
         }

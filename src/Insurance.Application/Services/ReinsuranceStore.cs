@@ -13,6 +13,12 @@ public sealed class ReinsuranceException(CessionProblem problem) : Exception($"r
 }
 
 /// <summary>
+/// An excess-of-loss treaty in the claim's currency is in force for a GEL claim on a foreign-currency coverage (H46): whether
+/// it shares such a loss is not decided (old program docs/07 §4.5, status open question 8), so the registration is refused.
+/// </summary>
+public sealed class CrossCurrencyXlException() : Exception("reinsurance: an excess-of-loss treaty on a claim in another currency than its coverage");
+
+/// <summary>
 /// Database side of outward reinsurance: applies treaties to premium ledger rows and claims (legacy src/lib/reinsurance.ts).
 /// Rows of one transaction are taken in the order they were written (created_at, then id); in PostgreSQL rows of one
 /// transaction shared one created_at, so their order was the ids' (random) order — any order was the legacy behaviour.
@@ -234,13 +240,22 @@ public static class ReinsuranceStore
             order by lower(convert(nchar(36), treaty_id)) collate Latin1_General_BIN2
             """, new { policyLineId })).ToList();
         var xl = await TreatiesForAsync(tx, classCode, occurredOn, ["excess_of_loss"]);
-        var claimCurrency = await tx.QuerySingleOrDefaultAsync<string>("select currency from core.claim where id = @claimId", new { claimId });
+        var currencies = await tx.QuerySingleOrDefaultAsync<(string Claim, string Line)>("""
+            select c.currency, coalesce(l.sum_insured_currency, p.premium_currency)
+            from core.claim c join core.policy_line l on l.id = c.policy_line_id join core.policy p on p.id = c.policy_id where c.id = @claimId
+            """, new { claimId });
+        var claimCurrency = currencies.Claim?.Trim() ?? "";
         // Refused as a whole, with the claim registration rolled back, rather than shared wrongly (H07: an
-        // excess-of-loss priority in another currency; H08: more than the loss).
+        // excess-of-loss priority in another currency; H08: more than the loss). A GEL claim on a USD coverage meets a USD
+        // treaty here and is refused (RI003), as the old program's design keeps it (docs/07 §4.5).
         AssertPlan(
             [.. proportional.Select(p => new CessionShare(Codes.Parse<TreatyKind>(p.Kind), p.SharePercent, p.Currency.Trim())),
              .. xl.Select(t => new CessionShare(t.TreatyKind, 0m, t.Currency.Trim()))],
-            claimCurrency?.Trim() ?? "");
+            claimCurrency);
+        // H46: a GEL treaty and a GEL claim whose coverage (sum insured) is in another currency. Whether the treaty shares that
+        // loss is open (status question 8); docs/04 rule 16ბ ties only a surplus treaty's retention to the sum insured's
+        // currency. Not decided, so the registration is refused rather than an excess of loss attached or skipped by guess.
+        if (xl.Count > 0 && claimCurrency == "GEL" && currencies.Line is { } line && line.Trim() != "GEL") throw new CrossCurrencyXlException();
         foreach (var p in proportional)
             await tx.ExecuteAsync("""
                 if not exists (select 1 from core.claim_cession where claim_id = @claimId and treaty_id = @treatyId)

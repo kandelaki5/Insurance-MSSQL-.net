@@ -159,7 +159,7 @@ public sealed class ClaimWorld(TestDatabase db, ICommandInterceptor? interceptor
             fields.Add(($"line:{policy.LineOf(coverage)}", "on"));
             fields.Add(($"reserve:{policy.LineOf(coverage)}", reserve));
         }
-        var outcome = await ClaimActions.RegisterClaimAsync(App, user, Form([.. fields]));
+        var outcome = await ClaimActions.RegisterClaimAsync(App, Rates, user, Form([.. fields]));
         Assert.True(outcome.RedirectTo is not null, $"not registered: {string.Join("; ", outcome.Errors.Select(e => $"{e.Key}={e.Value}"))} {outcome.Message}");
         var first = Guid.Parse(outcome.RedirectTo!.Split('/')[2].Split('?')[0]);
         return await ClaimsOfEventAsync(first);
@@ -191,6 +191,18 @@ public sealed class ClaimWorld(TestDatabase db, ICommandInterceptor? interceptor
         await c.ExecuteAsync("insert core.accounting_period (period_start, status, closed_at, closed_by) values (@month, N'closed', sysdatetimeoffset(), @actor)",
             new { month = new DateOnly(month.Year, month.Month, 1), actor });
     }
+
+    /// <summary>
+    /// The company setting claim.currency (H46): "gel" (the default) records a new claim on a USD/EUR policy in GEL; "policy"
+    /// keeps the old program's behaviour, the claim in the policy's currency — the old claims the legacy tests describe.
+    /// </summary>
+    public Task ClaimCurrencyAsync(string value) => AdminAsync("""
+        merge core.setting with (holdlock) as t using (select N'claim.currency' as [key]) as s on t.[key] = s.[key]
+        when matched then update set value = @value when not matched then insert ([key], value) values (N'claim.currency', @value);
+        """, new { value });
+
+    /// <summary>Old claims: a claim on a foreign-currency policy in the policy's currency, as the old program recorded it (H46).</summary>
+    public Task OldClaimsAsync() => ClaimCurrencyAsync("policy");
 
     public async Task RateAsync(string currency, DateOnly on, decimal rate)
     {

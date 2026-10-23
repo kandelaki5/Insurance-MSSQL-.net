@@ -1,5 +1,6 @@
 using Insurance.Application.Data;
 using Insurance.Application.Texts;
+using Insurance.Application.Texts.Screens;
 using Insurance.Domain.Compliance;
 using Insurance.Domain.Finance;
 using static Insurance.Application.Services.Billing;
@@ -20,14 +21,15 @@ public static class ClaimActions
     private sealed class TotalLossCancellationException() : Exception("the later cancellation of a totally lost policy could not be brought forward");
 
     /// <summary>What one claim payment comes to, worked out before it is written: what a request keeps and its approval checks again.</summary>
+    /// <remarks>OffsetRate and OffsetCurrency: the rate and currency the premium set-off was converted with (H46), null without one.</remarks>
     public sealed record ClaimPaymentQuote(DateOnly PaidOn, decimal Amount, decimal DeductibleWithheld, decimal PremiumOffset, decimal NetPaid, decimal NetPaidGel,
-        decimal Rate, string PayeeKind, Guid PayeePartyId);
+        decimal Rate, string PayeeKind, Guid PayeePartyId, decimal? OffsetRate, string? OffsetCurrency);
 
     /// <summary>A stored request for a claim payment above the threshold (0036): its quote and the choices of the form it came from.</summary>
     private sealed record ClaimPaymentRequestRow(Guid Id, DateOnly PaidOn, decimal Amount, decimal DeductibleWithheld, decimal PremiumOffset, decimal NetPaid,
-        decimal NetPaidGel, decimal Rate, string PayeeKind, Guid PayeePartyId, bool OffsetPremium, string TotalLossMode, string? Note)
+        decimal NetPaidGel, decimal Rate, string PayeeKind, Guid PayeePartyId, bool OffsetPremium, string TotalLossMode, string? Note, decimal? OffsetRate, string? OffsetCurrency)
     {
-        public ClaimPaymentQuote Quote => new(PaidOn, Amount, DeductibleWithheld, PremiumOffset, NetPaid, NetPaidGel, Rate, PayeeKind, PayeePartyId);
+        public ClaimPaymentQuote Quote => new(PaidOn, Amount, DeductibleWithheld, PremiumOffset, NetPaid, NetPaidGel, Rate, PayeeKind, PayeePartyId, OffsetRate, OffsetCurrency?.Trim());
     }
 
     /// <summary>The net in GEL is above the company's threshold and no request carries it: thrown, so everything written on the way is rolled back.</summary>
@@ -82,7 +84,39 @@ public static class ClaimActions
 
     private sealed record PolicyForClaim(Guid Id, DateOnly EffectiveFrom, DateOnly EffectiveTo, string PremiumCurrency, string Status, DateOnly? CancelledOn);
 
-    private sealed record LineForClaim(Guid Id, string ClassCode, decimal? SumInsured);
+    private sealed record LineForClaim(Guid Id, string ClassCode, decimal? SumInsured, decimal? Deductible);
+
+    /// <summary>
+    /// The currency a new claim on a policy of <paramref name="policyCurrency"/> is recorded in (H46; old program docs/07 §4.5,
+    /// owner 06.10.2026: "ზარალი აღირიცხება ლარში"): GEL on a foreign-currency policy, unless the company setting claim.currency
+    /// keeps the policy's currency (the old program's behaviour). A GEL policy's claim is in GEL either way. Decided when the
+    /// claim is registered; a claim keeps its currency (docs/07 §4.1). A missing or unknown setting is the first choice, GEL.
+    /// </summary>
+    public static async Task<string> NewClaimCurrencyAsync(Tx tx, string policyCurrency)
+    {
+        var currency = policyCurrency.Trim();
+        if (currency == "GEL") return currency;
+        var chosen = await tx.QuerySingleOrDefaultAsync<string>("select value from core.setting where [key] = N'claim.currency'");
+        var choices = SettingKeys.ChoiceKeys["claim.currency"];
+        return (chosen is not null && choices.Contains(chosen) ? chosen : choices[0]) == "gel" ? "GEL" : currency;
+    }
+
+    /// <summary>
+    /// The occurrence day's snapshot of a GEL claim on a foreign-currency policy (docs/07 §4.1, owner 8.8 "ზარალის თარიღით"):
+    /// the coverage's limit and deductible in GEL at the official rate of the occurrence day, the rate and its day.
+    /// Rounded as every conversion of the finance core (Money.ToGel, half away from zero to the tetri) — the rounding is
+    /// not decided by the owner (H46 UNKNOWN 1).
+    /// </summary>
+    private sealed record LimitSnapshot(decimal Rate, DateOnly On, long? LimitGel, long? DeductibleGel);
+
+    private static LimitSnapshot Snapshot(string policyCurrency, decimal rate, DateOnly occurredOn, decimal? sumInsured, decimal? deductible)
+    {
+        var currency = ParseCurrency(policyCurrency);
+        long? Gel(decimal? amount) => amount is { } a ? Money.ToGel(new Money(Tetri(a), currency), occurredOn, (_, _) => rate) : null;
+        return new LimitSnapshot(Math.Round(rate, 6), occurredOn, Gel(sumInsured), Gel(deductible));
+    }
+
+    private static decimal? DecOrNull(long? minor) => minor is { } m ? FromTetri(m) : null;
 
     /// <summary>
     /// Registers a loss event and a claim on each coverage it touches (docs/07 §10), and books each initial reserve on the
@@ -90,7 +124,7 @@ public static class ClaimActions
     /// reinsurance limits, a closed month — nothing is written and no number is taken. A second submit of the same form
     /// (its one-off key) opens the event the first one registered instead of registering the loss again.
     /// </summary>
-    public static async Task<FormOutcome> RegisterClaimAsync(Db db, CurrentUser user, PostedForm form)
+    public static async Task<FormOutcome> RegisterClaimAsync(Db db, Rates rates, CurrentUser user, PostedForm form)
     {
         var values = form.Trimmed();
         if (!user.CanWrite) return FormOutcome.Refused(message: Ka.Common.ReadOnly);
@@ -111,7 +145,7 @@ public static class ClaimActions
         if (requested.Select(r => r.LineId).Distinct(StringComparer.Ordinal).Count() != requested.Count) errors["policy_line_id"] = ClaimTexts.Errors.CoverageTwice;
         var lines = policy is not null && requested.Count > 0 && requested.All(r => IsUuid(r.LineId))
             ? (await db.ReadTxAsync(tx => tx.QueryAsync<LineForClaim>(
-                "select id as Id, class_code as ClassCode, sum_insured as SumInsured from core.policy_line where id in @ids and policy_id = @policyId",
+                "select id as Id, class_code as ClassCode, sum_insured as SumInsured, deductible as Deductible from core.policy_line where id in @ids and policy_id = @policyId",
                 new { ids = requested.Select(r => Guid.Parse(r.LineId)).Distinct().ToList(), policyId = policy.Id }))).ToList()
             : [];
         if (policy is not null && requested.Count > 0 && lines.Count != requested.Count) errors["policy_line_id"] = ClaimTexts.Errors.Coverage;
@@ -126,14 +160,26 @@ public static class ClaimActions
             errors["occurred_on"] = ClaimTexts.Errors.OccurredOn;
         if (DateOf(reportedOn) is null || string.CompareOrdinal(reportedOn, occurredOn) < 0) errors["reported_on"] = ClaimTexts.Errors.ReportedOn;
         if (string.IsNullOrEmpty(values.GetValueOrDefault("description"))) errors["description"] = ClaimTexts.Errors.Description;
+        // H46: on a foreign-currency policy the claim is in GEL (company setting claim.currency), its limit and deductible in
+        // GEL at the occurrence day's official rate. Without that rate nothing is registered and no number is taken.
+        var claimCurrency = policy is null ? null : await db.ReadTxAsync(tx => NewClaimCurrencyAsync(tx, policy.PremiumCurrency));
+        var cross = policy is not null && claimCurrency != policy.PremiumCurrency.Trim();
+        decimal? limitRate = null;
+        if (cross && !errors.ContainsKey("occurred_on") && DateOf(occurredOn) is { } day)
+        {
+            limitRate = await rates.RateOnAsync(policy!.PremiumCurrency.Trim(), day);
+            if (limitRate is null) errors["occurred_on"] = ClaimTexts.Errors.Rate;
+        }
         var parts = requested.Select(r =>
         {
             // The old code matched the typed id against the stored one as text (lower case).
             var line = lines.FirstOrDefault(l => l.Id.ToString() == r.LineId);
-            long? limitMinor = line?.SumInsured is { } s ? Tetri(s) : null;
+            var snapshot = cross && line is not null && limitRate is { } fx ? Snapshot(policy!.PremiumCurrency, fx, DateOf(occurredOn)!.Value, line.SumInsured, line.Deductible) : null;
+            // The reserve is in the claim's currency, so on a GEL claim it is held against the limit in GEL.
+            long? limitMinor = snapshot is not null ? snapshot.LimitGel : line?.SumInsured is { } s ? Tetri(s) : null;
             var reserveMinor = MinorOf(r.Reserve);
             if (reserveMinor <= 0 || (limitMinor is { } limit && reserveMinor > limit)) errors[r.ReserveField] = ClaimTexts.Errors.Reserve;
-            return (Request: r, Line: line, ReserveMinor: reserveMinor);
+            return (Request: r, Line: line, ReserveMinor: reserveMinor, Snapshot: snapshot);
         }).ToList();
         if (errors.Count > 0 || policy is null || parts.Any(p => p.Line is null)) return FormOutcome.Refused(errors);
 
@@ -160,13 +206,15 @@ public static class ClaimActions
                     var claimed = p.Request.Claimed;
                     await tx.ExecuteAsync("""
                         insert into core.claim (id, number, loss_event_id, policy_id, policy_line_id, currency, occurred_on, occurred_place, reported_on, description,
-                                                claimed_amount, created_by)
-                        values (@id, @number, @eventId, @policyId, @lineId, @currency, @occurred, @place, @reported, @description, @claimed, @userId)
+                                                claimed_amount, created_by, limit_gel, deductible_gel, limit_rate, limit_rate_on)
+                        values (@id, @number, @eventId, @policyId, @lineId, @currency, @occurred, @place, @reported, @description, @claimed, @userId,
+                                @limitGel, @deductibleGel, @limitRate, @limitRateOn)
                         """, new
                     {
                         id, number = eventNumber is null ? null : PartNumber(eventNumber, i + 1), eventId, policyId = policy.Id, lineId = p.Line!.Id,
-                        currency = policy.PremiumCurrency, occurred, place, reported, description,
+                        currency = claimCurrency, occurred, place, reported, description,
                         claimed = double.IsFinite(claimed) && claimed > 0 ? Fixed2(claimed) : (decimal?)null, userId = user.Id,
+                        limitGel = DecOrNull(p.Snapshot?.LimitGel), deductibleGel = DecOrNull(p.Snapshot?.DeductibleGel), limitRate = p.Snapshot?.Rate, limitRateOn = p.Snapshot?.On,
                     });
                     await tx.ExecuteAsync("""
                         insert into core.claim_reserve (claim_id, booked_on, change, reason, created_by) values (@id, @reported, @change, @reason, @userId)
@@ -183,6 +231,7 @@ public static class ClaimActions
             if (error?.Code == DbError.CheckViolation) return FormOutcome.Refused(new Dictionary<string, string> { ["reported_on"] = ClaimTexts.Errors.PeriodClosed });
             if (error?.Code == Domain.Common.Numbering.SeriesExhaustedCode) return FormOutcome.Refused(errors, Ka.Common.SeriesExhausted);
             if (e is ReinsuranceException ri) return FormOutcome.Refused(errors, ReinsuranceTexts.Problems[Codes.Of(ri.Problem).Replace('_', '-')]);
+            if (e is CrossCurrencyXlException) return FormOutcome.Refused(errors, ClaimTexts.Errors.XlCurrency);
             // The same form submitted twice at once: the other submit registered the event.
             if (error?.Code == DbError.UniqueViolation && requestKey is { } again && await RegisteredByAsync(db, again) is { } other)
                 return FormOutcome.Redirect($"/claims/{other}?registered=1");
@@ -198,7 +247,7 @@ public static class ClaimActions
     /// coverage, numbered after the event's claims, with its initial reserve. The event is locked so two additions cannot
     /// take the same number.
     /// </summary>
-    public static async Task<FormOutcome> AddEventCoverageAsync(Db db, CurrentUser user, PostedForm form)
+    public static async Task<FormOutcome> AddEventCoverageAsync(Db db, Rates rates, CurrentUser user, PostedForm form)
     {
         var values = form.Trimmed();
         if (!user.CanWrite) return FormOutcome.Refused(message: Ka.Common.ReadOnly);
@@ -225,10 +274,23 @@ public static class ClaimActions
                 if (ev is null) return "coverage";
                 if (reported < ev.OccurredOn) return "date";
                 var line = await tx.QuerySingleOrDefaultAsync<LineForClaim>(
-                    "select id as Id, class_code as ClassCode, sum_insured as SumInsured from core.policy_line where id = @lineId and policy_id = @policyId",
+                    "select id as Id, class_code as ClassCode, sum_insured as SumInsured, deductible as Deductible from core.policy_line where id = @lineId and policy_id = @policyId",
                     new { lineId, policyId = ev.PolicyId });
                 if (line is null) return "coverage";
-                if (reserveMinor <= 0 || (line.SumInsured is { } s && reserveMinor > Tetri(s))) return "reserve";
+                // H46: the new claim's currency by the company setting now. An event whose claims are in another currency (registered
+                // in the policy's currency before the switch) cannot take a GEL coverage, or the other way round: how one loss
+                // event and one class deductible would hold two currencies is not decided (H46 UNKNOWN 4), so nothing is written.
+                var currency = await NewClaimCurrencyAsync(tx, ev.Currency);
+                var others = (await tx.QueryAsync<string>("select distinct currency from core.claim where loss_event_id = @eventId", new { eventId = ev.Id })).Select(c => c.Trim()).ToList();
+                if (others.Any(c => c != currency)) return "currency-mixed";
+                LimitSnapshot? snapshot = null;
+                if (currency != ev.Currency.Trim())
+                {
+                    if (await rates.RateOnAsync(ev.Currency.Trim(), ev.OccurredOn) is not { } fx) return "rate";
+                    snapshot = Snapshot(ev.Currency, fx, ev.OccurredOn, line.SumInsured, line.Deductible);
+                }
+                long? limitMinor = snapshot is not null ? snapshot.LimitGel : line.SumInsured is { } s ? Tetri(s) : null;
+                if (reserveMinor <= 0 || (limitMinor is { } limit && reserveMinor > limit)) return "reserve";
                 var held = await tx.QuerySingleOrDefaultAsync<(int N, bool Taken)>("""
                     select count(*), convert(bit, case when count(case when policy_line_id = @lineId then 1 end) > 0 then 1 else 0 end)
                     from core.claim where loss_event_id = @eventId
@@ -236,12 +298,15 @@ public static class ClaimActions
                 if (held.Taken) return "twice";
                 var id = Guid.NewGuid();
                 await tx.ExecuteAsync("""
-                    insert into core.claim (id, number, loss_event_id, policy_id, policy_line_id, currency, occurred_on, occurred_place, reported_on, description, created_by)
-                    values (@id, @number, @eventId, @policyId, @lineId, @currency, @occurred, @place, @reported, @description, @userId)
+                    insert into core.claim (id, number, loss_event_id, policy_id, policy_line_id, currency, occurred_on, occurred_place, reported_on, description, created_by,
+                                            limit_gel, deductible_gel, limit_rate, limit_rate_on)
+                    values (@id, @number, @eventId, @policyId, @lineId, @currency, @occurred, @place, @reported, @description, @userId,
+                            @limitGel, @deductibleGel, @limitRate, @limitRateOn)
                     """, new
                 {
-                    id, number = PartNumber(ev.Number, held.N + 1), eventId = ev.Id, policyId = ev.PolicyId, lineId = line.Id, currency = ev.Currency,
+                    id, number = PartNumber(ev.Number, held.N + 1), eventId = ev.Id, policyId = ev.PolicyId, lineId = line.Id, currency,
                     occurred = ev.OccurredOn, place = ev.OccurredPlace, reported, description = ev.Description, userId = user.Id,
+                    limitGel = DecOrNull(snapshot?.LimitGel), deductibleGel = DecOrNull(snapshot?.DeductibleGel), limitRate = snapshot?.Rate, limitRateOn = snapshot?.On,
                 });
                 await tx.ExecuteAsync("insert into core.claim_reserve (claim_id, booked_on, change, reason, created_by) values (@id, @reported, @change, @reason, @userId)",
                     new { id, reported, change = Dec(reserveMinor), reason = ClaimTexts.Fields.InitialReserve, userId = user.Id });
@@ -253,6 +318,7 @@ public static class ClaimActions
         {
             if (PeriodClosed(e)) return FormOutcome.Refused(new Dictionary<string, string> { ["reported_on"] = ClaimTexts.Errors.PeriodClosed });
             if (e is ReinsuranceException ri) return FormOutcome.Refused(message: ReinsuranceTexts.Problems[Codes.Of(ri.Problem).Replace('_', '-')]);
+            if (e is CrossCurrencyXlException) return FormOutcome.Refused(message: ClaimTexts.Errors.XlCurrency);
             throw;
         }
         return added switch
@@ -261,6 +327,8 @@ public static class ClaimActions
             "twice" => FormOutcome.Refused(new Dictionary<string, string> { ["policy_line_id"] = ClaimTexts.Errors.CoverageTwice }),
             "reserve" => FormOutcome.Refused(new Dictionary<string, string> { ["initial_reserve"] = ClaimTexts.Errors.Reserve }),
             "date" => FormOutcome.Refused(new Dictionary<string, string> { ["reported_on"] = ClaimTexts.Errors.ReportedOn }),
+            "currency-mixed" => FormOutcome.Refused(message: ClaimTexts.Errors.CurrencyMixed),
+            "rate" => FormOutcome.Refused(message: ClaimTexts.Errors.Rate),
             _ => FormOutcome.Redirect($"/claims/{added}?registered=1"),
         };
     }
@@ -389,8 +457,10 @@ public static class ClaimActions
 
         await db.AsUserAsync(user.Id, async tx =>
         {
+            // A GEL claim on a foreign-currency policy (H46) is capped by its limit and deductible in GEL as fixed on the occurrence day.
             var claim = await tx.QuerySingleOrDefaultAsync<(string Status, decimal? Deductible, decimal? SumInsured)?>($"""
-                select c.status, l.deductible, l.sum_insured from core.claim c {LockRow} join core.policy_line l on l.id = c.policy_line_id where c.id = @claimId
+                select c.status, case when c.limit_rate is null then l.deductible else c.deductible_gel end, case when c.limit_rate is null then l.sum_insured else c.limit_gel end
+                from core.claim c {LockRow} join core.policy_line l on l.id = c.policy_line_id where c.id = @claimId
                 """, new { claimId });
             if (claim is not { } c) return 0;
             if (!Allowed.TryGetValue(decision, out var from) || !from.Contains(c.Status)) return 0;
@@ -443,7 +513,8 @@ public static class ClaimActions
 
     // ------------------------------------------------------------------ payment
 
-    private sealed record ClaimForPayment(string Status, Guid PolicyId, string Currency, decimal? ApprovedAmount, decimal DeductibleAmount, bool IsTotalLoss, Guid PolicyholderId);
+    private sealed record ClaimForPayment(string Status, Guid PolicyId, string Currency, decimal? ApprovedAmount, decimal DeductibleAmount, bool IsTotalLoss, Guid PolicyholderId,
+        string PolicyCurrency);
 
     /// <summary>
     /// One claim payment worked out and written, in the caller's transaction (after its binding permission check): gross in
@@ -452,6 +523,12 @@ public static class ClaimActions
     /// (docs/04 rule რ15) and may cancel the policy on the loss date. A net above the company's threshold needs the
     /// financial director: from the form it is thrown as ClaimPaymentAuthorizationNeeded (everything written on the way goes
     /// with the rollback); from an approved request it is written with the request, if it is still exactly what was asked.
+    ///
+    /// A GEL claim on a foreign-currency policy (H46; old program docs/07 §4.5) is paid in GEL at rate 1, its deductible in
+    /// GEL as fixed on the occurrence day. The premium debt stays in the policy's currency: a set-off is converted at the
+    /// payment day's official rate of that currency (CrossCurrencySetOff), its receipt records the GEL and its allocations
+    /// are in the policy's currency, each with its GEL and the rate; the claim payment keeps the rate and the currency.
+    /// A total loss on such a claim is refused: how the premium is kept back across currencies is not decided (UNKNOWN 3).
     /// </summary>
     private static async Task<string> SettleClaimPaymentAsync(Tx tx, Rates rates, Guid userId, ClaimPaymentInput input, ClaimPaymentRequestRow? request)
     {
@@ -463,7 +540,7 @@ public static class ClaimActions
         await tx.ExecuteAsync($"select id from core.loss_event {LockRow} where id = @eventId", new { eventId });
         var claim = await tx.QuerySingleOrDefaultAsync<ClaimForPayment>($"""
             select c.status as Status, c.policy_id as PolicyId, c.currency as Currency, c.approved_amount as ApprovedAmount, c.deductible_amount as DeductibleAmount,
-                   c.is_total_loss as IsTotalLoss, co.policyholder_id as PolicyholderId
+                   c.is_total_loss as IsTotalLoss, co.policyholder_id as PolicyholderId, p.premium_currency as PolicyCurrency
             from core.claim c {LockRow} join core.policy p on p.id = c.policy_id join core.contract co on co.id = p.contract_id
             where c.id = @claimId
             """, new { claimId });
@@ -491,16 +568,25 @@ public static class ClaimActions
         if (await rates.RateOnAsync(currencyCode, paidOn) is not { } rate) return "rate";
         var currency = ParseCurrency(currencyCode);
         RateProvider atRate = (_, _) => rate;
+        var policyCode = claim.PolicyCurrency.Trim();
+        // H46: a GEL claim on a foreign-currency policy (its rate above is 1).
+        var cross = currencyCode == "GEL" && policyCode != "GEL";
+        // Proposal (H46 UNKNOWN 3, not decided by the owner): no total-loss settlement across currencies until the rule is given.
+        if (cross && claim.IsTotalLoss) return "total-loss-currency";
 
         // The agreed deductible is withheld in full and only once, spread over partial payments as needed (review H02) —
         // once for the class in the loss event, over all its coverages (docs/07 §10, Codex H50). Coverages of the class with
         // different deductibles: which one applies is not decided yet, so nothing is paid. The group is every claim of the
         // class in the event, whatever its status (Codex H52); the target is the coverages' agreed deductible (H51).
-        var group = (await tx.QueryAsync<(Guid Id, decimal? LineDeductible)>("""
-            select c.id, l.deductible from core.claim c join core.policy_line l on l.id = c.policy_line_id
+        // A GEL claim on a foreign-currency policy takes its deductible in GEL as fixed on the occurrence day (H46). A group of
+        // claims in two currencies cannot share one deductible until the owner says how (H46 UNKNOWN 4): nothing is paid.
+        var group = (await tx.QueryAsync<(Guid Id, decimal? LineDeductible, string Currency)>("""
+            select c.id, case when c.limit_rate is null then l.deductible else c.deductible_gel end, c.currency
+            from core.claim c join core.policy_line l on l.id = c.policy_line_id
             where c.loss_event_id = @eventId
               and l.class_code = (select l2.class_code from core.claim c2 join core.policy_line l2 on l2.id = c2.policy_line_id where c2.id = @claimId)
             """, new { eventId, claimId })).ToList();
+        if (group.Select(g => g.Currency.Trim()).Distinct(StringComparer.Ordinal).Count() > 1) return "currency-mixed";
         if (Deductible.ClassDeductible(group.Select(g => Tetri(g.LineDeductible ?? 0m)).ToList()) is not { } shared) return "deductible";
         var groupWithheld = await tx.QuerySingleOrDefaultAsync<decimal>("select coalesce(sum(deductible_withheld), 0) from core.claim_payment where claim_id in @ids",
             new { ids = group.Select(g => g.Id).ToList() });
@@ -510,7 +596,44 @@ public static class ClaimActions
         // Premium set-off and total-loss handling need the policy's receivable as of the payment day.
         long offsetMinor = 0;
         Guid? offsetPaymentId = null;
-        if (offsetWanted || claim.IsTotalLoss)
+        decimal? offsetRate = null;
+        string? offsetCurrency = null;
+        if (cross && offsetWanted)
+        {
+            // Lock order everywhere: claim, then policy (review H04).
+            await tx.ExecuteAsync($"select id from core.policy {LockRow} where id = @policyId", new { policyId = claim.PolicyId });
+            // The set-off is a money payment of the premium debt, in GEL at the payment day's official rate (docs/04 rule 2).
+            if (await rates.RateOnAsync(policyCode, paidOn) is not { } fx) return "rate";
+            var policyCurrency = ParseCurrency(policyCode);
+            RateProvider atFx = (_, _) => fx;
+            var schedule = await LoadScheduleAsync(tx, claim.PolicyId);
+            var allocations = (await tx.QueryAsync<AllocationRow>("""
+                select a.amount as Amount, a.booked_on as ReceivedOn, p.method as Method
+                from core.payment_allocation a join core.payment p on p.id = a.payment_id
+                join core.installment i on i.id = a.installment_id where i.policy_id = @policyId
+                """, new { policyId = claim.PolicyId })).ToList();
+            var position = Receivable.ReceivableAsOf(ToInstallments(schedule, policyCurrency), ToCredits(allocations, policyCurrency), paidOn, atFx);
+            var setOff = CrossCurrencySetOff.Amounts(afterDeductible, position.Outstanding, fx);
+            if (setOff.Policy.Minor > 0)
+            {
+                var allocation = CrossCurrencySetOff.Allocate(setOff, position.Balances, fx);
+                var paymentId = Guid.NewGuid();
+                await tx.ExecuteAsync("""
+                    insert into core.payment (id, received_on, amount_gel, method, kind, payer_party_id, reference, created_by)
+                    values (@paymentId, @paidOn, @amountGel, N'claim_offset', N'receipt', @payer, @reference, @userId)
+                    """, new { paymentId, paidOn, amountGel = Dec(setOff.GelMinor), payer = claim.PolicyholderId, reference = note == "" ? ClaimTexts.Fields.PremiumOffset : note, userId });
+                foreach (var line in allocation.Lines)
+                    await tx.ExecuteAsync("""
+                        insert into core.payment_allocation (payment_id, installment_id, amount, amount_gel, rate, booked_on)
+                        values (@paymentId, @installmentId, @amount, @amountGel, @rate, @paidOn)
+                        """, new { paymentId, installmentId = Guid.Parse(line.InstallmentId), amount = Dec(line.Amount.Minor), amountGel = Dec(line.AmountGel), rate = Math.Round(fx, 6), paidOn });
+                offsetMinor = setOff.GelMinor;
+                offsetPaymentId = paymentId;
+                offsetRate = Math.Round(fx, 6);
+                offsetCurrency = policyCode;
+            }
+        }
+        else if (offsetWanted || claim.IsTotalLoss)
         {
             // Lock order everywhere: claim, then policy (review H04).
             await tx.ExecuteAsync($"select id from core.policy {LockRow} where id = @policyId", new { policyId = claim.PolicyId });
@@ -560,6 +683,9 @@ public static class ClaimActions
                         values (@paymentId, @installmentId, @amount, @amountGel, @rate, @paidOn)
                         """, new { paymentId, installmentId = Guid.Parse(line.InstallmentId), amount = Dec(line.Amount.Minor), amountGel = Dec(line.AmountGel), rate = Math.Round(rate, 6), paidOn });
                 offsetPaymentId = paymentId;
+                // In the claim's currency, which is the policy's here, at the payment day's rate.
+                offsetRate = Math.Round(rate, 6);
+                offsetCurrency = currencyCode;
             }
         }
         var netMinor = afterDeductible - offsetMinor;
@@ -567,11 +693,13 @@ public static class ClaimActions
 
         // The financial director's authorisation (owner, 17.10.2026, docs/05 ვ8): the net actually transferred, in GEL as it
         // is recorded, strictly above the company's threshold — one payment, never a sum.
-        var quote = new ClaimPaymentQuote(paidOn, Dec(grossMinor), Dec(deductibleMinor), Dec(offsetMinor), Dec(netMinor), Dec(netGel), Math.Round(rate, 6), payeeKind, payeeId);
+        var quote = new ClaimPaymentQuote(paidOn, Dec(grossMinor), Dec(deductibleMinor), Dec(offsetMinor), Dec(netMinor), Dec(netGel), Math.Round(rate, 6), payeeKind, payeeId,
+            offsetRate, offsetCurrency);
         const string InsertPayment = """
             insert into core.claim_payment (claim_id, paid_on, amount, deductible_withheld, premium_offset, net_paid, net_paid_gel, rate,
-                                            payee_kind, payee_party_id, offset_payment_id, note, created_by, request_id)
-            values (@claimId, @paidOn, @amount, @deductible, @offset, @net, @netGel, @rate, @payeeKind, @payeeId, @offsetPaymentId, @note, @userId, @requestId)
+                                            payee_kind, payee_party_id, offset_payment_id, note, created_by, request_id, offset_rate, offset_currency)
+            values (@claimId, @paidOn, @amount, @deductible, @offset, @net, @netGel, @rate, @payeeKind, @payeeId, @offsetPaymentId, @note, @userId, @requestId,
+                    @offsetRate, @offsetCurrency)
             """;
         if (request is not null)
         {
@@ -585,6 +713,7 @@ public static class ClaimActions
         {
             claimId, paidOn, amount = quote.Amount, deductible = quote.DeductibleWithheld, offset = quote.PremiumOffset, net = quote.NetPaid, netGel = quote.NetPaidGel,
             rate = quote.Rate, payeeKind, payeeId, offsetPaymentId, note = note == "" ? null : note, userId, requestId = request?.Id,
+            offsetRate = quote.OffsetRate, offsetCurrency = quote.OffsetCurrency,
         });
         // Paying takes the amount out of the reserve.
         await tx.ExecuteAsync("insert into core.claim_reserve (claim_id, booked_on, change, reason, created_by) values (@claimId, @paidOn, @change, @reason, @userId)",
@@ -678,13 +807,15 @@ public static class ClaimActions
                     if (!await PermissionStore.HasPermissionAsync(tx, user, "claim.payment.record")) return "not-allowed";
                     await tx.ExecuteAsync("""
                         insert into core.claim_payment_request (claim_id, paid_on, amount, deductible_withheld, premium_offset, net_paid, net_paid_gel, rate,
-                                                                payee_kind, payee_party_id, offset_premium, total_loss_mode, note, created_by)
-                        values (@claimId, @paidOn, @amount, @deductible, @offset, @net, @netGel, @rate, @payeeKind, @payeeId, @offsetWanted, @mode, @note, @userId)
+                                                                payee_kind, payee_party_id, offset_premium, total_loss_mode, note, created_by, offset_rate, offset_currency)
+                        values (@claimId, @paidOn, @amount, @deductible, @offset, @net, @netGel, @rate, @payeeKind, @payeeId, @offsetWanted, @mode, @note, @userId,
+                                @offsetRate, @offsetCurrency)
                         """, new
                     {
                         claimId, paidOn = q.PaidOn, amount = q.Amount, deductible = q.DeductibleWithheld, offset = q.PremiumOffset, net = q.NetPaid, netGel = q.NetPaidGel,
                         rate = q.Rate, payeeKind = q.PayeeKind, payeeId = q.PayeePartyId, offsetWanted, mode = Codes.Of(mode),
                         note = string.IsNullOrEmpty(values.GetValueOrDefault("note")) ? null : values["note"], userId = user.Id,
+                        offsetRate = q.OffsetRate, offsetCurrency = q.OffsetCurrency,
                     });
                     return "requested";
                 });
@@ -703,6 +834,8 @@ public static class ClaimActions
             "suspended" => FormOutcome.Refused(errors, AmlTexts.Suspension.Blocked),
             "payee" => FormOutcome.Refused(errors, ClaimTexts.Errors.PayeeBlocked),
             "deductible" => FormOutcome.Refused(errors, ClaimTexts.Errors.DeductibleDiffers),
+            "currency-mixed" => FormOutcome.Refused(errors, ClaimTexts.Errors.CurrencyMixed),
+            "total-loss-currency" => FormOutcome.Refused(errors, ClaimTexts.Errors.TotalLossCurrency),
             "exceeds" => FormOutcome.Refused(new Dictionary<string, string> { ["amount"] = ClaimTexts.Errors.Exceeds }),
             "rate" => FormOutcome.Refused(new Dictionary<string, string> { ["paid_on"] = ClaimTexts.Errors.Rate }),
             _ => FormOutcome.Redirect($"/claims/{claimText}?paid=1"),
@@ -738,14 +871,16 @@ public static class ClaimActions
                 var request = await tx.QuerySingleOrDefaultAsync<ClaimPaymentRequestRow>("""
                     select id as Id, paid_on as PaidOn, amount as Amount, deductible_withheld as DeductibleWithheld, premium_offset as PremiumOffset, net_paid as NetPaid,
                            net_paid_gel as NetPaidGel, rate as Rate, payee_kind as PayeeKind, payee_party_id as PayeePartyId, offset_premium as OffsetPremium,
-                           total_loss_mode as TotalLossMode, note as Note
+                           total_loss_mode as TotalLossMode, note as Note, offset_rate as OffsetRate, offset_currency as OffsetCurrency
                     from core.claim_payment_request where id = @requestId and claim_id = @claimId
                     """, new { requestId, claimId });
                 if (request is null) return "state";
                 var result = await SettleClaimPaymentAsync(tx, rates, user.Id, new ClaimPaymentInput(
                     claimId, request.PaidOn, Tetri(request.Amount), request.PayeeKind, request.PayeeKind == "policyholder" ? null : request.PayeePartyId,
                     request.OffsetPremium, ModeOf(request.TotalLossMode), request.Note ?? ""), request);
-                return result == "ok" ? "approved" : result;
+                // The H46 refusals have no answer of their own here (a request is never made for them; they arise only if the
+                // claim changed since): the state answer.
+                return result switch { "ok" => "approved", "currency-mixed" or "total-loss-currency" => "state", _ => result };
             });
         }
         catch (StaleClaimPaymentRequestException)
@@ -901,10 +1036,10 @@ public static class ClaimActions
                 await tx.ExecuteAsync("""
                     insert into core.claim_payment (id, claim_id, paid_on, amount, deductible_withheld, premium_offset, net_paid, net_paid_gel, rate,
                                                     payee_kind, payee_party_id, offset_payment_id, note, created_by,
-                                                    kind, reverses_claim_payment_id, reversal_reason, returned_on, bank_reference)
+                                                    kind, reverses_claim_payment_id, reversal_reason, returned_on, bank_reference, offset_rate, offset_currency)
                     select newid(), claim_id, @on, -amount, -deductible_withheld, -premium_offset, -net_paid, -net_paid_gel, rate,
                            payee_kind, payee_party_id, @offsetBack, @note, @userId,
-                           N'reversal', id, @reason, @returnedOn, @bankReference
+                           N'reversal', id, @reason, @returnedOn, @bankReference, offset_rate, offset_currency
                     from core.claim_payment where id = @paymentId
                     """, new
                 {

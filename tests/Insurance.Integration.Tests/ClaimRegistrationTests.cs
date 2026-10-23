@@ -44,7 +44,7 @@ public sealed class ClaimRegistrationTests(TestDatabase db) : IClassFixture<Test
         var form = ClaimWorld.Form(("policy_number", p.Number.ToLowerInvariant()), ("occurred_on", $"{y}-03-03"), ("reported_on", $"{y}-03-05"), ("occurred_place", "თბილისი"),
             ("description", " ავარია "), ($"line:{p.LineOf("damage")}", "on"), ($"reserve:{p.LineOf("damage")}", "3000"), ($"claimed:{p.LineOf("damage")}", "3500.5"),
             ($"line:{p.LineOf("equipment")}", "on"), ($"reserve:{p.LineOf("equipment")}", "500"), ($"line:{p.LineOf("assistance")}", "on"), ($"reserve:{p.LineOf("assistance")}", "150"));
-        var outcome = await ClaimActions.RegisterClaimAsync(w.App, u, form);
+        var outcome = await ClaimActions.RegisterClaimAsync(w.App, w.Rates, u, form);
         Assert.EndsWith("?registered=1", outcome.RedirectTo);
         var first = Guid.Parse(outcome.RedirectTo!.Split('/')[2].Split('?')[0]);
         var rows = await w.RowsAsync<(string Number, string Event, string Class, decimal? Claimed, string Currency, string? Place, string Description)>("""
@@ -69,7 +69,7 @@ public sealed class ClaimRegistrationTests(TestDatabase db) : IClassFixture<Test
     {
         var (u, p, y) = await PolicyAsync();
         var counter = await CounterAsync();
-        var outcome = await ClaimActions.RegisterClaimAsync(w.App, u, Registration(p, new DateOnly(y, 3, 3), new DateOnly(y, 3, 4), null, ("damage", "3000"), ("equipment", "5000")));
+        var outcome = await ClaimActions.RegisterClaimAsync(w.App, w.Rates, u, Registration(p, new DateOnly(y, 3, 3), new DateOnly(y, 3, 4), null, ("damage", "3000"), ("equipment", "5000")));
         Assert.Null(outcome.RedirectTo);
         Assert.Equal(ClaimTexts.Errors.Reserve, outcome.Errors[$"reserve:{p.LineOf("equipment")}"]);
         Assert.False(outcome.Errors.ContainsKey($"reserve:{p.LineOf("damage")}"));
@@ -83,11 +83,11 @@ public sealed class ClaimRegistrationTests(TestDatabase db) : IClassFixture<Test
         var (u, p, y) = await PolicyAsync();
         var key = Guid.NewGuid().ToString();
         var form = Registration(p, new DateOnly(y, 3, 3), new DateOnly(y, 3, 4), key, ("damage", "1000"));
-        var first = await ClaimActions.RegisterClaimAsync(w.App, u, form);
-        var second = await ClaimActions.RegisterClaimAsync(w.App, u, form);
+        var first = await ClaimActions.RegisterClaimAsync(w.App, w.Rates, u, form);
+        var second = await ClaimActions.RegisterClaimAsync(w.App, w.Rates, u, form);
         Assert.Equal(first.RedirectTo, second.RedirectTo);
         var key2 = Guid.NewGuid().ToString();
-        var both = await Task.WhenAll(Enumerable.Range(0, 2).Select(_ => ClaimActions.RegisterClaimAsync(w.App, u, Registration(p, new DateOnly(y, 3, 3), new DateOnly(y, 3, 4), key2, ("assistance", "100")))));
+        var both = await Task.WhenAll(Enumerable.Range(0, 2).Select(_ => ClaimActions.RegisterClaimAsync(w.App, w.Rates, u, Registration(p, new DateOnly(y, 3, 3), new DateOnly(y, 3, 4), key2, ("assistance", "100")))));
         Assert.NotNull(both[0].RedirectTo);
         Assert.Equal(both[0].RedirectTo, both[1].RedirectTo);
         Assert.Equal(2, await w.ScalarAsync<int>("select count(*) from core.loss_event where request_key in @keys", new { keys = new[] { Guid.Parse(key), Guid.Parse(key2) } }));
@@ -114,11 +114,11 @@ public sealed class ClaimRegistrationTests(TestDatabase db) : IClassFixture<Test
         }
         Assert.Equal("LE001", await Insert(other.Id, other.LineOf("damage")));
         Assert.Equal(DbError.UniqueViolation, await Insert(p.Id, p.LineOf("damage")));
-        var twice = await ClaimActions.AddEventCoverageAsync(w.App, u, ClaimWorld.Form(("claim_id", claims[0].ToString()), ("policy_line_id", p.LineOf("damage").ToString()),
+        var twice = await ClaimActions.AddEventCoverageAsync(w.App, w.Rates, u, ClaimWorld.Form(("claim_id", claims[0].ToString()), ("policy_line_id", p.LineOf("damage").ToString()),
             ("reported_on", $"{y}-03-05"), ("initial_reserve", "10")));
         Assert.Equal(ClaimTexts.Errors.CoverageTwice, twice.Errors["policy_line_id"]);
         // The same line twice in one form.
-        var dup = await ClaimActions.RegisterClaimAsync(w.App, u, ClaimWorld.Form(("policy_number", p.Number), ("occurred_on", $"{y}-03-03"), ("reported_on", $"{y}-03-04"),
+        var dup = await ClaimActions.RegisterClaimAsync(w.App, w.Rates, u, ClaimWorld.Form(("policy_number", p.Number), ("occurred_on", $"{y}-03-03"), ("reported_on", $"{y}-03-04"),
             ("description", "x"), ($"line:{p.LineOf("theft")}", "on"), ($"line:{p.LineOf("theft")}", "on")));
         Assert.Equal(ClaimTexts.Errors.Coverage, dup.Errors["policy_line_id"]);
     }
@@ -127,12 +127,12 @@ public sealed class ClaimRegistrationTests(TestDatabase db) : IClassFixture<Test
     public async Task The_original_single_coverage_form_still_registers_one_claim_numbered_as_its_event()
     {
         var (u, p, y) = await PolicyAsync();
-        var outcome = await ClaimActions.RegisterClaimAsync(w.App, u, ClaimWorld.Form(("policy_number", p.Number), ("policy_line_id", p.LineOf("damage").ToString()),
+        var outcome = await ClaimActions.RegisterClaimAsync(w.App, w.Rates, u, ClaimWorld.Form(("policy_number", p.Number), ("policy_line_id", p.LineOf("damage").ToString()),
             ("occurred_on", $"{y}-03-03"), ("reported_on", $"{y}-03-04"), ("description", "x"), ("initial_reserve", "1000"), ("claimed_amount", "1200")));
         var claim = Guid.Parse(outcome.RedirectTo!.Split('/')[2].Split('?')[0]);
         Assert.Equal([(true, 1200m)], await w.RowsAsync<(bool, decimal?)>(
             "select convert(bit, case when c.number = v.number then 1 else 0 end), c.claimed_amount from core.claim c join core.loss_event v on v.id = c.loss_event_id where c.id = @claim", new { claim }));
-        var missing = await ClaimActions.RegisterClaimAsync(w.App, u, ClaimWorld.Form(("policy_number", p.Number), ("occurred_on", $"{y}-03-03"), ("reported_on", $"{y}-03-04"), ("description", "x")));
+        var missing = await ClaimActions.RegisterClaimAsync(w.App, w.Rates, u, ClaimWorld.Form(("policy_number", p.Number), ("occurred_on", $"{y}-03-03"), ("reported_on", $"{y}-03-04"), ("description", "x")));
         Assert.Equal(ClaimTexts.Errors.Coverage, missing.Errors["policy_line_id"]);
     }
 
@@ -140,21 +140,21 @@ public sealed class ClaimRegistrationTests(TestDatabase db) : IClassFixture<Test
     public async Task Field_checks_of_a_registration()
     {
         var (u, p, y) = await PolicyAsync();
-        var outcome = await ClaimActions.RegisterClaimAsync(w.App, u, ClaimWorld.Form(("policy_number", "NONE"), ("occurred_on", "x"), ("reported_on", ""), ("description", " ")));
+        var outcome = await ClaimActions.RegisterClaimAsync(w.App, w.Rates, u, ClaimWorld.Form(("policy_number", "NONE"), ("occurred_on", "x"), ("reported_on", ""), ("description", " ")));
         Assert.Equal(ClaimTexts.Errors.Policy, outcome.Errors["policy_number"]);
         Assert.Equal(ClaimTexts.Errors.Coverage, outcome.Errors["policy_line_id"]);
         Assert.Equal(ClaimTexts.Errors.OccurredOn, outcome.Errors["occurred_on"]);
         Assert.Equal(ClaimTexts.Errors.ReportedOn, outcome.Errors["reported_on"]);
         Assert.Equal(ClaimTexts.Errors.Description, outcome.Errors["description"]);
         // Outside the term (the end day is not covered), reported before it occurred, no reserve.
-        var outside = await ClaimActions.RegisterClaimAsync(w.App, u, Registration(p, new DateOnly(y + 1, 1, 1), new DateOnly(y + 1, 1, 2), null, ("damage", "100")));
+        var outside = await ClaimActions.RegisterClaimAsync(w.App, w.Rates, u, Registration(p, new DateOnly(y + 1, 1, 1), new DateOnly(y + 1, 1, 2), null, ("damage", "100")));
         Assert.Equal(ClaimTexts.Errors.OccurredOn, outside.Errors["occurred_on"]);
-        var early = await ClaimActions.RegisterClaimAsync(w.App, u, Registration(p, new DateOnly(y, 3, 3), new DateOnly(y, 3, 2), null, ("damage", "0")));
+        var early = await ClaimActions.RegisterClaimAsync(w.App, w.Rates, u, Registration(p, new DateOnly(y, 3, 3), new DateOnly(y, 3, 2), null, ("damage", "0")));
         Assert.Equal(ClaimTexts.Errors.ReportedOn, early.Errors["reported_on"]);
         Assert.Equal(ClaimTexts.Errors.Reserve, early.Errors[$"reserve:{p.LineOf("damage")}"]);
         // A draft policy takes no claim.
         await w.ExecAsync("update core.policy set status = N'draft', approved_at = null, approved_by = null where id = @id", new { id = p.Id });
-        Assert.Equal(ClaimTexts.Errors.Policy, (await ClaimActions.RegisterClaimAsync(w.App, u, Registration(p, new DateOnly(y, 3, 3), new DateOnly(y, 3, 4), null, ("damage", "100")))).Errors["policy_number"]);
+        Assert.Equal(ClaimTexts.Errors.Policy, (await ClaimActions.RegisterClaimAsync(w.App, w.Rates, u, Registration(p, new DateOnly(y, 3, 3), new DateOnly(y, 3, 4), null, ("damage", "100")))).Errors["policy_number"]);
     }
 
     [Fact]
@@ -164,11 +164,11 @@ public sealed class ClaimRegistrationTests(TestDatabase db) : IClassFixture<Test
         var cancelOn = new DateOnly(y, 6, 1);
         await w.App.AsUserAsync(u.Id, tx => PolicyCancel.CancelPolicyInTxAsync(tx, p.Id, cancelOn, "ტესტი", u.Id));
         Assert.Equal("cancelled", await w.ScalarAsync<string>("select status from core.policy where id = @id", new { id = p.Id }));
-        var onTheDay = await ClaimActions.RegisterClaimAsync(w.App, u, Registration(p, cancelOn, new DateOnly(y, 6, 2), null, ("damage", "100")));
+        var onTheDay = await ClaimActions.RegisterClaimAsync(w.App, w.Rates, u, Registration(p, cancelOn, new DateOnly(y, 6, 2), null, ("damage", "100")));
         Assert.Equal(ClaimTexts.Errors.OccurredOn, onTheDay.Errors["occurred_on"]);
-        var after = await ClaimActions.RegisterClaimAsync(w.App, u, Registration(p, new DateOnly(y, 7, 1), new DateOnly(y, 7, 2), null, ("damage", "100")));
+        var after = await ClaimActions.RegisterClaimAsync(w.App, w.Rates, u, Registration(p, new DateOnly(y, 7, 1), new DateOnly(y, 7, 2), null, ("damage", "100")));
         Assert.Equal(ClaimTexts.Errors.OccurredOn, after.Errors["occurred_on"]);
-        Assert.NotNull((await ClaimActions.RegisterClaimAsync(w.App, u, Registration(p, cancelOn.AddDays(-1), new DateOnly(y, 8, 1), null, ("damage", "100")))).RedirectTo);
+        Assert.NotNull((await ClaimActions.RegisterClaimAsync(w.App, w.Rates, u, Registration(p, cancelOn.AddDays(-1), new DateOnly(y, 8, 1), null, ("damage", "100")))).RedirectTo);
     }
 
     [Fact]
@@ -177,10 +177,10 @@ public sealed class ClaimRegistrationTests(TestDatabase db) : IClassFixture<Test
         var (u, p, y) = await PolicyAsync();
         await w.CloseMonthAsync(u.Id, new DateOnly(y, 2, 1));
         var counter = await CounterAsync();
-        var outcome = await ClaimActions.RegisterClaimAsync(w.App, u, Registration(p, new DateOnly(y, 2, 3), new DateOnly(y, 2, 4), null, ("damage", "100")));
+        var outcome = await ClaimActions.RegisterClaimAsync(w.App, w.Rates, u, Registration(p, new DateOnly(y, 2, 3), new DateOnly(y, 2, 4), null, ("damage", "100")));
         Assert.Equal(ClaimTexts.Errors.PeriodClosed, outcome.Errors["reported_on"]);
         Assert.Equal(counter, await CounterAsync());
-        Assert.NotNull((await ClaimActions.RegisterClaimAsync(w.App, u, Registration(p, new DateOnly(y, 2, 3), new DateOnly(y, 3, 4), null, ("damage", "100")))).RedirectTo);
+        Assert.NotNull((await ClaimActions.RegisterClaimAsync(w.App, w.Rates, u, Registration(p, new DateOnly(y, 2, 3), new DateOnly(y, 3, 4), null, ("damage", "100")))).RedirectTo);
     }
 
     [Fact]
@@ -191,7 +191,7 @@ public sealed class ClaimRegistrationTests(TestDatabase db) : IClassFixture<Test
         await w.ExecAsync("update core.number_sequence set padding = 1, next_value = 10 where code = N'claim'");
         try
         {
-            var outcome = await ClaimActions.RegisterClaimAsync(w.App, u, Registration(p, new DateOnly(y, 3, 3), new DateOnly(y, 3, 4), null, ("damage", "100")));
+            var outcome = await ClaimActions.RegisterClaimAsync(w.App, w.Rates, u, Registration(p, new DateOnly(y, 3, 3), new DateOnly(y, 3, 4), null, ("damage", "100")));
             Assert.Equal(Ka.Common.SeriesExhausted, outcome.Message);
             Assert.Equal(0, await w.ScalarAsync<int>("select count(*) from core.claim where policy_id = @id", new { id = p.Id }));
         }
@@ -207,12 +207,12 @@ public sealed class ClaimRegistrationTests(TestDatabase db) : IClassFixture<Test
         var (u, p, y) = await PolicyAsync();
         var claim = (await w.RegisterAsync(u, p, new DateOnly(y, 3, 3), new DateOnly(y, 3, 4), ("damage", "1000")))[0];
         PostedForm Add(string line, string on, string reserve) => ClaimWorld.Form(("claim_id", claim.ToString()), ("policy_line_id", line), ("reported_on", on), ("initial_reserve", reserve));
-        Assert.Equal(ClaimTexts.Errors.Coverage, (await ClaimActions.AddEventCoverageAsync(w.App, u, Add("x", $"{y}-03-05", "10"))).Errors["policy_line_id"]);
-        Assert.Equal(ClaimTexts.Errors.ReportedOn, (await ClaimActions.AddEventCoverageAsync(w.App, u, Add(p.LineOf("equipment").ToString(), "x", "10"))).Errors["reported_on"]);
-        Assert.Equal(ClaimTexts.Errors.ReportedOn, (await ClaimActions.AddEventCoverageAsync(w.App, u, Add(p.LineOf("equipment").ToString(), $"{y}-03-02", "10"))).Errors["reported_on"]);
-        Assert.Equal(ClaimTexts.Errors.Reserve, (await ClaimActions.AddEventCoverageAsync(w.App, u, Add(p.LineOf("equipment").ToString(), $"{y}-03-05", "2000.01"))).Errors["initial_reserve"]);
-        Assert.Equal(ClaimTexts.Errors.Coverage, (await ClaimActions.AddEventCoverageAsync(w.App, u, Add(Guid.NewGuid().ToString(), $"{y}-03-05", "10"))).Errors["policy_line_id"]);
-        var added = await ClaimActions.AddEventCoverageAsync(w.App, u, Add(p.LineOf("assistance").ToString(), $"{y}-03-05", "100"));
+        Assert.Equal(ClaimTexts.Errors.Coverage, (await ClaimActions.AddEventCoverageAsync(w.App, w.Rates, u, Add("x", $"{y}-03-05", "10"))).Errors["policy_line_id"]);
+        Assert.Equal(ClaimTexts.Errors.ReportedOn, (await ClaimActions.AddEventCoverageAsync(w.App, w.Rates, u, Add(p.LineOf("equipment").ToString(), "x", "10"))).Errors["reported_on"]);
+        Assert.Equal(ClaimTexts.Errors.ReportedOn, (await ClaimActions.AddEventCoverageAsync(w.App, w.Rates, u, Add(p.LineOf("equipment").ToString(), $"{y}-03-02", "10"))).Errors["reported_on"]);
+        Assert.Equal(ClaimTexts.Errors.Reserve, (await ClaimActions.AddEventCoverageAsync(w.App, w.Rates, u, Add(p.LineOf("equipment").ToString(), $"{y}-03-05", "2000.01"))).Errors["initial_reserve"]);
+        Assert.Equal(ClaimTexts.Errors.Coverage, (await ClaimActions.AddEventCoverageAsync(w.App, w.Rates, u, Add(Guid.NewGuid().ToString(), $"{y}-03-05", "10"))).Errors["policy_line_id"]);
+        var added = await ClaimActions.AddEventCoverageAsync(w.App, w.Rates, u, Add(p.LineOf("assistance").ToString(), $"{y}-03-05", "100"));
         Assert.EndsWith("?registered=1", added.RedirectTo);
         Assert.Equal(2, (await w.ClaimsOfEventAsync(claim)).Count);
     }
@@ -285,13 +285,16 @@ public sealed class ClaimRegistrationTests(TestDatabase db) : IClassFixture<Test
         {
             var u = await w.UserAsync("claims");
             var counter = await CounterAsync();
-            var outcome = await ClaimActions.RegisterClaimAsync(w.App, u, Registration(p, new DateOnly(y, 7, 15), new DateOnly(y, 7, 16), null, ("damage", "1000")));
+            var outcome = await ClaimActions.RegisterClaimAsync(w.App, w.Rates, u, Registration(p, new DateOnly(y, 7, 15), new DateOnly(y, 7, 16), null, ("damage", "1000")));
             Assert.Equal(ReinsuranceTexts.Problems[problem], outcome.Message);
             Assert.Equal(0, await w.ScalarAsync<int>("select count(*) from core.claim where policy_id = @id", new { id = p.Id }));
             Assert.Equal(0, await w.ScalarAsync<int>("select count(*) from core.loss_event where policy_id = @id", new { id = p.Id }));
             Assert.Equal(counter, await CounterAsync());
         }
         var actor = await w.UserAsync("admin");
+        // An old claim: the USD policy's claim in USD (H46 setting claim.currency = policy). The GEL claim on a USD coverage
+        // meeting a GEL treaty is ClaimGelOnForeignPolicyTests' case.
+        await w.OldClaimsAsync();
 
         var y1 = Interlocked.Increment(ref year);
         await w.RateAsync("USD", new DateOnly(y1, 1, 1), 2.7m);

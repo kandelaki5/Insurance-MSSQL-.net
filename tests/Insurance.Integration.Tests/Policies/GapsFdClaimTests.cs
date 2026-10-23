@@ -34,6 +34,8 @@ public sealed class FdClaimWorld(TestDatabase db)
     public async Task<Claim> ClaimAsync(string currency = "GEL", decimal deductible = 1000m, decimal? owed = null, decimal approved = 20000m, bool totalLoss = false, DateOnly? occurred = null)
     {
         var claims = await C.UserAsync("claims");
+        // The legacy cases describe old claims: a USD/EUR policy's claim in its currency (H46 setting claim.currency = policy).
+        if (currency != "GEL") await C.OldClaimsAsync();
         var policy = await C.PolicyAsync(claims.Id, Start, [new ClaimWorld.Line("damage", 50000m, deductible, owed ?? 0m)],
             owed is { } o ? [(Start, o)] : null, currency, 1m);
         // Reported on 02.10 (or the day after a later loss), approved that day.

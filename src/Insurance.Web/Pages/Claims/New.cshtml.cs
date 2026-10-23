@@ -6,12 +6,18 @@ using Microsoft.AspNetCore.Mvc;
 namespace Insurance.Web.Pages.Claims;
 
 /// <summary>Registering a loss event (legacy src/app/(app)/claims/new/page.tsx with claim-form.tsx and registerClaim).</summary>
-public sealed class NewModel : AppPageModel
+public sealed class NewModel(Rates rates) : AppPageModel
 {
     public string Number { get; private set; } = "";
     public ClaimReads.PolicyForNew? Policy { get; private set; }
     public IReadOnlyList<ClaimReads.CoverageLine> Lines { get; private set; } = [];
     public bool Usable => Policy is { Status: "active" or "cancelled" };
+
+    /// <summary>The currency the claim will be recorded in (H46: GEL on a foreign-currency policy, by the company setting).</summary>
+    public string ClaimCurrency { get; private set; } = "";
+
+    /// <summary>A GEL claim on a foreign-currency policy: the limit and deductible stay in the policy's currency.</summary>
+    public bool CrossCurrency => Policy is not null && ClaimCurrency != Policy.PremiumCurrency.Trim();
     private DateOnly? today;
     public DateOnly Today => today ??= Db.Today();
 
@@ -27,7 +33,7 @@ public sealed class NewModel : AppPageModel
 
     public async Task<IActionResult> OnPostAsync()
     {
-        var outcome = await ClaimActions.RegisterClaimAsync(Db, Me, Request.PostedForm());
+        var outcome = await ClaimActions.RegisterClaimAsync(Db, rates, Me, Request.PostedForm());
         if (outcome.RedirectTo is { } to) return Redirect(to);
         if (!Me.CanWrite) return Redirect("/claims");
         KeepTrimmedForm();
@@ -44,6 +50,7 @@ public sealed class NewModel : AppPageModel
         if (Number == "") return;
         Policy = await Db.ReadTxAsync(tx => ClaimReads.PolicyByNumberAsync(tx, Number));
         if (Policy is not null) Lines = await Db.ReadTxAsync(tx => ClaimReads.LinesAsync(tx, Policy.Id));
+        if (Policy is not null) ClaimCurrency = await Db.ReadTxAsync(tx => ClaimActions.NewClaimCurrencyAsync(tx, Policy.PremiumCurrency));
         if (Policy is not null && !Values.ContainsKey("occurred_on") && !Values.ContainsKey("reported_on"))
         {
             Values["occurred_on"] = Fmt.Iso(Today < Policy.EffectiveFrom ? Policy.EffectiveFrom : Today);

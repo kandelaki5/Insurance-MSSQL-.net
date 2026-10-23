@@ -415,7 +415,11 @@ public static class Ka
         public static readonly global::System.Collections.Generic.IReadOnlyDictionary<string, global::System.Collections.Generic.IReadOnlyDictionary<string, string>> Choices = global::Insurance.Application.Texts.TextMap.Of(
             ("policy.reduction_order", global::Insurance.Application.Texts.TextMap.Of(
                 ("last_first", "ბოლო შენატანები მცირდება (ბოლოდან წინ)"),
-                ("equal_unpaid", "თანაბრად ნაწილდება გადაუხდელ შენატანებზე"))));
+                ("equal_unpaid", "თანაბრად ნაწილდება გადაუხდელ შენატანებზე"))),
+            // H46 (owner 06.10.2026, old program docs/07 §4.5); wording proposed by Claude, not approved by the owner.
+            ("claim.currency", global::Insurance.Application.Texts.TextMap.Of(
+                ("gel", "ლარში (ლიმიტი და ფრანშიზა — შემთხვევის დღის კურსით)"),
+                ("policy", "პოლისის ვალუტაში"))));
 
         public static class Numbering
         {

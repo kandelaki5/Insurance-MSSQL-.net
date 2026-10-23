@@ -37,6 +37,8 @@ public sealed class ClaimFaultTests : IClassFixture<TestDatabase>
     {
         var at = y ?? Interlocked.Increment(ref year);
         var claims = await w.UserAsync("claims");
+        // An old claim: a USD policy's claim in USD (H46 setting claim.currency = policy).
+        if (currency != "GEL") await w.OldClaimsAsync();
         var policy = await w.PolicyAsync(claims.Id, new DateOnly(at, 10, 1), [new ClaimWorld.Line("damage", 20000m, 100m, premium)], installments, currency, policyRate);
         var claim = (await w.RegisterAsync(claims, policy, new DateOnly(at, 10, 1), new DateOnly(at, 10, 2), ("damage", "1000")))[0];
         await w.ApproveAsync(claims, claim, "1000", new DateOnly(at, 10, 2));

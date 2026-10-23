@@ -69,10 +69,10 @@
                 <tr>
                     <th></th>
                     <th>@F.Coverage</th>
-                    <th>@F.SumInsured</th>
-                    <th>@F.Deductible</th>
-                    <th>@F.ClaimedAmount, @p.PremiumCurrency.Trim()</th>
-                    <th>@F.InitialReserve, @p.PremiumCurrency.Trim()</th>
+                    <th>@F.SumInsured@(Model.CrossCurrency ? $", {p.PremiumCurrency.Trim()}" : "")</th>
+                    <th>@F.Deductible@(Model.CrossCurrency ? $", {p.PremiumCurrency.Trim()}" : "")</th>
+                    <th>@F.ClaimedAmount, @Model.ClaimCurrency</th>
+                    <th>@F.InitialReserve, @Model.ClaimCurrency</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -94,6 +94,10 @@
                 </tbody>
             </table>
             <div class="hint">@F.ReserveHint</div>
+            @if (Model.CrossCurrency)
+            {
+                <div class="hint">@ClaimTexts.Notes.GelOnForeign</div>
+            }
         </div>
         <div class="toolbar">
             <button class="btn">@ClaimTexts.Register</button>

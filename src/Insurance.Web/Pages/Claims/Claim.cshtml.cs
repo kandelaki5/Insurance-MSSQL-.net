@@ -86,7 +86,7 @@ public sealed class ClaimModel(Rates rates) : AppPageModel
 
     public async Task<IActionResult> OnPostAddCoverageAsync(Guid id)
     {
-        var outcome = await ClaimActions.AddEventCoverageAsync(Db, Me, Request.PostedForm());
+        var outcome = await ClaimActions.AddEventCoverageAsync(Db, rates, Me, Request.PostedForm());
         return outcome.RedirectTo is { } to ? Redirect(to) : await RefusedAsync(id, outcome, "coverage");
     }
 
@@ -128,6 +128,23 @@ public sealed class ClaimModel(Rates rates) : AppPageModel
     public static string Money(decimal value) => Billing.GroupedTetri(Billing.Tetri(value));
 
     public static string MoneyTetri(long tetri) => Billing.GroupedTetri(tetri);
+
+    /// <summary>
+    /// A limit or deductible of the coverage, in the policy's currency; on a GEL claim of a foreign-currency policy (H46) with
+    /// the occurrence day's rate and its GEL as fixed on the claim: "1 000.00 USD × 2.6 (01.10.2041) = 2 600.00 ₾".
+    /// </summary>
+    public string InPolicyCurrency(decimal amount, decimal? gel)
+    {
+        var c = Data.Claim;
+        if (!c.CrossCurrency) return $"{Money(amount)} {Currency}";
+        return $"{Money(amount)} {c.PolicyCurrency.Trim()} × {Fmt.Plain(c.LimitRate!.Value)} ({Fmt.Date(c.LimitRateOn!.Value)}) = {(gel is { } g ? Money(g) : "—")} ₾";
+    }
+
+    /// <summary>A set-off converted from the policy's currency (H46): "100.00 USD × 2.7 = 270.00 ₾"; null for any other row.</summary>
+    public string? SetOffConversion(ClaimReads.PaymentRow p) =>
+        p.OffsetRate is { } rate && p.OffsetCurrency is { } ccy && ccy.Trim() != Currency && p.OffsetInPolicy is { } policy
+            ? $"{Money(policy)} {ccy.Trim()} × {Fmt.Plain(rate)} = {Money(p.PremiumOffset)} ₾"
+            : null;
 
     public static string Badge(string status) => status is "paid" or "closed" ? "low" : status == "rejected" ? "high" : "warn";
 

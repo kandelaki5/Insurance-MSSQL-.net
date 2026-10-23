@@ -289,7 +289,7 @@ public sealed class LegacyDbCheckNumberingTests(TestDatabase db) : IClassFixture
                      })
             {
                 var before = await Counters();
-                var outcome = await ClaimActions.RegisterClaimAsync(w.App, u, form);
+                var outcome = await ClaimActions.RegisterClaimAsync(w.App, w.Rates, u, form);
                 Assert.Null(outcome.RedirectTo);
                 Assert.Equal(Ka.Common.SeriesExhausted, outcome.Message);
                 Assert.Equal(0, await Written());

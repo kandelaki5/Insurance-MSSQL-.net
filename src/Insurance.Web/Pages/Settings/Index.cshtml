@@ -15,8 +15,9 @@
     var keys = labels.Keys.ToList();
     var groups = new[]
     {
-        (Ka.Settings.Company, keys.Where(k => !k.StartsWith("aml.", StringComparison.Ordinal) && !k.StartsWith("accounting.", StringComparison.Ordinal) && !k.StartsWith("policy.", StringComparison.Ordinal) && !k.StartsWith("payment.", StringComparison.Ordinal)).ToList()),
+        (Ka.Settings.Company, keys.Where(k => !k.StartsWith("aml.", StringComparison.Ordinal) && !k.StartsWith("accounting.", StringComparison.Ordinal) && !k.StartsWith("policy.", StringComparison.Ordinal) && !k.StartsWith("payment.", StringComparison.Ordinal) && !k.StartsWith("claim.", StringComparison.Ordinal)).ToList()),
         (Ka.Settings.Policy, keys.Where(k => k.StartsWith("policy.", StringComparison.Ordinal)).ToList()),
+        (ClaimTexts.Title, keys.Where(k => k.StartsWith("claim.", StringComparison.Ordinal)).ToList()),
         (Ka.Settings.Aml, keys.Where(k => k.StartsWith("aml.", StringComparison.Ordinal)).ToList()),
         (Ka.Settings.Accounting, keys.Where(k => k.StartsWith("accounting.", StringComparison.Ordinal) || k.StartsWith("payment.", StringComparison.Ordinal)).ToList()),
     };

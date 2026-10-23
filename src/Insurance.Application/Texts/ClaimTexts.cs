@@ -148,6 +148,11 @@ public static class ClaimTexts
         public const string Reversal = "შებრუნება ახალი სტრიქონია: თავდაპირველი ანაზღაურება არ იცვლება. ყველა თანხა ზუსტად საპირისპიროა, იგივე კურსით; რეზერვი აღდგება, პრემიასთან ჩათვლა უკან ბრუნდება (პოლისის დავალიანება აღდგება). ბანკში არაფერი იგზავნება — მხოლოდ ფაქტი აღირიცხება.";
         public const string Payee = "დამზღვევის გარდა სხვა მიმღები (მოსარგებლე, სერვისი, სხვა) კლიენტების რეესტრიდან აირჩევა მისი ნომრით — ჯერ რეესტრში უნდა იყოს დამატებული.";
 
+        // H46 (old program docs/07 §4.5, owner 06.10.2026): a GEL claim on a foreign-currency policy. Wording proposed by
+        // Claude, not approved by the owner (tests/parity/cases/common-texts-after-baseline.json).
+        public const string PaymentGel = "თანხა ლარშია; გასაცემი = თანხა − ფრანშიზა − პრემიასთან ჩათვლა. პრემიის დავალიანება პოლისის ვალუტაშია: ჩათვლა მასში ანაზღაურების დღის კურსით იანგარიშება, ცენტამდე ქვემოთ დამრგვალებით.";
+        public const string GelOnForeign = "ზარალი აღირიცხება ლარში. სადაზღვევო თანხა და ფრანშიზა პოლისის ვალუტაშია და ლარში გადაიყვანება შემთხვევის დღის ოფიციალური კურსით.";
+
         /// <summary>The texts above by their old keys, in their order, for a lookup by code.</summary>
         public static readonly global::System.Collections.Generic.IReadOnlyDictionary<string, string> ByKey = global::Insurance.Application.Texts.TextMap.Of(
             ("reserve", Reserve),
@@ -285,6 +290,12 @@ public static class ClaimTexts
         public const string TotalLossCancellation = "პოლისი უკვე გაუქმებულია უფრო გვიანი თარიღიდან და გაუქმება ზარალის დღეზე ვერ გადმოვიდა; ანაზღაურება არ გატარდა";
         public const string Exceeds = "ანაზღაურება დამტკიცებულ თანხას აჭარბებს";
         public const string Rate = "ამ თარიღის კურსი ვერ მოიძებნა";
+
+        // H46 (old program docs/07 §4.5, owner 06.10.2026): refusals where no owner rule decides the case yet. Wording proposed
+        // by Claude, not approved by the owner (tests/parity/cases/common-texts-after-baseline.json).
+        public const string CurrencyMixed = "ამ შემთხვევის ზარალები სხვა ვალუტაშია: ერთ შემთხვევაში ლარისა და სხვა ვალუტის ზარალის აღრიცხვის წესი ჯერ დასადასტურებელია — არაფერი ჩაწერილა";
+        public const string TotalLossCurrency = "ზარალი ლარშია, პოლისი კი სხვა ვალუტაში: სრული განადგურებისას პრემიის დაკავების წესი ასეთ ზარალზე ჯერ დასადასტურებელია — ანაზღაურება არ გატარდა";
+        public const string XlCurrency = "ზარალი ლარშია, დაფარვა კი სხვა ვალუტაში: ზარალის ექსცედენტის (XL) ხელშეკრულების გამოყენების წესი ასეთ ზარალზე ჯერ დასადასტურებელია — ზარალი არ დარეგისტრირდა";
 
         /// <summary>The texts above by their old keys, in their order, for a lookup by code.</summary>
         public static readonly global::System.Collections.Generic.IReadOnlyDictionary<string, string> ByKey = global::Insurance.Application.Texts.TextMap.Of(

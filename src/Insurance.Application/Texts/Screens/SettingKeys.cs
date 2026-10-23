@@ -30,12 +30,17 @@ public static class SettingKeys
         ("aml.review_months_low", "გადახედვის ინტერვალი — დაბალი (თვე)"),
         ("accounting.close_within_days", "თვის დახურვის ვადა თვის დასრულებიდან (კალენდარული დღე, 1–31)"),
         ("payment.fd_threshold_gel", "ერთი გადახდა, რომლის ზემოთაც ფინანსური დირექტორის ავტორიზაციაა საჭირო (ლარი)"),
-        ("policy.reduction_order", "ცვლილებით შემცირებული პრემიის განაწილება გრაფიკზე"));
+        ("policy.reduction_order", "ცვლილებით შემცირებული პრემიის განაწილება გრაფიკზე"),
+        // H46 (owner 06.10.2026, old program docs/07 §8.4); wording proposed by Claude, not approved by the owner.
+        ("claim.currency", "ზარალის ვალუტა უცხო ვალუტის პოლისზე"));
 
     /// <summary>Settings chosen from a fixed list (the first value is the default when nothing is saved).</summary>
     public static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> ChoiceKeys = TextMap.Of<IReadOnlyList<string>>(
         // Owner, 07.10.2026: either the last instalments shrink, or the reduction is split equally over the unpaid ones.
-        ("policy.reduction_order", ["last_first", "equal_unpaid"]));
+        ("policy.reduction_order", ["last_first", "equal_unpaid"]),
+        // H46: a new claim on a USD/EUR policy is in GEL (owner, 06.10.2026: "ზარალი აღირიცხება ლარში"), or in the policy's
+        // currency as the old program recorded it. Read when a claim is registered; a claim keeps its currency.
+        ("claim.currency", ["gel", "policy"]));
 
     /// <summary>Settings holding a whole number of days, checked on save (CloseDeadline).</summary>
     public static readonly IReadOnlySet<string> DayKeys = new HashSet<string>(StringComparer.Ordinal) { "accounting.close_within_days" };

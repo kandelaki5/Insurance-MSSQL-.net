@@ -35,12 +35,17 @@ public sealed class PostgresImport(string postgresConnection, string sqlServerAd
 
     /// <summary>
     /// Nullable target columns the old database never had: left null on imported rows (sanctions fingerprints and the reuse
-    /// of a decision, migration 0010 — an imported screening has no fingerprint and is never reused).
+    /// of a decision, migration 0010 — an imported screening has no fingerprint and is never reused; a GEL claim's
+    /// occurrence-day snapshot and a set-off's rate, migration 0012 — the old program recorded every claim in its policy's
+    /// currency, so an imported claim has no snapshot and an imported set-off keeps its rate only in its allocations).
     /// </summary>
     public static readonly IReadOnlyDictionary<string, IReadOnlySet<string>> TargetOnlyColumns = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal)
     {
         ["sanction_list_version"] = new HashSet<string>(StringComparer.Ordinal) { "content_sha256" },
         ["sanctions_screening"] = new HashSet<string>(StringComparer.Ordinal) { "subject_sha256", "matches_sha256", "list_sha256", "decision", "reuses_screening_id" },
+        ["claim"] = new HashSet<string>(StringComparer.Ordinal) { "limit_gel", "deductible_gel", "limit_rate", "limit_rate_on" },
+        ["claim_payment"] = new HashSet<string>(StringComparer.Ordinal) { "offset_rate", "offset_currency" },
+        ["claim_payment_request"] = new HashSet<string>(StringComparer.Ordinal) { "offset_rate", "offset_currency" },
     };
 
     /// <summary>Tables the migrations fill with reference rows, replaced by the source's on the first run (children first).</summary>

@@ -128,8 +128,8 @@
         <div><dt>@F.Policyholder</dt><dd>@claim.Policyholder</dd></div>
         <div><dt>@F.Object</dt><dd>@claim.Object</dd></div>
         <div><dt>@F.Coverage</dt><dd>@(claim.Coverage ?? claim.ClassCode) (@claim.ClassCode)</dd></div>
-        <div><dt>@F.SumInsured</dt><dd>@(claim.SumInsured is { } si ? $"{ClaimModel.Money(si)} {cur}" : "—")</dd></div>
-        <div><dt>@F.Deductible</dt><dd>@(claim.Deductible is { } de ? $"{ClaimModel.Money(de)} {cur}" : "—")</dd></div>
+        <div><dt>@F.SumInsured</dt><dd>@(claim.SumInsured is { } si ? Model.InPolicyCurrency(si, claim.LimitGel) : "—")</dd></div>
+        <div><dt>@F.Deductible</dt><dd>@(claim.Deductible is { } de ? Model.InPolicyCurrency(de, claim.DeductibleGel) : "—")</dd></div>
         <div><dt>@F.OccurredOn</dt><dd>@Fmt.Date(claim.OccurredOn)@(string.IsNullOrEmpty(claim.OccurredPlace) ? "" : $", {claim.OccurredPlace}")</dd></div>
         <div><dt>@F.ReportedOn</dt><dd>@Fmt.Date(claim.ReportedOn)</dd></div>
         <div><dt>@F.ClaimedAmount</dt><dd>@(claim.ClaimedAmount is { } ca ? $"{ClaimModel.Money(ca)} {cur}" : "—")</dd></div>
@@ -224,7 +224,7 @@
     var mode = Model.FormValue("pay", "total_loss_mode", "earned_unpaid");
     <form method="post" action="@Model.Action("PayClaim")" asp-antiforgery="true" class="card">
         <h2>@A.Pay</h2>
-        <p class="note">@ClaimTexts.Notes.Payment</p>
+        <p class="note">@(claim.CrossCurrency ? ClaimTexts.Notes.PaymentGel : ClaimTexts.Notes.Payment)</p>
         @if (Model.FormMessage("pay") is { } payMessage)
         {
             <div class="alert error">@payMessage</div>
@@ -464,7 +464,13 @@ else
                 <td>@Fmt.Date(p.PaidOn)</td>
                 <td class="num">@ClaimModel.Money(p.Amount)</td>
                 <td class="num">@ClaimModel.Money(p.DeductibleWithheld)</td>
-                <td class="num">@ClaimModel.Money(p.PremiumOffset)</td>
+                <td class="num">
+                    @ClaimModel.Money(p.PremiumOffset)
+                    @if (Model.SetOffConversion(p) is { } conversion)
+                    {
+                        <br /><span class="hint">@conversion</span>
+                    }
+                </td>
                 <td class="num">@ClaimModel.Money(p.NetPaid)</td>
                 <td class="num">@ClaimModel.Money(p.NetPaidGel)</td>
                 <td>@F.PayeeKinds.GetValueOrDefault(p.PayeeKind)@(p.PayeeName is { } pn ? $" — {pn}" : "")</td>

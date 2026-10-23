@@ -56,12 +56,19 @@ public static class ClaimReads
 
     public sealed record ClaimCard(Guid Id, string Number, Guid PolicyId, string PolicyNumber, string PolicyStatus, string Policyholder, string? Object, string? Coverage,
         string ClassCode, decimal? SumInsured, decimal? Deductible, string Currency, DateOnly OccurredOn, string? OccurredPlace, DateOnly ReportedOn, string Description,
-        string Status, decimal? ClaimedAmount, decimal? ApprovedAmount, decimal DeductibleAmount, bool IsTotalLoss, string? RejectionReason, DateOnly? ClosedOn);
+        string Status, decimal? ClaimedAmount, decimal? ApprovedAmount, decimal DeductibleAmount, bool IsTotalLoss, string? RejectionReason, DateOnly? ClosedOn,
+        string PolicyCurrency, decimal? LimitGel, decimal? DeductibleGel, decimal? LimitRate, DateOnly? LimitRateOn)
+    {
+        /// <summary>A GEL claim on a foreign-currency policy (H46): its limit and deductible were fixed in GEL on the occurrence day.</summary>
+        public bool CrossCurrency => LimitRate is not null;
+    }
 
     public sealed record ReserveRow(Guid Id, DateOnly BookedOn, decimal Change, string Reason, string? UserName);
 
+    /// <remarks>OffsetRate, OffsetCurrency: the set-off's conversion (H46); OffsetInPolicy: the set-off in the policy's currency, from its receipt's allocations.</remarks>
     public sealed record PaymentRow(Guid Id, DateOnly PaidOn, decimal Amount, decimal DeductibleWithheld, decimal PremiumOffset, decimal NetPaid, decimal NetPaidGel,
-        string PayeeKind, string? PayeeName, string? Note, string Kind, Guid? ReversesClaimPaymentId, string? ReversalReason, DateOnly? ReturnedOn, string? BankReference)
+        string PayeeKind, string? PayeeName, string? Note, string Kind, Guid? ReversesClaimPaymentId, string? ReversalReason, DateOnly? ReturnedOn, string? BankReference,
+        decimal? OffsetRate, string? OffsetCurrency, decimal? OffsetInPolicy)
     {
         /// <summary>For a reversal: the day of the payment it reverses.</summary>
         public DateOnly? ReversesOn { get; init; }
@@ -93,7 +100,8 @@ public static class ClaimReads
                    pc.name_ka as Coverage, l.class_code as ClassCode, l.sum_insured as SumInsured, l.deductible as Deductible, c.currency as Currency,
                    c.occurred_on as OccurredOn, c.occurred_place as OccurredPlace, c.reported_on as ReportedOn, c.description as Description, c.status as Status,
                    c.claimed_amount as ClaimedAmount, c.approved_amount as ApprovedAmount, c.deductible_amount as DeductibleAmount, c.is_total_loss as IsTotalLoss,
-                   c.rejection_reason as RejectionReason, c.closed_on as ClosedOn
+                   c.rejection_reason as RejectionReason, c.closed_on as ClosedOn, p.premium_currency as PolicyCurrency, c.limit_gel as LimitGel,
+                   c.deductible_gel as DeductibleGel, c.limit_rate as LimitRate, c.limit_rate_on as LimitRateOn
             from core.claim c
             join core.policy p on p.id = c.policy_id
             join core.contract co on co.id = p.contract_id
@@ -111,7 +119,9 @@ public static class ClaimReads
         var paymentRows = (await db.QueryAsync<PaymentRow>("""
             select cp.id as Id, cp.paid_on as PaidOn, cp.amount as Amount, cp.deductible_withheld as DeductibleWithheld, cp.premium_offset as PremiumOffset,
                    cp.net_paid as NetPaid, cp.net_paid_gel as NetPaidGel, cp.payee_kind as PayeeKind, pa.display_name as PayeeName, cp.note as Note, cp.kind as Kind,
-                   cp.reverses_claim_payment_id as ReversesClaimPaymentId, cp.reversal_reason as ReversalReason, cp.returned_on as ReturnedOn, cp.bank_reference as BankReference
+                   cp.reverses_claim_payment_id as ReversesClaimPaymentId, cp.reversal_reason as ReversalReason, cp.returned_on as ReturnedOn, cp.bank_reference as BankReference,
+                   cp.offset_rate as OffsetRate, cp.offset_currency as OffsetCurrency,
+                   (select sum(a.amount) from core.payment_allocation a where a.payment_id = cp.offset_payment_id) as OffsetInPolicy
             from core.claim_payment cp left join core.party pa on pa.id = cp.payee_party_id
             where cp.claim_id = @id order by cp.created_at
             """, new { id })).ToList();

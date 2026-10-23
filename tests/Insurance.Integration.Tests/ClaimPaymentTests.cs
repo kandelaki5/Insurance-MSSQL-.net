@@ -32,6 +32,9 @@ public sealed class ClaimPaymentTests(TestDatabase db) : IClassFixture<TestDatab
     {
         var y = Interlocked.Increment(ref year);
         var claims = await w.UserAsync("claims");
+        // The legacy tests describe old claims: a USD policy's claim in USD (H46: the company setting claim.currency = policy).
+        // GEL claims on USD policies are tested in ClaimGelOnForeignPolicyTests.
+        if (currency != "GEL") await w.OldClaimsAsync();
         var policy = await w.PolicyAsync(claims.Id, new DateOnly(y, 10, 1), [new ClaimWorld.Line("damage", 20000m, deductible, premium)], installments, currency, policyRate);
         var claim = (await w.RegisterAsync(claims, policy, new DateOnly(y, 10, 1), new DateOnly(y, 10, 2), ("damage", "1000")))[0];
         await w.ApproveAsync(claims, claim, "1000", new DateOnly(y, 10, 2));
@@ -463,7 +466,7 @@ public sealed class ClaimPaymentTests(TestDatabase db) : IClassFixture<TestDatab
         foreach (var (claim, amount) in new[] { (c[0], "120"), (c[0], "80"), (c[1], "500"), (c[0], "800") }) await w.PayAsync(a, claim, amount, x.Today, x.Today);
         Assert.Equal([(4, 200m, 1300m)], await w.RowsAsync<(int, decimal, decimal)>("select count(*), sum(deductible_withheld), sum(net_paid) from core.claim_payment where claim_id in @c", new { c }));
 
-        var added = await ClaimActions.AddEventCoverageAsync(w.App, x.Claims, ClaimWorld.Form(("claim_id", c[0].ToString()), ("policy_line_id", x.Policy.LineOf("theft").ToString()),
+        var added = await ClaimActions.AddEventCoverageAsync(w.App, w.Rates, x.Claims, ClaimWorld.Form(("claim_id", c[0].ToString()), ("policy_line_id", x.Policy.LineOf("theft").ToString()),
             ("reported_on", ClaimWorld.D(x.Today)), ("initial_reserve", "400")));
         var third = Guid.Parse(added.RedirectTo!.Split('/')[2].Split('?')[0]);
         var ev = await w.ScalarAsync<string>("select v.number from core.loss_event v join core.claim c on c.loss_event_id = v.id where c.id = @id", new { id = c[0] });
@@ -483,8 +486,8 @@ public sealed class ClaimPaymentTests(TestDatabase db) : IClassFixture<TestDatab
         Assert.Equal($"/claims/{x.Claim}?reserve=not-allowed", await ClaimActions.ChangeReserveAsync(w.App, viewer,
             ClaimWorld.Form(("claim_id", x.Claim.ToString()), ("booked_on", ClaimWorld.D(x.Today)), ("new_level", "5"), ("reason", "x")), x.Today));
         Assert.Equal(ClaimTexts.PaymentNotAllowed, (await w.PayAsync(viewer, x.Claim, "10", x.Today, x.Today)).Message);
-        Assert.Equal(Ka.Common.ReadOnly, (await ClaimActions.RegisterClaimAsync(w.App, viewer, ClaimWorld.Form(("policy_number", x.Policy.Number)))).Message);
-        Assert.Equal(Ka.Common.ReadOnly, (await ClaimActions.AddEventCoverageAsync(w.App, viewer, ClaimWorld.Form(("claim_id", x.Claim.ToString())))).Message);
+        Assert.Equal(Ka.Common.ReadOnly, (await ClaimActions.RegisterClaimAsync(w.App, w.Rates, viewer, ClaimWorld.Form(("policy_number", x.Policy.Number)))).Message);
+        Assert.Equal(Ka.Common.ReadOnly, (await ClaimActions.AddEventCoverageAsync(w.App, w.Rates, viewer, ClaimWorld.Form(("claim_id", x.Claim.ToString())))).Message);
         Assert.Equal($"/claims/{x.Claim}?reversal=not-allowed", await ClaimActions.ReverseClaimPaymentAsync(w.App, viewer, ClaimWorld.Form(("claim_id", x.Claim.ToString())), x.Today));
         Assert.Equal($"/claims/{x.Claim}?recovery=not-allowed", await ClaimActions.AddRecoveryAsync(w.App, viewer, ClaimWorld.Form(("claim_id", x.Claim.ToString()))));
         Assert.Equal("approved", await StatusAsync(x.Claim));
