@@ -50,7 +50,24 @@ dotnet run --project src/Insurance.Web
 
 ბრაუზერში გახსენით ბრძანების ეკრანზე ნაჩვენები მისამართი (მაგ. `http://localhost:5000`) და შედით ადმინისტრატორით. დანარჩენ მომხმარებლებს „მომხმარებლების“ ეკრანიდან შექმნით.
 
-ინტერნეტში გაშვებისას საჭიროა HTTPS. თუ პროგრამა reverse proxy-ს უკანაა, `Insurance:TrustForwardedFor=true` ჩართეთ მხოლოდ მაშინ, როცა proxy `X-Forwarded-For`-ს თავად წერს.
+### HTTPS და reverse proxy
+
+Development-ის გარდა ყველა გარემოში (`ASPNETCORE_ENVIRONMENT` არ არის `Development`) პროგრამა მხოლოდ HTTPS-ით მუშაობს. სესიისა და ფორმის დაცვის (csrf) cookie ყოველთვის `Secure`-ია, ხოლო ჩვეულებრივ HTTP მოთხოვნაზე პროგრამა უარს ამბობს და განმარტებას აჩვენებს.
+
+- **IIS (in-process) ან Kestrel საკუთარი სერტიფიკატით:** დამატებითი პარამეტრი არ სჭირდება. პროგრამა HTTPS-ს თავად ხედავს.
+- **reverse proxy ან ბალანსერი, რომელიც TLS-ს თავად ასრულებს** და პროგრამას HTTP-ით უკავშირდება: მიუთითეთ proxy-ის მისამართი. მხოლოდ ასეთი მისამართიდან მიიღება `X-Forwarded-Proto` და `X-Forwarded-For`. ნებისმიერი სხვა კლიენტის ეს სათაურები უგულებელყოფილია, ამიტომ კლიენტი ვერც სქემას შეცვლის და ვერც შესვლის მცდელობების მისამართს.
+
+  ```
+  Insurance__ForwardedHeaders__KnownProxies__0=10.0.0.5
+  Insurance__ForwardedHeaders__KnownNetworks__0=10.0.0.0/24
+  ```
+
+  ამავე კომპიუტერზე მომუშავე proxy (127.0.0.1, ::1) და IIS out-of-process ავტომატურად სანდოა.
+- ძველი პარამეტრი `Insurance:TrustForwardedFor` გაუქმდა. ის `X-Forwarded-For`-ს ნებისმიერი კლიენტისგან იღებდა.
+
+ადგილობრივი სატესტო გაშვება (`Development`) HTTP-ითაც მუშაობს. cookie მაშინ მხოლოდ HTTPS მოთხოვნაზეა `Secure`.
+
+ცოცხალ ჰოსტინგზე (მაგ. SmarterASP) ეს ჯაჭვი ჯერ არ შემოწმებულა (NOT TESTED).
 
 ## სატესტო მომხმარებლები
 

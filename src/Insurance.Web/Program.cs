@@ -25,15 +25,19 @@ builder.Services.AddRazorPages(options =>
     // Every page needs a signed-in user except the login page; each page checks its own permission on top.
     options.Conventions.ConfigureFilter(new RequireUserFilter());
 });
+builder.AddTrustedProxies();
 builder.Services.AddAntiforgery(options =>
 {
     options.Cookie.Name = "csrf";
-    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+    options.Cookie.SecurePolicy = Hosting.AntiforgeryPolicy(builder.Environment);
     options.Cookie.SameSite = SameSiteMode.Lax;
 });
 
 var app = builder.Build();
 
+// First, so the scheme and the client's address are the proxy's word only when the proxy is a trusted one (Hosting).
+app.UseForwardedHeaders();
+app.RequireHttpsOutsideDevelopment();
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");

@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 namespace Insurance.Web.Pages;
 
 [AllowAnonymousPage]
-public sealed class LoginModel(Auth auth, RequestUser requestUser, IConfiguration configuration) : PageModel
+public sealed class LoginModel(Auth auth, RequestUser requestUser) : PageModel
 {
     public string? FormError { get; private set; }
 
@@ -29,19 +29,9 @@ public sealed class LoginModel(Auth auth, RequestUser requestUser, IConfiguratio
     }
 
     /// <summary>
-    /// The network source that login throttling counts. Behind a reverse proxy (Insurance:TrustForwardedFor) the first
-    /// address of X-Forwarded-For, as the legacy code took it; otherwise the connection's own address, which the client
-    /// cannot forge.
+    /// The network source that login throttling counts: the connection's address, which the forwarded-headers middleware
+    /// replaces with the client's only when the request came through a trusted proxy (Hosting). The legacy code took the
+    /// first address of X-Forwarded-For from anyone, which let a client pick the key it was throttled by.
     /// </summary>
-    private string? Source()
-    {
-        if (configuration.GetValue<bool>("Insurance:TrustForwardedFor"))
-        {
-            var forwarded = Request.Headers["X-Forwarded-For"].ToString().Split(',')[0].Trim();
-            if (forwarded.Length > 0) return forwarded;
-            var real = Request.Headers["X-Real-IP"].ToString();
-            if (real.Length > 0) return real;
-        }
-        return HttpContext.Connection.RemoteIpAddress?.ToString();
-    }
+    private string? Source() => HttpContext.Connection.RemoteIpAddress?.ToString();
 }
