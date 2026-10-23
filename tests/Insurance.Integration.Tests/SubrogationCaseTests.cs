@@ -331,6 +331,10 @@ public sealed class SubrogationCaseTests(TestDatabase db) : IClassFixture<TestDa
         Assert.True((await a).Ok);
         Assert.Equal(Lari(600), await BalanceAsync(caseId));
         Assert.Equal("partially_received", await StatusAsync(caseId));
+        // Legacy scripts/regress-db/check.ts D20: the audit shows the case closed by B, then partially received again by A.
+        Assert.Equal(["closed", "partially_received"], (await w.RowsAsync<string>("""
+            select json_value(new_row, '$.status') from core.audit_log where table_name = N'subrogation_case' and row_id = @id and action = N'update' order by id
+            """, new { id = caseId.ToString() }))[^2..]);
     }
 
     [Fact]
