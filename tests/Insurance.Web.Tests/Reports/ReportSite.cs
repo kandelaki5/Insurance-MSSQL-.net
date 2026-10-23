@@ -95,15 +95,13 @@ public sealed partial class ReportSite : IAsyncDisposable
     private static string CellText(Match m) => WebUtility.HtmlDecode(Tag().Replace(m.Groups[1].Value, "")).Trim();
 
     /// <summary>The cells of the first table row whose first cell is <paramref name="first"/> (tags inside cells stripped to their first text).</summary>
-    public static string[] Cells(string html, string first)
-    {
-        foreach (Match row in Regex.Matches(html, "<tr[^>]*>([\\s\\S]*?)</tr>"))
-        {
-            var cells = CellRe().Matches(row.Groups[1].Value).Select(CellText).ToArray();
-            if (cells.Length > 0 && cells[0] == first) return cells;
-        }
-        return [];
-    }
+    public static string[] Cells(string html, string first) => Rows(html, first).FirstOrDefault() ?? [];
+
+    /// <summary>The cells of every table row whose first cell is <paramref name="first"/>, in order.</summary>
+    public static List<string[]> Rows(string html, string first) =>
+        Regex.Matches(html, "<tr[^>]*>([\\s\\S]*?)</tr>")
+            .Select(row => CellRe().Matches(row.Groups[1].Value).Select(CellText).ToArray())
+            .Where(cells => cells.Length > 0 && cells[0] == first).ToList();
 
     /// <summary>The cells of every total row of the page, in order.</summary>
     public static List<string[]> TotalRows(string html) =>
