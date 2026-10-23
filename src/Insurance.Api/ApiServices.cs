@@ -56,6 +56,7 @@ public static class ApiServices
             .Produces<MeResponse>()
             .ProducesProblem(StatusCodes.Status401Unauthorized);
         PolicyEndpoints.Map(signedIn);
+        PolicyCardEndpoints.Map(signedIn);
         return app;
     }
 }
@@ -69,6 +70,7 @@ public static class Problems
 {
     public const string NotSignedInCode = "not-signed-in";
     public const string InvalidPagingCode = "invalid-paging";
+    public const string NoSuchPolicyCode = "no-such-policy";
 
     public static IResult NotSignedIn() => Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "სისტემაში შესვლა საჭიროა",
         extensions: new Dictionary<string, object?> { ["code"] = NotSignedInCode });
@@ -76,4 +78,7 @@ public static class Problems
     public static IResult InvalidPaging(int maxLimit) => Results.Problem(statusCode: StatusCodes.Status400BadRequest,
         title: $"გვერდის პარამეტრები არასწორია: offset ≥ 0, limit 1-დან {maxLimit}-მდე",
         extensions: new Dictionary<string, object?> { ["code"] = InvalidPagingCode });
+
+    public static IResult NoSuchPolicy() => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "ასეთი პოლისი არ არსებობს",
+        extensions: new Dictionary<string, object?> { ["code"] = NoSuchPolicyCode });
 }

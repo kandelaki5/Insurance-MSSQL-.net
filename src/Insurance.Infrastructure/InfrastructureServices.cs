@@ -12,6 +12,7 @@ public static class InfrastructureServices
     {
         services.AddSingleton<ISystemStatusQuery, SystemStatusQuery>();
         services.AddSingleton<IPolicyListQuery, PolicyListQuery>();
+        services.AddSingleton<IPolicyCardQuery, PolicyCardQuery>();
         return services;
     }
 }
