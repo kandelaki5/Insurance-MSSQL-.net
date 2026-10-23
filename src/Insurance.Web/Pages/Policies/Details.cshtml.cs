@@ -213,6 +213,22 @@ public sealed class DetailsModel(Rates rates) : AppPageModel
         return Page();
     }
 
+    public async Task<IActionResult> OnGetDataAsync()
+    {
+        if (!ValidRoute(out var id) || !await LoadAsync(id)) return NotFound();
+        return new JsonResult(new {
+            Policy.Id, Policy.Number, Client=Policy.Policyholder, Policy.Product, Vehicle=Objects,
+            From=Policy.EffectiveFrom, To=Policy.EffectiveTo, Policy.Status, Policy.Currency,
+            Premium=Lines.Sum(l=>l.Premium), Outstanding=(decimal)Receivable.Outstanding/100m,
+            OutstandingGel=(decimal)Receivable.OutstandingGel/100m,
+            Overdue=(decimal)Receivable.Overdue/100m,
+            Overpaid=(decimal)Receivable.Overpaid/100m,
+            Cessions=Cessions.Select(c=>new { c.TreatyId,c.TreatyNumber,c.TreatyName,c.SharePercent,c.Amount,c.AmountGel,c.BookedOn,c.IsCancellation }),
+            Schedule=Receivable.Balances.Select(b=>new {b.DueOn,Amount=(decimal)b.Amount/100m,Outstanding=(decimal)b.Outstanding/100m}),
+            AsOf=Today, Receives, Approves, Me.CanWrite
+        });
+    }
+
     private IActionResult Back(string? to) => Redirect(to ?? $"/policies/{RouteData.Values["id"]}");
 
     public async Task<IActionResult> OnPostApproveAsync()

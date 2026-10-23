@@ -21,18 +21,12 @@
     var role = user.RoleCode;
 }
 <!DOCTYPE html>
-<html lang="ka">
-<head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>@(ViewData["Title"] is string title ? title + " — " : "")@Ka.AppName</title>
-    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
-</head>
-<body>
-<div class="shell">
-    <aside class="sidebar">
-        <div class="brand">@Ka.AppName</div>
-        <nav>
+<html lang="ka"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><meta name="theme-color" content="#f7f8fc"/>
+<title>@(ViewData["Title"] is string title ? title + " — " : "")@Ka.AppName</title>
+<link rel="stylesheet" href="~/ui/styles.css" asp-append-version="true"/>
+<link rel="stylesheet" href="~/css/workspace.css" asp-append-version="true"/>
+</head><body>
+<nav id="server-navigation" hidden aria-hidden="true">
             <a href="/">@Ka.Nav.Home</a>
             <a href="/policies">@Ka.Nav.Policies</a>
             <a href="/policies/pending">@Ka.Nav.PendingPolicies</a>
@@ -77,19 +71,12 @@
                 <a href="/settings">@Ka.Nav.Settings</a>
                 <a href="/settings/products">@Ka.Settings.ProductTexts.Nav</a>
             }
-        </nav>
-        <div class="user">
-            <div>@user.FullName</div>
-            <div class="role">@user.RoleName</div>
-            <form method="post" action="/logout">
-                @Html.AntiForgeryToken()
-                <button>@Ka.Nav.Logout</button>
-            </form>
-        </div>
-    </aside>
-    <main class="content">@RenderBody()</main>
-</div>
+</nav>
+<form id="server-logout" method="post" action="/logout" hidden>@Html.AntiForgeryToken()</form>
+<app-root data-full-name="@user.FullName" data-role-name="@user.RoleName" data-can-write="@user.CanWrite.ToString().ToLowerInvariant()"></app-root>
+<div id="server-content" hidden>@RenderBody()</div>
+<noscript><p class="noscript-note">პროგრამის სამუშაო სივრცისთვის ჩართეთ JavaScript.</p><style>#server-content[hidden]{display:block;padding:24px}</style></noscript>
 <script src="~/js/date-input.js" asp-append-version="true"></script>
-@await RenderSectionAsync("Scripts", required: false)
-</body>
-</html>
+@await RenderSectionAsync("Scripts",required:false)
+<script src="~/ui/main.js" type="module" asp-append-version="true"></script>
+</body></html>
