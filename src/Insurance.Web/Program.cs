@@ -1,5 +1,8 @@
+using Insurance.Api;
 using Insurance.Application;
 using Insurance.Application.Data;
+using Insurance.Application.Ports;
+using Insurance.Infrastructure;
 using Insurance.Application.Services;
 using Insurance.Web.Infrastructure;
 
@@ -15,6 +18,11 @@ builder.Services.AddSingleton<Auth>();
 builder.Services.AddScoped<RequestUser>();
 builder.Services.AddHttpClient();
 builder.Services.AddApplicationServices();
+// The layers (docs/architecture, ADR 0001): the adapters behind the Application's ports and the /api/v1 endpoints, in this one site.
+builder.Services.AddInsuranceInfrastructure();
+builder.Services.AddInsuranceApi();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUserSource, HttpCurrentUserSource>();
 builder.Services.Configure<SanctionsOptions>(builder.Configuration.GetSection("Insurance:Sanctions"));
 
 // Georgian (and every other) text is written as it is, not as &#x...; entities.
@@ -55,6 +63,7 @@ app.Use(async (context, next) =>
 app.UseStaticFiles();
 app.UseRouting();
 app.MapRazorPages();
+app.MapInsuranceApi(app.Environment, app.Configuration);
 app.Run();
 
 public partial class Program;

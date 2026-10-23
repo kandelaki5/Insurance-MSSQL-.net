@@ -4,5 +4,8 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Insurance.Application\Insurance.Application.csproj" />
+    <!-- The composition root (ADR 0001): the host serves the Razor pages, the Angular build and the API in one site. -->
+    <ProjectReference Include="..\Insurance.Api\Insurance.Api.csproj" />
+    <ProjectReference Include="..\Insurance.Infrastructure\Insurance.Infrastructure.csproj" />
   </ItemGroup>
 </Project>
