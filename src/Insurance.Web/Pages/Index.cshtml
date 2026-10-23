@@ -1,0 +1,44 @@
+@page "/"
+@model Insurance.Web.Pages.IndexModel
+@{
+    ViewData["Title"] = Ka.Nav.Home;
+}
+<h1>@Ka.Home.Welcome, @Model.Me.FullName</h1>
+<div class="stats">
+    <div class="card stat">
+        <div class="value">@Model.Totals.Parties</div>
+        <div class="label">@Ka.Home.Parties</div>
+    </div>
+    <div class="card stat">
+        <div class="value">@Model.Totals.Classes</div>
+        <div class="label">@Ka.Home.Classes</div>
+    </div>
+    <div class="card stat">
+        <div class="label">@Ka.Home.LastRates</div>
+        @if (Model.LastRates.Count == 0)
+        {
+            <div>@Ka.Common.NoData</div>
+        }
+        @foreach (var r in Model.LastRates)
+        {
+            <div>@r.Currency: <strong>@Fmt.Fixed(r.Rate, 4)</strong> (@Fmt.Iso(r.RateDate))</div>
+        }
+    </div>
+</div>
+
+<h2 class="section">@Ka.Home.Reminders</h2>
+<div class="card">
+    @if (Model.Reminders.Count == 0)
+    {
+        <div>@Ka.Home.NothingDue</div>
+    }
+    else
+    {
+        <ul class="changes">
+            @foreach (var r in Model.Reminders)
+            {
+                <li><a href="@r.Href"><strong>@r.Count</strong> @r.Label</a></li>
+            }
+        </ul>
+    }
+</div>

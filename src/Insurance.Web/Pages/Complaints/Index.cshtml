@@ -1,0 +1,82 @@
+@page "/complaints"
+@model Insurance.Web.Pages.Complaints.IndexModel
+@{
+    var f = ComplaintTexts.Fields.ByKey;
+    ViewData["Title"] = ComplaintTexts.Title;
+}
+<h1>@ComplaintTexts.Title</h1>
+<p class="note">@ComplaintTexts.Note</p>
+<div class="toolbar">
+    <form style="display: flex; gap: 8px">
+        <select name="status" style="width: auto">
+            <option value="" selected="@(Model.Status == "")">@f["status"]: —</option>
+            @foreach (var (value, title) in ComplaintTexts.Statuses)
+            {
+                <option value="@value" selected="@(Model.Status == value)">@title</option>
+            }
+        </select>
+        <button class="btn secondary">@Ka.Common.Search</button>
+    </form>
+    <div class="spacer"></div>
+    @if (Model.Me.CanWrite)
+    {
+        <a class="btn" href="/complaints/new">@ComplaintTexts.New</a>
+    }
+</div>
+@if (Model.Rows.Count == 0)
+{
+    <div class="card empty">@Ka.Common.NoData</div>
+}
+else
+{
+    <table>
+        <thead>
+        <tr>
+            <th>@f["number"]</th>
+            <th>@f["receivedOn"]</th>
+            <th>@f["channel"]</th>
+            <th>@f["customerName"]</th>
+            <th>@f["policyNumber"]</th>
+            <th>@f["category"]</th>
+            <th>@f["status"]</th>
+            <th>@f["deadline"]</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var r in Model.Rows)
+        {
+            var deadline = r.ReceivedOn.AddDays(ComplaintTexts.ResponseDays);
+            var daysLeft = deadline.DayNumber - Model.Today.DayNumber;
+            var category = r.Category.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            <tr>
+                <td><a href="/complaints/@r.Id">@r.Number</a></td>
+                <td>@Fmt.Date(r.ReceivedOn)</td>
+                <td>@ComplaintTexts.Channels.GetValueOrDefault(r.Channel)</td>
+                <td>@r.CustomerName</td>
+                <td>@r.PolicyNumber</td>
+                <td>@category. @ComplaintTexts.Categories.GetValueOrDefault(category)</td>
+                <td><span class="badge @(r.Status == "open" ? "warn" : "low")">@ComplaintTexts.Statuses.GetValueOrDefault(r.Status)</span></td>
+                <td>
+                    @if (r.Status == "open")
+                    {
+                        @Fmt.Date(deadline)
+                        @(" ")
+                        @if (daysLeft < 0)
+                        {
+                            <span class="badge high">@ComplaintTexts.Overdue</span>
+                        }
+                        else if (daysLeft <= 5)
+                        {
+                            <span class="badge warn">@ComplaintTexts.DueSoon</span>
+                        }
+                    }
+                    else if (r.RespondedOn is { } responded)
+                    {
+                        @Fmt.Date(responded)
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}

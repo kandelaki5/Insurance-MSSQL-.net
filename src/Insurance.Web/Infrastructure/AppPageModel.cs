@@ -45,6 +45,22 @@ public abstract class AppPageModel : PageModel
             if (value.Count == 1 && key != "__RequestVerificationToken") Values[key] = value[0] ?? "";
     }
 
+    /// <summary>
+    /// Every posted field once, trimmed as JavaScript trims (legacy Object.fromEntries([...form.entries()].map(([k, v]) =>
+    /// [k, String(v).trim()]))): a repeated field keeps its last value, as Object.fromEntries did.
+    /// </summary>
+    protected Dictionary<string, string> PostedValues()
+    {
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (!Request.HasFormContentType) return values;
+        foreach (var (key, value) in Request.Form)
+            if (key != "__RequestVerificationToken" && value.Count > 0) values[key] = Insurance.Domain.Common.JsText.Trim(value[^1] ?? "");
+        return values;
+    }
+
+    /// <summary>Whether the form has the field at all (legacy form.has: an unticked checkbox is not sent).</summary>
+    protected bool Posted(string name) => Request.HasFormContentType && Request.Form.ContainsKey(name);
+
     public string Value(string name, string? fallback = null) => Values.TryGetValue(name, out var v) ? v : fallback ?? "";
     public string? Error(string name) => Errors.GetValueOrDefault(name);
 }

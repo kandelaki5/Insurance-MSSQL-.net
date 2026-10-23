@@ -1,0 +1,83 @@
+@page "/parties"
+@model Insurance.Web.Pages.Parties.IndexModel
+@using Insurance.Domain.Common
+@{
+    ViewData["Title"] = Ka.Party.Title;
+    var f = Ka.Party.Fields;
+}
+<h1>@Ka.Party.Title</h1>
+<div class="toolbar">
+    <form style="display: flex; gap: 8px; flex: 1; max-width: 680px">
+        <input type="search" name="q" value="@Model.Q" placeholder="@Ka.Party.SearchPlaceholder" />
+        <select name="filter" style="width: auto">
+            @foreach (var (value, title) in Ka.Party.Filters)
+            {
+                <option value="@value" selected="@(Model.Filter == value)">@title</option>
+            }
+        </select>
+        <button class="btn secondary">@Ka.Common.Search</button>
+    </form>
+    <div class="spacer"></div>
+    @if (Model.Me.CanWrite)
+    {
+        <a class="btn" href="/parties/new?kind=person">@Ka.Party.NewPerson</a>
+        <a class="btn" href="/parties/new?kind=organization">@Ka.Party.NewOrganization</a>
+    }
+</div>
+@if (Model.Rows.Count == 0)
+{
+    <div class="card empty">@Ka.Common.NoData</div>
+}
+else
+{
+    <table>
+        <thead>
+        <tr>
+            <th>@f["displayName"]</th>
+            <th>@f["idNumber"]</th>
+            <th>@f["kind"]</th>
+            <th>@f["segment"]</th>
+            <th>@f["riskLevel"]</th>
+            <th>@f["riskReviewOn"]</th>
+            <th>@f["phone"]</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var p in Model.Rows)
+        {
+            <tr>
+                <td><a href="/parties/@p.Id">@p.DisplayName</a></td>
+                <td>@p.IdNumber</td>
+                <td>@Ka.Party.Kind.GetValueOrDefault(p.Kind)</td>
+                <td>@Ka.Party.Segment.GetValueOrDefault(p.Segment)</td>
+                <td>
+                    @if (p.RiskLevel is not null)
+                    {
+                        <span class="badge @p.RiskLevel">@Ka.Party.Risk.GetValueOrDefault(p.RiskLevel)</span>
+                    }
+                    else
+                    {
+                        <span class="badge warn">@Ka.Party.RiskCard.NotAssessed</span>
+                    }
+                </td>
+                <td>
+                    @if (p.RiskReviewOn is { } review)
+                    {
+                        @Fmt.Date(review)
+                        @(" ")
+                        @if (review < Model.Today)
+                        {
+                            <span class="badge high">@Ka.Party.RiskCard.Overdue</span>
+                        }
+                        else if (review <= Model.Soon)
+                        {
+                            <span class="badge warn">@Ka.Party.RiskCard.DueSoon</span>
+                        }
+                    }
+                </td>
+                <td style="white-space: nowrap">@Phone.FormatPhone(p.Phone)</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}

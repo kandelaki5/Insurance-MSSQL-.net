@@ -1,0 +1,126 @@
+@model Insurance.Web.Pages.Parties.PartyFormView
+@using Insurance.Domain.Common
+@{
+    var f = Ka.Party.Fields;
+    var v = Model.Values;
+    var ro = Model.ReadOnly;
+    string Val(string name) => v.GetValueOrDefault(name) ?? "";
+    bool IsOn(string name) => Val(name) is "on" or "true";
+    // After a failed save the two parts come back as typed; otherwise the stored number is split.
+    var phone = v.ContainsKey("phone_code") ? new PhoneParts(Val("phone_code"), Val("phone")) : Phone.SplitPhone(v.GetValueOrDefault("phone"));
+}
+@functions {
+    private Microsoft.AspNetCore.Html.IHtmlContent Err(string name) =>
+        Model.Errors.TryGetValue(name, out var message) ? new Microsoft.AspNetCore.Html.HtmlString($"<div class=\"field-error\">{System.Net.WebUtility.HtmlEncode(message)}</div>") : Microsoft.AspNetCore.Html.HtmlString.Empty;
+}
+@{
+    async Task Text(string name, string label, string type = "text", string? cls = null)
+    {
+        <div class="@cls">
+            <label for="@name">@label</label>
+            @if (type == "date")
+            {
+                <date-input id="@name" name="@name" value="@Val(name)" disabled="@ro" min="1900-01-01" max="2100-12-31" />
+            }
+            else
+            {
+                <input id="@name" name="@name" type="@type" value="@Val(name)" disabled="@ro" />
+            }
+            @Err(name)
+        </div>
+    }
+    async Task Check(string name, string label)
+    {
+        <div class="check">
+            <input id="@name" name="@name" type="checkbox" checked="@IsOn(name)" disabled="@ro" />
+            <label for="@name">@label</label>
+        </div>
+    }
+    async Task Select(string name, string label, IReadOnlyDictionary<string, string> options)
+    {
+        <div>
+            <label for="@name">@label</label>
+            <select id="@name" name="@name" disabled="@ro">
+                <option value="" selected="@(Val(name) == "")">—</option>
+                @foreach (var (value, title) in options)
+                {
+                    <option value="@value" selected="@(Val(name) == value)">@title</option>
+                }
+            </select>
+        </div>
+    }
+}
+<form method="post" asp-page-handler="Save">
+    @if (Model.Message is not null)
+    {
+        <div class="alert error">@Model.Message</div>
+    }
+    <input type="hidden" name="id" value="@Val("id")" />
+    <input type="hidden" name="kind" value="@Model.Kind" />
+
+    <div class="card">
+        <h2>@Ka.Party.Sections.Identity</h2>
+        <div class="grid">
+            @if (Model.Kind == "person")
+            {
+                await Text("last_name", f["lastName"]);
+                await Text("first_name", f["firstName"]);
+                await Text("tax_id", f["taxIdPerson"]);
+                await Text("birth_date", f["birthDate"], "date");
+                await Select("gender", f["gender"], Ka.Party.Gender);
+            }
+            else
+            {
+                await Text("name", f["name"], "text", "wide");
+                await Text("tax_id", f["taxIdOrganization"]);
+                await Text("legal_form", f["legalForm"]);
+                await Text("state_share_percent", f["stateSharePercent"], "number");
+                await Check("is_public_entity", f["isPublicEntity"]);
+            }
+            @{ await Check("is_resident", f["isResident"]); }
+            @{ await Text("foreign_id", f["foreignId"]); }
+            @{ await Text("country_code", f["countryCode"]); }
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>@Ka.Party.Sections.Contact</h2>
+        <div class="grid">
+            @{ await Text("registration_place", f["registrationPlace"]); }
+            @{ await Text("legal_address", f["legalAddress"], "text", "wide"); }
+            @{ await Text("actual_address", f["actualAddress"], "text", "wide"); }
+            <div>
+                <label for="phone">@f["phone"]</label>
+                <div style="display: flex; gap: 6px">
+                    <input id="phone_code" name="phone_code" type="text" inputmode="tel" aria-label="@f["phoneCode"]" style="width: 72px" value="@phone.Code" disabled="@ro" />
+                    <input id="phone" name="phone" type="tel" inputmode="tel" placeholder="5XX XX XX XX" value="@phone.Number" disabled="@ro" />
+                </div>
+                @Err("phone")
+            </div>
+            @{ await Text("email", f["email"], "email"); }
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>@Ka.Party.Sections.Compliance</h2>
+        <div class="grid">
+            @{ await Text("identified_at", f["identifiedAt"], "date"); }
+            @{ await Text("verified_at", f["verifiedAt"], "date"); }
+            @{ await Text("sanctions_checked_at", f["sanctionsCheckedAt"], "date"); }
+            @{ await Check("is_pep", f["isPep"]); }
+            @if (Model.Kind == "organization")
+            {
+                await Text("self_declaration_on", f["selfDeclarationOn"], "date");
+                await Check("is_group_member", f["isGroupMember"]);
+            }
+        </div>
+    </div>
+
+    <div class="toolbar">
+        @if (!ro)
+        {
+            <button class="btn">@Ka.Common.Save</button>
+        }
+        <a class="btn secondary" href="/parties">@Ka.Common.Cancel</a>
+    </div>
+</form>

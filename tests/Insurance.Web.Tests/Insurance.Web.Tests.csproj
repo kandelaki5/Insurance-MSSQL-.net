@@ -16,6 +16,8 @@
   <ItemGroup>
     <!-- The same fresh-database fixture as the integration tests. -->
     <Compile Include="..\Insurance.Integration.Tests\TestDatabase.cs" Link="TestDatabase.cs" />
+    <Compile Include="..\Insurance.Integration.Tests\Fixtures.cs" Link="Fixtures.cs" />
+    <Compile Include="..\Insurance.Integration.Tests\ComplianceFixtures.cs" Link="ComplianceFixtures.cs" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

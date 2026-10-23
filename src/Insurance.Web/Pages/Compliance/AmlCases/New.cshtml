@@ -1,0 +1,62 @@
+@page "/compliance/aml-cases/new"
+@model Insurance.Web.Pages.Compliance.AmlCases.NewModel
+@{
+    var f = AmlTexts.Cases.Fields.ByKey;
+    ViewData["Title"] = AmlTexts.Cases.New;
+    var source = Model.Value("source", "monitoring");
+    var classCode = Model.Value("class_code");
+}
+<h1>@AmlTexts.Cases.New</h1>
+<p class="note">@AmlTexts.Cases.Note</p>
+<form method="post">
+    @if (Model.FormError is not null)
+    {
+        <div class="alert error">@Model.FormError</div>
+    }
+    <div class="card">
+        <div class="grid">
+            <div>
+                <label for="party_id_number">@f["partyIdNumber"]</label>
+                <input id="party_id_number" name="party_id_number" type="text" value="@Model.Value("party_id_number")" />
+                @if (Model.Error("party_id_number") is { } e1) { <div class="field-error">@e1</div> }
+            </div>
+            <div>
+                <label for="opened_on">@f["openedOn"]</label>
+                <date-input id="opened_on" name="opened_on" value="@Model.Value("opened_on")" />
+                @if (Model.Error("opened_on") is { } e2) { <div class="field-error">@e2</div> }
+            </div>
+            <div>
+                <label for="source">@f["source"]</label>
+                <select id="source" name="source">
+                    @foreach (var (value, title) in AmlTexts.Cases.Sources)
+                    {
+                        <option value="@value" selected="@(value == source)">@title</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label for="class_code">@f["classCode"]</label>
+                <select id="class_code" name="class_code">
+                    <option value="" selected="@(classCode == "")">—</option>
+                    @foreach (var c in Model.Classes)
+                    {
+                        <option value="@c.Code" selected="@(c.Code == classCode)">@c.Code. @c.Name</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label for="transaction_ref">@f["transactionRef"]</label>
+                <input id="transaction_ref" name="transaction_ref" type="text" value="@Model.Value("transaction_ref")" />
+            </div>
+            <div class="wide">
+                <label for="description">@f["description"]</label>
+                <textarea id="description" name="description" rows="4">@Model.Value("description")</textarea>
+                @if (Model.Error("description") is { } e3) { <div class="field-error">@e3</div> }
+            </div>
+        </div>
+    </div>
+    <div class="toolbar">
+        <button class="btn">@AmlTexts.Cases.Register</button>
+        <a class="btn secondary" href="/compliance/aml-cases">@Ka.Common.Cancel</a>
+    </div>
+</form>

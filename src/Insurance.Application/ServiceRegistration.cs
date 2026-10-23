@@ -10,6 +10,8 @@ public static class ServiceRegistration
     {
         services.AddHttpClient("nbg", c => c.Timeout = TimeSpan.FromSeconds(15));
         services.AddSingleton<Rates>();
+        // The UN consolidated sanctions list is large; its address is Insurance:Sanctions:UnListUrl (SanctionsOptions).
+        services.AddHttpClient("sanctions", c => c.Timeout = TimeSpan.FromSeconds(120));
         return services;
     }
 }
