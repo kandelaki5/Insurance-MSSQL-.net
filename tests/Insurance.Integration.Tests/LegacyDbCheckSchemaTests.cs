@@ -212,6 +212,30 @@ public sealed class LegacyDbCheckSchemaTests(TestDatabase db) : IClassFixture<Te
         Assert.Equal(["R", "R"], await c.QueryAsync<string>("select rtrim(type) from sys.database_principals where name in (N'core_app', N'core_reader')"));
     }
 
+    /// <summary>
+    /// Legacy core_reader read every table of core but users and sessions, those added later too, by the schema's default
+    /// privileges (old db/README.md line 30). SQL Server has none: the migration runner grants it after every run (Migrator);
+    /// this keeps that true for tables added later, such as 0011's (the session's pass table of 0009 is internal and left out).
+    /// </summary>
+    [Fact]
+    public async Task Core_reader_reads_every_core_table_and_view_but_users_sessions_and_the_internal_pass()
+    {
+        await using var c = await db.OpenAdminAsync();
+        await c.ExecuteAsync("""
+            if database_principal_id(N'core_reader_probe') is null create user core_reader_probe without login;
+            if is_rolemember(N'core_reader', N'core_reader_probe') = 0 alter role core_reader add member core_reader_probe;
+            """);
+        Assert.Empty(await c.QueryAsync<string>("""
+            declare @objects table (name sysname);
+            -- Read the catalogue as the owner: a user sees in sys.objects only what it has a right on.
+            insert @objects select o.name from sys.objects o
+            where o.schema_id = schema_id(N'core') and o.type in (N'U', N'V') and o.name not in (N'app_user', N'session', N'case_money_pass');
+            execute as user = N'core_reader_probe';
+            select name from @objects where coalesce(has_perms_by_name(N'core.' + quotename(name), N'OBJECT', N'SELECT'), 0) = 0 order by name;
+            revert;
+            """));
+    }
+
     [Fact]
     public async Task K3_the_schema_belongs_to_the_owner_and_neither_role_may_alter_it_or_create_objects()
     {
