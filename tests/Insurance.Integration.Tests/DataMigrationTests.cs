@@ -22,9 +22,21 @@ public sealed class DataMigrationTests
         return db;
     }
 
-    private static Task<PostgresImport.Result> ImportAsync(TestDatabase db) => new PostgresImport(World!, db.AdminConnection, _ => { }).RunAsync();
+    private static Task<PostgresImport.Result> ImportAsync(TestDatabase db, string? source = null) => new PostgresImport(source ?? World!, db.AdminConnection, _ => { }).RunAsync();
 
-    private static async Task<IReadOnlyList<Reconcile.Check>> ReconcileAsync(TestDatabase db) => await new Reconcile(World!, db.AdminConnection).RunAsync();
+    private static async Task<IReadOnlyList<Reconcile.Check>> ReconcileAsync(TestDatabase db, string? source = null) => await new Reconcile(source ?? World!, db.AdminConnection).RunAsync();
+
+    private static async Task PgAdminAsync(string sql)
+    {
+        await using var pg = new Npgsql.NpgsqlConnection(World);
+        await pg.OpenAsync();
+        await pg.ExecuteAsync(sql);
+    }
+
+    private static string Login(string role, string password) =>
+        new Npgsql.NpgsqlConnectionStringBuilder(World) { Username = role, Password = password, Pooling = false }.ConnectionString;
+
+    private static string Script(string name) => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "postgres", name));
 
     [SkippableFact]
     public async Task Import_reconciles_every_table_figure_and_relation()
@@ -137,5 +149,73 @@ public sealed class DataMigrationTests
             Assert.Equal(0, await c.ExecuteScalarAsync<int>("select count(*) from core.session"));
         }
         finally { await db.DisposeAsync(); }
+    }
+
+    /// <summary>
+    /// Codex R06: the migration's documented PostgreSQL reader (database/postgres/migration-reader.sql), and only its rights,
+    /// imports and reconciles the whole world, cannot write, and is removed by its drop script. The old core_reader, which
+    /// docs/MIGRATION.md first named, cannot: it does not see core.app_user, so the import refuses before writing anything.
+    /// </summary>
+    [SkippableFact]
+    public async Task R06_the_documented_migration_reader_alone_imports_and_reconciles_and_core_reader_is_not_enough()
+    {
+        Skip.If(World is null, "INSURANCE_TEST_PG_WORLD is not set");
+        const string reader = "insurance_migration_reader", oldReader = "ins_it_core_reader_login";
+        var password = "Pw-" + Guid.NewGuid().ToString("N");
+        await PgAdminAsync($"""
+            do $$ begin
+              if exists (select from pg_roles where rolname = '{reader}') then execute 'drop owned by {reader}; drop role {reader}'; end if;
+              if exists (select from pg_roles where rolname = '{oldReader}') then execute 'drop owned by {oldReader}; drop role {oldReader}'; end if;
+            end $$;
+            """);
+        await PgAdminAsync(Script("migration-reader.sql"));
+        // The old core_reader's rights as the old db/README.md (lines 27–32) and migration 0017 give them, on a login of its own.
+        await PgAdminAsync($"""
+            alter role {reader} password '{password}';
+            create role {oldReader} login password '{password}';
+            grant usage on schema core to {oldReader};
+            grant select on all tables in schema core to {oldReader};
+            revoke select on core.app_user, core.session from {oldReader};
+            revoke select on core.sanctions_screening from {oldReader};
+            alter role {oldReader} set default_transaction_read_only = on;
+            """);
+        try
+        {
+            var asReader = Login(reader, password);
+            await using (var pg = new Npgsql.NpgsqlConnection(asReader))
+            {
+                await pg.OpenAsync();
+                Assert.True(await pg.ExecuteScalarAsync<int>("select count(*) from core.app_user") > 0);
+                foreach (var sql in new[] { "update core.setting set value = value", "select count(*) from core.session" })
+                    await Assert.ThrowsAsync<Npgsql.PostgresException>(() => pg.ExecuteAsync(sql));
+            }
+
+            var db = await FreshAsync();
+            try
+            {
+                var result = await ImportAsync(db, asReader);
+                Assert.Equal("initial", result.Mode);
+                Assert.All(await ReconcileAsync(db, asReader), c => Assert.True(c.Equal, $"{c.Name}: {c.FirstDifference}"));
+            }
+            finally { await db.DisposeAsync(); }
+
+            // Negative control: core_reader's rights stop the import before it writes anything.
+            var other = await FreshAsync();
+            try
+            {
+                var e = await Assert.ThrowsAsync<InvalidOperationException>(() => ImportAsync(other, Login(oldReader, password)));
+                Assert.Contains("app_user", e.Message);
+                await using var c = await other.OpenAdminAsync();
+                Assert.Equal(0, await c.ExecuteScalarAsync<int>("select count(*) from core.data_import"));
+            }
+            finally { await other.DisposeAsync(); }
+        }
+        finally
+        {
+            await PgAdminAsync(Script("migration-reader-drop.sql") + $"\ndrop owned by {oldReader}; drop role if exists {oldReader};");
+        }
+        await using var check = new Npgsql.NpgsqlConnection(World);
+        await check.OpenAsync();
+        Assert.Equal(0, await check.ExecuteScalarAsync<int>($"select count(*) from pg_roles where rolname in ('{reader}', '{oldReader}')"));
     }
 }
