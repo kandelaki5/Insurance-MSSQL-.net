@@ -184,7 +184,7 @@ create table core.app_user (
   id            uniqueidentifier not null constraint app_user_pkey primary key constraint app_user_id_df default newid(),
   username      nvarchar(100) not null constraint app_user_username_key unique
                 constraint app_user_username_check check (username = lower(username)),
-  full_name     nvarchar(400) not null,
+  full_name     nvarchar(max) not null,
   password_hash nvarchar(400) not null,
   role_code     nvarchar(50) not null constraint app_user_role_code_fkey references core.role (code),
   branch_id     uniqueidentifier null constraint app_user_branch_id_fkey references core.branch (id),
@@ -514,12 +514,12 @@ create table core.party (
   -- Passport or foreign registration number for non-residents.
   foreign_id           nvarchar(100) null,
   country_code         nchar(2) not null constraint party_country_code_df default N'GE',
-  first_name           nvarchar(200) null,
-  last_name            nvarchar(200) null,
+  first_name           nvarchar(max) null,
+  last_name            nvarchar(max) null,
   birth_date           date null,
   gender               nvarchar(10) null constraint party_gender_check check (gender in (N'male', N'female')),
-  name                 nvarchar(400) null,
-  legal_form           nvarchar(200) null,
+  name                 nvarchar(max) null,
+  legal_form           nvarchar(max) null,
   state_share_percent  decimal(5, 2) null constraint party_state_share_percent_check check (state_share_percent between 0 and 100),
   is_public_entity     bit not null constraint party_is_public_entity_df default 0,
   registration_place   nvarchar(max) null,
@@ -558,7 +558,12 @@ create table core.party (
 create unique index party_tax_id_key on core.party (tax_id) where tax_id is not null;
 alter table core.party add display_name_lower as lower(case when kind = N'person'
   then ltrim(rtrim(coalesce(last_name, N'') + N' ' + coalesce(first_name, N''))) else name end) persisted;
-create index party_display_name_idx on core.party (display_name_lower);
+-- Names are unbounded text, as in PostgreSQL; an index key holds at most 1700 bytes, so the index (legacy
+-- party_display_name_idx on lower(display_name)) is on the name's first 400 characters. Lists order by this key and then by
+-- the whole name, which is the order of the whole name.
+alter table core.party add display_name_sort as convert(nvarchar(400), lower(case when kind = N'person'
+  then ltrim(rtrim(coalesce(last_name, N'') + N' ' + coalesce(first_name, N''))) else name end)) persisted;
+create index party_display_name_idx on core.party (display_name_sort);
 create index party_risk_review_idx on core.party (risk_review_on);
 
 -- Agents, brokers and other sales channels (order №11/2016, annexes 5 and 6).
@@ -566,7 +571,7 @@ create table core.intermediary (
   id                 uniqueidentifier not null constraint intermediary_pkey primary key constraint intermediary_id_df default newid(),
   party_id           uniqueidentifier not null constraint intermediary_party_id_fkey references core.party (id),
   kind               nvarchar(20) not null constraint intermediary_kind_check check (kind in (N'agent', N'broker', N'bank', N'employee')),
-  contract_no        nvarchar(200) null,
+  contract_no        nvarchar(max) null,
   contract_date      date null,
   valid_to           date null,
   status             nvarchar(20) not null constraint intermediary_status_df default N'active'

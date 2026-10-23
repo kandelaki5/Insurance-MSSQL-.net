@@ -61,6 +61,25 @@ public sealed class PartyTests(WebApp app) : IClassFixture<WebApp>
     }
 
     [Fact]
+    public async Task A_name_and_address_of_any_length_are_kept_as_typed_and_the_list_orders_by_the_whole_name()
+    {
+        // PostgreSQL text has no limit and the legacy form none either: a 1000-character surname is saved, not refused.
+        var (client, _) = await app.SignedInAsync("sales");
+        var stem = new string('ჰ', 450);
+        var (taxA, taxB) = (Fixtures.RandomTaxId(), Fixtures.RandomTaxId());
+        var longAddress = string.Concat(Enumerable.Repeat("რუსთაველის გამზირი 1, ", 60));
+        // Two surnames equal in their first 450 characters: the list orders them by the rest.
+        Html.Location(await WebApp.PostFormAsync(client, "/parties/new?handler=Save", Person(taxA, new() { ["last_name"] = stem + "ბ" + new string('ა', 549), ["legal_address"] = longAddress }), "/parties/new"));
+        Html.Location(await WebApp.PostFormAsync(client, "/parties/new?handler=Save", Person(taxB, new() { ["last_name"] = stem + "ა" }), "/parties/new"));
+        await using var c = await app.Db.OpenAdminAsync();
+        var (name, address) = await c.QuerySingleAsync<(string, string)>("select last_name, legal_address from core.party where tax_id = @taxA", new { taxA });
+        Assert.Equal((1000, longAddress.Trim()), (name.Length, address));
+        var list = await Html.BodyAsync(await client.GetAsync("/parties?q=" + Uri.EscapeDataString(stem)));
+        var (a, b) = (list.IndexOf(taxA, StringComparison.Ordinal), list.IndexOf(taxB, StringComparison.Ordinal));
+        Assert.True(a > 0 && b > 0 && b < a, "the shorter surname (…ა) comes before (…ბ…)");
+    }
+
+    [Fact]
     public async Task An_organization_needs_nine_digits_and_a_share_up_to_100_and_a_state_share_makes_it_a_state_segment()
     {
         var (client, _) = await app.SignedInAsync("underwriter");

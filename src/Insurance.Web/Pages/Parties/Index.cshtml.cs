@@ -33,7 +33,7 @@ public sealed class IndexModel : AppPageModel
               and (@filter = N'all'
                    or (@filter = N'unrated' and risk_level is null)
                    or (@filter = N'reviewDue' and risk_review_on <= @soon))
-            order by display_name_lower, id
+            order by display_name_sort, display_name_lower, id
             """, new { q = Q, pattern, filter = Filter, soon = Soon }))).ToList();
     }
 }

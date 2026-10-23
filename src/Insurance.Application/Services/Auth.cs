@@ -66,6 +66,9 @@ public sealed class Auth(Db db)
     {
         var username = rawUsername.Trim().ToLowerInvariant();
         if (username.Length > 100) username = username[..100];
+        // The source is a key of the attempts' index, so it is kept to the column's 200 characters (legacy text had no
+        // limit; an address is far shorter, and a longer forwarded header is cut, not refused).
+        if (source is { Length: > 200 }) source = source[..200];
         return await db.ReadAsync(async c =>
         {
             var counts = await c.QuerySingleAsync<(int ByUser, int BySource)>("""

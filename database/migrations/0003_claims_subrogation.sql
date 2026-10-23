@@ -14,8 +14,8 @@ create table core.loss_event (
   reported_on    date not null,
   description    nvarchar(max) not null,
   request_key    uniqueidentifier null,
-  source_ref     nvarchar(400) null,
-  source_batch   nvarchar(400) null,
+  source_ref     nvarchar(max) null,
+  source_batch   nvarchar(max) null,
   created_at     datetimeoffset(6) not null constraint loss_event_created_at_df default sysdatetimeoffset(),
   created_by     uniqueidentifier null constraint loss_event_created_by_fkey references core.app_user (id),
   constraint loss_event_dates check (reported_on >= occurred_on)
@@ -160,7 +160,7 @@ create table core.subrogation_case (
   opened_on    date not null,
   -- The document that shows who was at fault: police report, court decision or admission.
   basis_kind   nvarchar(30) null constraint subrogation_case_basis_kind_check check (basis_kind in (N'police_report', N'court_decision', N'admission')),
-  basis_number nvarchar(400) null,
+  basis_number nvarchar(max) null,
   basis_date   date null,
   note         nvarchar(max) null,
   -- The one-off key of the form: a second submit finds this case instead of opening another.
@@ -180,7 +180,7 @@ create table core.subrogation_party (
   case_id        uniqueidentifier not null constraint subrogation_party_case_id_fkey references core.subrogation_case (id),
   party_id       uniqueidentifier not null constraint subrogation_party_party_id_fkey references core.party (id),
   role           nvarchar(30) not null constraint subrogation_party_role_check check (role in (N'liable_person', N'liability_insurer')),
-  policy_number  nvarchar(200) null,
+  policy_number  nvarchar(max) null,
   coverage       nvarchar(max) null,
   limit_gel      decimal(18, 2) null constraint subrogation_party_limit_gel_check check (limit_gel > 0),
   response       nvarchar(20) null constraint subrogation_party_response_check check (response in (N'accepted', N'disputed', N'rejected')),
@@ -231,7 +231,7 @@ create table core.subrogation_movement (
   payer_id             uniqueidentifier null constraint subrogation_movement_payer_id_fkey references core.subrogation_party (id),
   document_kind        nvarchar(30) not null constraint subrogation_movement_document_kind_check
                        check (document_kind in (N'demand_letter', N'debtor_acceptance', N'court_decision', N'bank_statement', N'correction')),
-  document_number      nvarchar(400) null,
+  document_number      nvarchar(max) null,
   document_date        date null,
   note                 nvarchar(max) null,
   request_key          uniqueidentifier not null constraint subrogation_movement_request_key_key unique,
@@ -265,7 +265,7 @@ create table core.complaint (
   received_on      date not null,
   channel          nvarchar(20) not null constraint complaint_channel_check check (channel in (N'written', N'electronic', N'oral')),
   party_id         uniqueidentifier null constraint complaint_party_id_fkey references core.party (id),
-  customer_name    nvarchar(400) not null,
+  customer_name    nvarchar(max) not null,
   customer_contact nvarchar(max) null,
   policy_id        uniqueidentifier null constraint complaint_policy_id_fkey references core.policy (id),
   claim_id         uniqueidentifier null constraint complaint_claim_id_fkey references core.claim (id),
@@ -838,7 +838,7 @@ create procedure core.record_case_money
   @reverses_recovery_id uniqueidentifier, @received_on date, @amount_gel decimal(18, 2), @bank_reference nvarchar(100),
   @recovery_note nvarchar(max), @created_by uniqueidentifier,
   @movement_id uniqueidentifier, @movement_kind nvarchar(20), @reverses_movement_id uniqueidentifier, @payer_id uniqueidentifier,
-  @document_kind nvarchar(30), @document_number nvarchar(400), @document_date date, @movement_note nvarchar(max), @request_key uniqueidentifier
+  @document_kind nvarchar(30), @document_number nvarchar(max), @document_date date, @movement_note nvarchar(max), @request_key uniqueidentifier
 as
 begin
   set nocount on;

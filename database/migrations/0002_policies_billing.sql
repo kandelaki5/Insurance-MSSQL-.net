@@ -26,7 +26,7 @@ create table core.policy (
   contract_id        uniqueidentifier not null constraint policy_contract_id_fkey references core.contract (id),
   number             nvarchar(100) not null constraint policy_number_key unique,
   issued_on          date not null,
-  issue_place        nvarchar(400) null,
+  issue_place        nvarchar(max) null,
   -- Set when this policy was issued as a change to an earlier one.
   replaces_policy_id uniqueidentifier null constraint policy_replaces_policy_id_fkey references core.policy (id),
   effective_from     date not null,

@@ -24,17 +24,17 @@ create index party_risk_assessment_party_idx on core.party_risk_assessment (part
 create table core.party_beneficial_owner (
   id                  uniqueidentifier not null constraint party_beneficial_owner_pkey primary key constraint party_beneficial_owner_id_df default newid(),
   party_id            uniqueidentifier not null constraint party_beneficial_owner_party_id_fkey references core.party (id),
-  first_name          nvarchar(200) not null,
-  last_name           nvarchar(200) not null,
+  first_name          nvarchar(max) not null,
+  last_name           nvarchar(max) not null,
   birth_date          date null,
   personal_number     nvarchar(50) null,
   document_number     nvarchar(100) null,
   document_issued_on  date null,
   document_country    nchar(2) null,
-  document_issuer     nvarchar(400) null,
+  document_issuer     nvarchar(max) null,
   document_valid_to   date null,
   citizenship         nchar(2) null,
-  birth_place         nvarchar(400) null,
+  birth_place         nvarchar(max) null,
   criterion           nvarchar(20) not null constraint party_beneficial_owner_criterion_check check (criterion in (N'share', N'control', N'executive')),
   share_percent       decimal(5, 2) null constraint party_beneficial_owner_share_percent_check check (share_percent between 0 and 100),
   is_direct           bit not null constraint party_beneficial_owner_is_direct_df default 1,
@@ -59,8 +59,8 @@ create table core.sanction_list_entry (
   name          nvarchar(max) not null,
   aliases       nvarchar(max) not null constraint sanction_list_entry_aliases_df default N'[]'
                 constraint sanction_list_entry_aliases_json check (isjson(aliases) = 1 and left(ltrim(aliases), 1) = N'['),
-  list_type     nvarchar(200) null,
-  reference     nvarchar(200) null,
+  list_type     nvarchar(max) null,
+  reference     nvarchar(max) null,
   listed_on     date null,
   nationalities nvarchar(max) not null constraint sanction_list_entry_nationalities_df default N'[]'
                 constraint sanction_list_entry_nationalities_json check (isjson(nationalities) = 1 and left(ltrim(nationalities), 1) = N'['),
@@ -105,7 +105,7 @@ create table core.aml_case (
   opened_on       date not null,
   source          nvarchar(20) not null constraint aml_case_source_check check (source in (N'monitoring', N'employee', N'fms_request', N'other')),
   description     nvarchar(max) not null,
-  transaction_ref nvarchar(400) null,
+  transaction_ref nvarchar(max) null,
   class_code      nvarchar(20) null constraint aml_case_class_code_fkey references core.insurance_class (code),
   status          nvarchar(20) not null constraint aml_case_status_df default N'open'
                   constraint aml_case_status_check check (status in (N'open', N'examined', N'reported', N'closed')),
@@ -115,7 +115,7 @@ create table core.aml_case (
   str_sent_at     datetimeoffset(6) null,
   str_type        nvarchar(10) null constraint aml_case_str_type_check check (str_type in (N'ml', N'tf', N'other')),
   str_other_basis nvarchar(max) null,
-  fms_reference   nvarchar(200) null,
+  fms_reference   nvarchar(max) null,
   closed_on       date null,
   note            nvarchar(max) null,
   created_at      datetimeoffset(6) not null constraint aml_case_created_at_df default sysdatetimeoffset(),
@@ -135,7 +135,7 @@ create table core.fms_suspension (
   kind                 nvarchar(10) not null constraint fms_suspension_kind_check check (kind in (N'oral', N'written')),
   scope                nvarchar(20) not null constraint fms_suspension_scope_df default N'all'
                        constraint fms_suspension_scope_check check (scope in (N'all', N'transaction')),
-  transaction_ref      nvarchar(400) null,
+  transaction_ref      nvarchar(max) null,
   instructed_at        datetimeoffset(6) not null,
   written_confirmed_at datetimeoffset(6) null,
   ends_at              datetimeoffset(6) not null,
@@ -154,7 +154,7 @@ GO
 
 -- The single policy or claim of a client that carries a number (case and surrounding spaces ignored);
 -- nothing when the number is empty, unknown, another client's, or ambiguous (0022).
-create function core.resolve_suspension_target(@party uniqueidentifier, @ref nvarchar(400))
+create function core.resolve_suspension_target(@party uniqueidentifier, @ref nvarchar(max))
 returns table
 as
 return
@@ -189,7 +189,7 @@ begin
   set nocount on;
   declare @rows table (
     id uniqueidentifier primary key, party_id uniqueidentifier, case_id uniqueidentifier, kind nvarchar(10), scope nvarchar(20),
-    transaction_ref nvarchar(400), instructed_at datetimeoffset(6), written_confirmed_at datetimeoffset(6), ends_at datetimeoffset(6),
+    transaction_ref nvarchar(max), instructed_at datetimeoffset(6), written_confirmed_at datetimeoffset(6), ends_at datetimeoffset(6),
     lifted_at datetimeoffset(6), lift_reason nvarchar(max), note nvarchar(max), created_at datetimeoffset(6), created_by uniqueidentifier,
     target_policy_id uniqueidentifier, target_claim_id uniqueidentifier, legacy_unmapped bit);
   insert @rows select id, party_id, case_id, kind, scope, transaction_ref, instructed_at, written_confirmed_at, ends_at, lifted_at,
@@ -220,7 +220,7 @@ begin
     throw 51000, N'[23514] a suspension keeps its id', 1;
   declare @rows table (
     id uniqueidentifier primary key, party_id uniqueidentifier, case_id uniqueidentifier, kind nvarchar(10), scope nvarchar(20),
-    transaction_ref nvarchar(400), instructed_at datetimeoffset(6), written_confirmed_at datetimeoffset(6), ends_at datetimeoffset(6),
+    transaction_ref nvarchar(max), instructed_at datetimeoffset(6), written_confirmed_at datetimeoffset(6), ends_at datetimeoffset(6),
     lifted_at datetimeoffset(6), lift_reason nvarchar(max), note nvarchar(max), created_at datetimeoffset(6), created_by uniqueidentifier,
     target_policy_id uniqueidentifier, target_claim_id uniqueidentifier, legacy_unmapped bit);
   insert @rows
