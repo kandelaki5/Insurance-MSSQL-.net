@@ -106,3 +106,18 @@ Closed at the baseline per Codex (checked, not repeated here): H01–H06, H12–
   - `secure` cookie: `SameAsRequest` / `IsHttps` in `Program.cs:31`, `RequestUser.cs:27`;
   - upload parser: ExcelDataReader for .xls.
   These were not Codex findings at the baseline.
+
+## D. Update after Codex INS-DOTNET-MSSQL-003 (23.10.2026, evening)
+
+The table rows above are the state at `d419fee` and are not rewritten; what changed since, with the commit and its test:
+
+| Item | Then | Now | Commit | Evidence |
+|---|---|---|---|---|
+| 6 — H46 (GEL claim on a USD/EUR policy) | STILL OPEN, not built | **Built** as the owner confirmed it (docs/07 §4.5): company setting `claim.currency` (gel by default, policy for the old behaviour), migration 0012, set-off at the payment day's rate rounded down to the cent. Cases no rule decides are refused, nothing written (total loss across currencies, two currencies in one event, XL in another currency) | `015028e` | I/ClaimGelOnForeignPolicyTests (9, negative control: 8 fail when a new claim takes the policy's currency), W/ClaimGelCardTests, D/CrossCurrencySetOffTests |
+| §6.1 — verifyPassword on a damaged hash (Codex R01) | rewrite decision asked | **Fixed**: only `scrypt$<32 hex>$<128 hex>` is verified | `d08f031` | PasswordTests, CommonParityTests (6 divergences listed), AuthTests |
+| §6.2 — approval after the month closed (PR #212) | rewrite decision asked | **Built** as #212 (owner): refused with „შეუძლებელია პოლისის დამტკიცება, თვე დახურულია“ under the period lock | `4a073ea` | ApprovalClosedMonthTests, FdRequestClosedMonthTests |
+| §6.6 — re-screening an earlier false match | rewrite decision asked | **Built** (owner, 23.10.2026): a reasoned dismissal is reused on an unchanged subject, list and hits; never lifts a block | `f90d73b` | SanctionsReuseTests (9), ScreeningFingerprintTests |
+| ZAZA-009 `secure` cookie | SameAsRequest | Secure outside Development, plain HTTP refused there, forwarded headers only from configured proxies (Codex R03) | `f51a693` | HostingTests (4) |
+| Open-PR capabilities #207/#218/#225/#211/#214/#215, #361, #350, #362, #366 | not in the baseline | **Built** (MIGRATION-COVERAGE §9) | `4a073ea`, `afc43e7`, `e915643`, `602ffbc` | named there |
+
+Still open, unchanged: CLAIM-Q1/Q2 (DEFERRED), the different-deductibles-within-one-class sub-case (OPEN), H07, H08, H44-B1, H44-B2, the role matrix and the other owner questions of section B.
