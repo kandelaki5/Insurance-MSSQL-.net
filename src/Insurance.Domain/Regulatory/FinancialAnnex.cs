@@ -14,6 +14,8 @@ namespace Insurance.Domain.Regulatory;
 ///   - Info: the company's name, address, phone and e-mail from the settings, and the reporting date; the rest is not kept.
 ///   - The printed headers of the three sheets filled (BS, BS-IR &amp; RR, BS-R): the company's name beside „მზღვეველი:" (D1) and the date
 ///     after „ანგარიშგების თარიღი:" (B2:F2) (Codex PR351_FORM1_PRINT_HEADERS_MISSING_20261019); merges and styles as they are.
+///   - The profit and loss's insurance part — IS (N2), IS-COM (N2-1), P&amp;C(NL) (N4), N2-6 00160 and N1-8, from the year's start — when the
+///     year's figures are given (IncomeStatement; owner, 20.10.2026; old program PR #366).
 ///   - The balance (BS) and every other sheet: the template's own formulas; their inputs (cash, investments, capital…) are not kept.
 /// The column „გასული წლის შესაბამისი პერიოდი" stays empty (owner 19.10.2026: the program does not know when the company's records
 /// begin, so a zero there could be "not kept" rather than a real zero).
@@ -36,10 +38,10 @@ public static class FinancialAnnex
     /// <summary>Info's cells filled from the settings and the date.</summary>
     public static class InfoCells { public const string Name = "D6", Period = "D7", Address = "D11", Phone = "D12", Email = "D14"; }
     /// <summary>The balance's insurance lines (formulas from the subforms), for the preview: code, row, and whether the program fills what it sums
-    /// (00070 reinsurance receivables, 00130 and 00270 deferred commission, 00210 other insurance liabilities: not kept — their formula's 0
-    /// is the template's over empty inputs, not a figure of the program).</summary>
+    /// (00070 reinsurance receivables, 00210 other insurance liabilities: not kept — their formula's 0 is the template's over empty inputs, not
+    /// a figure of the program; 00130 and 00270, the deferred commission, come from N1-8, which the profit and loss fills — PR #366).</summary>
     public static readonly IReadOnlyList<(string Code, int Row, bool Filled)> BalanceLines =
-        [("00060", 14, true), ("00070", 15, false), ("00120", 20, true), ("00130", 21, false), ("00200", 30, true), ("00210", 31, false), ("00270", 37, false)];
+        [("00060", 14, true), ("00070", 15, false), ("00120", 20, true), ("00130", 21, true), ("00200", 30, true), ("00210", 31, false), ("00270", 37, true)];
 
     private static string Ddmmyyyy(string iso) => $"{JsSemantics.Slice(iso, 8, 10)}.{JsSemantics.Slice(iso, 5, 7)}.{JsSemantics.Slice(iso, 0, 4)}";
 
@@ -55,11 +57,12 @@ public static class FinancialAnnex
         [("E10", report.Totals.UnearnedGel), ("E11", report.ClaimsTotals.RbnsGel), ("E12", report.ClaimsTotals.IbnrGel), ("E16", report.Totals.CededUnearnedGel), ("E17", report.ClaimsTotals.ReinsurerRbnsGel)];
 
     /// <summary>
-    /// The annex filled for a month: N1-7, N1-4 and Info; nothing else is written. Both reports must be of the same day. The reinsurer's
-    /// commission receivable of that day (tetri) goes to N1-4 00140 when given.
+    /// The annex filled for a month: N1-7, N1-4 and Info, and — given the year's figures — the profit and loss (IncomeStatement); nothing
+    /// else is written. Every report must be of the same day. The reinsurer's commission receivable of that day (tetri) goes to N1-4 00140
+    /// when given.
     /// </summary>
     public static TemplateWorkbook FillFinancialAnnex(byte[] template, PremiumReport report, ImpairmentForN14 impairment, IReadOnlyDictionary<string, string?> settings,
-        decimal? riCommissionTetri = null)
+        decimal? riCommissionTetri = null, IncomeStatementSource? income = null)
     {
         var hash = ReservesPlacement.TemplateHash(template);
         if (hash != N1TemplateSha256) throw new InvalidOperationException($"The financial annex template is not the confirmed one ({hash})");
@@ -84,6 +87,8 @@ public static class FinancialAnnex
             if (!string.IsNullOrEmpty(company)) wb.SetText(sheet, "D1", company, create: true);
             wb.SetText(sheet, "B2", $"{JsSemantics.TrimEnd(wb.TemplateText(sheet, "B2"))} {Ddmmyyyy(report.To)}");
         }
+        // The profit and loss, from the year's start to the same day (old program PR #366).
+        if (income is not null) IncomeStatement.FillIncomeStatement(wb, report, IncomeStatement.BalancesOf(report, impairment), income, company);
         return wb;
     }
 }

@@ -149,6 +149,44 @@ else
     }
     </tbody>
 </table>
+@* Form 1's profit and loss (old program PR #366): IS, IS-COM, N2-6 and N1-8 read back from the same workbook; what no row takes, named. *@
+<h3>@T.IncomeTitle(D(m.Income.From), D(m.Income.To))</h3>
+<p class="note">@T.IncomeCoverage</p>
+@foreach (var (title, sheet, lines) in new[] { (T.IsTitle, IncomeStatement.IsSheet, T.IsLines), (T.ComTitle, IncomeStatement.CommissionSheet, T.ComLines), (T.OtherExpensesTitle, IncomeStatement.OtherExpensesSheet, T.OtherExpensesLines), (T.DeferredTitle, IncomeStatement.DeferredSheet, T.DeferredLines) })
+{
+    <div>
+        <h3>@title</h3>
+        <table style="max-width: 760px">
+            <tbody>
+            @foreach (var (reference, label) in lines)
+            {
+                <tr class="@(m.N1.IsFormula(sheet, reference) ? "total-row" : null)">
+                    <td>@label</td>
+                    <td class="num">@G(m.N1Value(sheet, reference))</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+<p class="note">@T.ClaimCountCheck(m.Claims.Cases, m.Claims.Losses)</p>
+@if (m.IncomeUnplaced.Count > 0)
+{
+    <h3>@T.Unplaced</h3>
+    <p class="note">@T.IncomeUnplacedNote</p>
+    <table style="max-width: 760px">
+        <tbody>
+        @foreach (var u in m.IncomeUnplaced)
+        {
+            <tr>
+                <td>@T.IncomeParts[u.Part]@(u.Code.Length > 0 ? $" — {u.Code}" : "")@(u.Reason is { } reason ? $" ({T.TreatyReasons[reason]})" : "")</td>
+                <td class="num">@(u.Part is "treaty" or "reinsurerPaid" ? "" : u.Count.ToString(System.Globalization.CultureInfo.InvariantCulture))</td>
+                <td class="num">@Insurance.Web.Pages.Accounting.Regulatory.IndexModel.Amount(u.AmountGel)</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
 <h2 class="section">@T.Groups.Statistical</h2>
 <h3>@T.Form6</h3>
 <form class="toolbar">

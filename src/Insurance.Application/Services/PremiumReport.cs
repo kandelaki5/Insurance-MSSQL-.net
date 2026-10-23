@@ -116,11 +116,11 @@ public static partial class PremiumReport
     internal static string Lower(Guid id) => id.ToString("D");
 
     /// <summary>earnedInPeriod's rule exactly: the earned at the period's end less the earned the day before it starts.</summary>
-    private static BigInteger EarnedIn(IEnumerable<ExactPremiumTx> txs, DateOnly from, DateOnly to) =>
+    internal static BigInteger EarnedIn(IEnumerable<ExactPremiumTx> txs, DateOnly from, DateOnly to) =>
         txs.Aggregate(BigInteger.Zero, (sum, tx) => sum + EarnedPremium.EarnedAsOfExact(tx, to) - EarnedPremium.EarnedAsOfExact(tx, from.AddDays(-1)));
 
     /// <summary>premiumPosition's unearned exactly: of every row booked by the day, its amount less what it has earned.</summary>
-    private static BigInteger Unearned(IEnumerable<ExactPremiumTx> txs, DateOnly asOf) =>
+    internal static BigInteger Unearned(IEnumerable<ExactPremiumTx> txs, DateOnly asOf) =>
         txs.Aggregate(BigInteger.Zero, (sum, tx) => asOf < tx.BookedOn ? sum : sum + tx.Minor - EarnedPremium.EarnedAsOfExact(tx, asOf));
 
     /// <summary>

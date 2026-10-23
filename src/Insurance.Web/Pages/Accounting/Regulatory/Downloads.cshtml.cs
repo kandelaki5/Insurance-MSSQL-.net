@@ -16,8 +16,8 @@ public sealed class Form1XlsxModel(Rates rates) : AppPageModel
         var requested = Query("month");
         var month = Insurance.Application.Services.PremiumReport.ReportMonth(requested, Db.Today());
         if (requested != month) return Downloads.Text("Bad month", 400);
-        var (report, impairment, settings, riCommission) = await Db.ReadTxAsync(tx => RegulatoryForms.MonthAsync(tx, rates.LatestRateOnOrBeforeAsync, month));
-        return Downloads.Form(Response, RegulatoryForms.Form1(report, impairment, settings, riCommission), $"financial-annex-n1-{month}.xlsx");
+        var (report, impairment, settings, riCommission, income) = await Db.ReadTxAsync(tx => RegulatoryForms.MonthAsync(tx, rates.LatestRateOnOrBeforeAsync, month));
+        return Downloads.Form(Response, RegulatoryForms.Form1(report, impairment, settings, riCommission, income), $"financial-annex-n1-{month}.xlsx");
     }
 }
 

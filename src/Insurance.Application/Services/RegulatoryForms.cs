@@ -33,21 +33,28 @@ public static class RegulatoryForms
 
     /// <summary>
     /// The month's figures for form 1 and the reserves placement: the month report, then the impairment totals of its last day, then the
-    /// reinsurer's commission receivable of that day (N1-4 00140, PR #362) — the order of the old combined reporting head (#363).
+    /// reinsurer's commission receivable of that day (N1-4 00140, PR #362), then the profit and loss's figures from the year's start to that
+    /// day (PR #366) — the order of the old combined reporting head (#363).
     /// </summary>
-    public static async Task<(PremiumReport.Report Report, ImpairmentReport.ReportExact Impairment, IReadOnlyDictionary<string, string> Settings, BigInteger RiCommission)> MonthAsync(
+    public static async Task<(PremiumReport.Report Report, ImpairmentReport.ReportExact Impairment, IReadOnlyDictionary<string, string> Settings, BigInteger RiCommission,
+        IncomeStatementSource Income)> MonthAsync(
         Tx db, Valuation valuation, string month)
     {
         var report = await PremiumReport.BuildAsync(db, valuation, month);
         var settings = await Settings.LoadSettingsAsync(db);
         var impairment = await ImpairmentReport.BuildTotalsExactAsync(db, valuation, report.To);
         var riCommission = await RiCommissionLedger.ReceivableGelAsync(db, valuation, report.To);
-        return (report, impairment, settings, riCommission);
+        // The profit and loss, from the year's start to the same day (old program PR #366): read last, in the same transaction.
+        var income = await IncomeStatementReader.ReadAsync(db, valuation, report.To);
+        return (report, impairment, settings, riCommission, income);
     }
 
-    /// <summary>The official financial reporting annex N1 ("Form 1") filled with the month's insurance figures (00140 when the receivable is given).</summary>
-    public static TemplateWorkbook Form1(PremiumReport.Report report, ImpairmentReport.ReportExact impairment, IReadOnlyDictionary<string, string> settings, BigInteger? riCommissionTetri = null) =>
-        FinancialAnnex.FillFinancialAnnex(Templates.FinancialAnnexTemplate(), ToForms(report), ToForms(impairment), SettingsOf(settings), riCommissionTetri is { } rc ? (decimal)rc : null);
+    /// <summary>The official financial reporting annex N1 ("Form 1") filled with the month's insurance figures (00140 when the receivable is given,
+    /// and, given the year's figures, its profit and loss).</summary>
+    public static TemplateWorkbook Form1(PremiumReport.Report report, ImpairmentReport.ReportExact impairment, IReadOnlyDictionary<string, string> settings,
+        BigInteger? riCommissionTetri = null, IncomeStatementSource? income = null) =>
+        FinancialAnnex.FillFinancialAnnex(Templates.FinancialAnnexTemplate(), ToForms(report), ToForms(impairment), SettingsOf(settings),
+            riCommissionTetri is { } rc ? (decimal)rc : null, income);
 
     /// <summary>The official reserves placement workbook filled with the month's figures.</summary>
     public static ReservesPlacementResult Reserves(PremiumReport.Report report, IReadOnlyDictionary<string, string> settings) =>

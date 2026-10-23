@@ -29,6 +29,9 @@ public sealed class IndexModel(Rates rates) : AppPageModel
     public IReadOnlyList<Form6Row> Form6 { get; private set; } = [];
     public (List<string> Classes, int Rows) Overflow6 { get; private set; }
     public IReadOnlyList<string> Quarters { get; private set; } = [];
+    public IncomeStatementSource Income { get; private set; } = null!;
+    public IReadOnlyList<UnplacedIncomeRow> IncomeUnplaced { get; private set; } = [];
+    public (int Cases, int Losses) Claims { get; private set; }
 
     /// <summary>An exact decimal text grouped for reading (1234567.5 → 1,234,567.50); more than two places as they are; none — "—".</summary>
     public static string Grouped(string? text)
@@ -63,13 +66,17 @@ public sealed class IndexModel(Rates rates) : AppPageModel
         var asked = Query("quarter");
         Quarter = !string.IsNullOrEmpty(asked) && Insurance.Domain.Regulatory.Form6.QuarterEnd(asked) is not null ? asked : Insurance.Domain.Regulatory.Form6.QuarterOf(Month);
         QuarterDay = Insurance.Domain.Regulatory.Form6.QuarterEnd(Quarter)!;
-        var (report, impairment, settings, riCommission, form6) = await Db.ReadTxAsync(async tx =>
+        var (report, impairment, settings, riCommission, income, form6) = await Db.ReadTxAsync(async tx =>
         {
-            var (r, i, s, rc) = await RegulatoryForms.MonthAsync(tx, rates.LatestRateOnOrBeforeAsync, Month);
-            return (r, i, s, rc, await RegulatoryForms.Form6RowsAsync(tx, QuarterDay));
+            var (r, i, s, rc, inc) = await RegulatoryForms.MonthAsync(tx, rates.LatestRateOnOrBeforeAsync, Month);
+            return (r, i, s, rc, inc, await RegulatoryForms.Form6RowsAsync(tx, QuarterDay));
         });
         Report = report;
-        N1 = RegulatoryForms.Form1(report, impairment, settings, riCommission);
+        N1 = RegulatoryForms.Form1(report, impairment, settings, riCommission, income);
+        // Form 1's profit and loss (old program PR #366): what no row takes, and part III's cases beside the losses they are.
+        Income = income;
+        IncomeUnplaced = IncomeStatement.UnplacedIncome(income);
+        Claims = IncomeStatement.ClaimCounts(income);
         ReceivableGel = report.Receivables.Aggregate(BigInteger.Zero, (s, r) => s + r.OutstandingGel);
         N14Gross = new[] { "E10", "E13", "E16" }.Aggregate(BigInteger.Zero, (s, reference) => s + (TetriOf(N1Value(FinancialAnnex.ReceivablesSheet, reference)) ?? 0));
         var placed = RegulatoryForms.Reserves(report, settings);
