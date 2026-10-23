@@ -115,6 +115,55 @@ public sealed class PremiumReportPageTests
         Assert.Equal("3,598.03", again[0].Rows[0][6]);
     }
 
+    private static string[][] Ri(Table t) => [.. t.Rows.Select(r => new[] { r[0] }.Concat(r[^3..]).ToArray())];
+
+    [Fact]
+    public async Task A_USD_quota_share_shows_the_commission_stored_in_GEL_and_the_reinsurers_UPR_on_the_gross_cession()
+    {
+        // legacy usd-ri-commission-page.test.ts: 1.08 USD at 3.0000 = 3.24 GEL from 01.07.2026, quota 30 % with 20 %; ceded by the writer.
+        await using var site = await ReportSite.CreateAsync();
+        var w = site.World;
+        await w.RateAsync("USD", "2026-07-01", 4m);
+        var p = await w.PolicyAsync("T-USD-1", "2026-07-01", "2027-07-01", [new LineSpec("5.1", 1.08m, 3.24m, 20000m, "USD")], currency: "USD", rate: 3m);
+        await w.TreatyAsync("RI030", "quota_share", "2026-01-01", "2027-12-31", ["5.1"], "USD", cededPercent: 30m, commissionPercent: 20m);
+        await w.CedeAsync(p.IssueRows[0]);
+        var (client, _) = await site.SignedInAsync("accountant");
+        var before = await w.FingerprintAsync();
+        var html = await ReportSite.PageAsync(client, "/accounting/premium-report?month=2026-07");
+        var table = Tables(html)[0];
+        Assert.Equal(new Table(PremiumHeader, [["5.1", Casco, "1", "3.24", "3.24", "0.28", "2.96", "0.97", "0.89", "0.19"], ["სულ", "1", "3.24", "3.24", "0.28", "2.96", "0.97", "0.89", "0.19"]]), table, new TableComparer());
+        Assert.Contains("01.07.2026 – 31.07.2026", html);
+        Assert.Equal(before, await w.FingerprintAsync());
+        Assert.Empty(site.Nbg.Requests);
+    }
+
+    [Fact]
+    public async Task A_late_booked_commission_falls_in_the_month_it_is_booked_with_its_sign_and_earlier_months_stay()
+    {
+        // legacy late-commission-page.test.ts: 1.02 GEL booked 01.04.2026 for a cover from 01.03.2026; the cancellation from 01.07 booked 01.08.
+        await using var site = await ReportSite.CreateAsync();
+        var w = site.World;
+        var p = await w.PolicyAsync("T-LATE-1", "2026-03-01", "2027-03-01", [new LineSpec("5.1", 1.02m, 1.02m)], bookedOn: "2026-04-01");
+        await w.TreatyAsync("RI030", "quota_share", "2026-01-01", "2027-12-31", ["5.1"], cededPercent: 30m, commissionPercent: 20m);
+        await w.CedeAsync(p.IssueRows[0]);
+        var (client, _) = await site.SignedInAsync("accountant");
+        async Task<Table> PageAsync(string month) => Tables(await ReportSite.PageAsync(client, $"/accounting/premium-report?month={month}"))[0];
+        var march = await PageAsync("2026-03");
+        var april = await PageAsync("2026-04");
+        var july = await PageAsync("2026-07");
+        Assert.Equal([[Ka.Common.NoData]], march.Rows);
+        Assert.Equal([["5.1", "0.31", "0.26", "0.06"], ["სულ", "0.31", "0.26", "0.06"]], Ri(april));
+        Assert.Equal([["5.1", "0.00", "0.18", "0.00"], ["სულ", "0.00", "0.18", "0.00"]], Ri(july));
+        var cancel = await w.TxAsync(p.Lines[0], "cancellation", -0.68m, -0.68m, "2026-08-01", "2026-07-01", "2027-03-01", p.IssueRows[0]);
+        await w.WriteAsync(async tx => { await ReinsuranceStore.CedeCancellationAsync(tx, cancel, w.Admin); return 0; });
+        var august = await PageAsync("2026-08");
+        Assert.Equal([["5.1", "-0.21", "0.00", "-0.04"], ["სულ", "-0.21", "0.00", "-0.04"]], Ri(august));
+        Assert.Equal(["-0.68", "-0.09", "0.00"], august.Rows[0][4..7]);
+        Assert.Equal(["0.00", "0.09", "0.59"], july.Rows[0][4..7]);
+        Assert.Equal(april, await PageAsync("2026-04"), new TableComparer());
+        Assert.Equal(july, await PageAsync("2026-07"), new TableComparer());
+    }
+
     private sealed class TableComparer : IEqualityComparer<Table>
     {
         public bool Equals(Table? x, Table? y) => x is not null && y is not null && x.Header.SequenceEqual(y.Header)
