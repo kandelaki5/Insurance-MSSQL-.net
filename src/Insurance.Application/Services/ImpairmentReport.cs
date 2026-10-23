@@ -41,7 +41,7 @@ public static class ImpairmentReport
     private sealed record PolicyDb(Guid Id, string Number, string Currency, DateOnly EffectiveFrom, DateOnly EffectiveTo, DateOnly? CancelledOn,
         string Policyholder, string Segment, string Classes, string? DebtorKinds, string? Intermediaries, string? Insured, string? Beneficiary);
 
-    private sealed record LedgerDb(Guid Id, Guid? CancelsId, Guid? ReceivableId, decimal Amount, DateOnly BookedOn, DateOnly CoverFrom, DateOnly CoverTo);
+    private sealed record LedgerDb(Guid Id, Guid? CancelsId, decimal Amount, DateOnly BookedOn, DateOnly CoverFrom, DateOnly CoverTo, Guid? ReceivableId);
 
     private sealed record Inputs(List<PolicyDb> Policies, List<LedgerDb> Ledger, Dictionary<Guid, decimal> Paid, List<(string Currency, decimal Rate, DateOnly Date)> RateOf);
 
