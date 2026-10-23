@@ -182,9 +182,26 @@ public class CommonParityTests
         return Parity.Diff(c.GetProperty("key").Str(), Convert.ToHexStringLower(key));
     });
 
-    [Fact(DisplayName = "parity: verifyPassword on altered and malformed stored values")]
-    public void VerifyPassword() => Parity.All(Cases("verifyPassword"), c =>
-        Parity.Diff(c.GetProperty("verifies").GetBoolean(), Password.VerifyPassword(c.GetProperty("password").Str(), c.GetProperty("stored").Str())));
+    /// <summary>
+    /// The old verifyPassword let in a damaged stored value: it read the hex up to the first pair that is not hex and took
+    /// the key's length from what was left, so "scrypt$aa$zz" gave an empty key that every password matched, and a cut or
+    /// extended value still verified (Codex R01). The rewrite refuses everything but the exact form the old hashPassword
+    /// wrote; on those the two agree, and the cases where they part are exactly the damaged values the old code let in.
+    /// </summary>
+    [Fact(DisplayName = "parity: verifyPassword on altered values; damaged ones the old code let in are refused (R01)")]
+    public void VerifyPassword()
+    {
+        var wellFormed = new System.Text.RegularExpressions.Regex("^scrypt\\$[0-9a-fA-F]{32}\\$[0-9a-fA-F]{128}$");
+        var cases = Cases("verifyPassword").ToList();
+        Parity.All(cases, c =>
+        {
+            var stored = c.GetProperty("stored").Str();
+            return Parity.Diff(c.GetProperty("verifies").GetBoolean() && wellFormed.IsMatch(stored), Password.VerifyPassword(c.GetProperty("password").Str(), stored));
+        });
+        var refusedHere = cases.Where(c => c.GetProperty("verifies").GetBoolean() && !wellFormed.IsMatch(c.GetProperty("stored").Str()))
+            .Select(c => c.GetProperty("stored").Str()).Select(s => s.Length > 20 ? $"{s[..6]}…{s.Split('$')[1].Length}/{s.Split('$')[2].Length}/{s.Split('$').Length}" : s);
+        Assert.Equal(["scrypt…32/128/4", "scrypt$aa$zz", "scrypt$aa$a", "scrypt…32/127/3", "scrypt…32/126/3", "scrypt…33/128/3"], refusedHere);
+    }
 
     [Fact(DisplayName = "parity: toUpperCase of every code point that changes")]
     public void ToUpperCase() => Parity.All(Cases("toUpperCase"), c =>

@@ -42,4 +42,36 @@ public class PasswordTests
     {
         foreach (var stored in new[] { "", "scrypt", "scrypt$", "scrypt$aa", "scrypt$aa$", "scrypt$$aa", "bcrypt$aa$bb" }) Assert.False(Password.VerifyPassword("x", stored), stored);
     }
+
+    /// <summary>
+    /// Codex R01: the old reading of a damaged hash gave a key of what hex was left, down to none, and an empty key matches
+    /// every password. A damaged stored value — short or garbage hex, an odd digit, a cut or extended key, a salt of the wrong
+    /// length, an extra part — must verify neither its own password nor any other.
+    /// </summary>
+    [Fact(DisplayName = "a damaged scrypt hash verifies no password, not even the one it was made from (R01)")]
+    public void Damaged()
+    {
+        const string password = "Tbilisi-2026!";
+        var good = Password.HashPassword(password);
+        var (salt, key) = (good.Split('$')[1], good.Split('$')[2]);
+        Assert.True(Password.VerifyPassword(password, good));
+        var damaged = new[]
+        {
+            "scrypt$aa$zz", "scrypt$aa$z", "scrypt$xx$zz", "scrypt$zz$ab", "scrypt$aa$a", "scrypt$aa$aa",
+            $"scrypt${salt}$", $"scrypt${salt}$zz", $"scrypt${salt}${key[..^1]}", $"scrypt${salt}${key[..^2]}", $"scrypt${salt}${key}0",
+            $"scrypt${salt}${key}00", $"scrypt${salt}${key[..^2]}zz", $"scrypt${salt}${key[..2]}", $"scrypt${salt}z${key}",
+            $"scrypt${salt[..^2]}${key}", $"scrypt${salt}00${key}", $"scrypt${salt}${key}$extra", $"scrypt${salt}${key}$",
+            $"scrypt$${salt}${key}", $" scrypt${salt}${key}", $"scrypt${salt}${key} ", $"SCRYPT${salt}${key}", $"scrypt${salt}${key[..^1]}g",
+        };
+        foreach (var stored in damaged)
+        {
+            Assert.False(Password.VerifyPassword(password, stored), stored);
+            Assert.False(Password.VerifyPassword("anything", stored), stored);
+            Assert.False(Password.VerifyPassword("", stored), stored);
+        }
+        // Upper-case hex is still hex: the same hash written in capitals verifies its own password and no other.
+        var upper = $"scrypt${salt.ToUpperInvariant()}${key.ToUpperInvariant()}";
+        Assert.True(Password.VerifyPassword(password, upper));
+        Assert.False(Password.VerifyPassword(password + "x", upper));
+    }
 }
