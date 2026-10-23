@@ -153,6 +153,52 @@ public sealed class BrowserFlowTests(BrowserApp app) : IClassFixture<BrowserApp>
         Assert.Contains("800.00", card);
         // The payment released the reserve: nothing is left to pay.
         Assert.Equal(0m, await W.ScalarAsync<decimal>("select sum(change) from core.claim_reserve where claim_id = @claimId", new { claimId }));
+
+        // The payment was a mistake: the accountant reverses it on the card. A mirror row is written (the payment itself is
+        // never changed) and the reserve comes back; the reversed payment offers no second reversal.
+        await accountant.Locator("details summary", new() { HasText = Insurance.Application.Texts.ClaimTexts.Actions.Reverse }).ClickAsync();
+        var reverse = accountant.Locator("form[action*='ReverseClaimPayment']");
+        await SubmitAsync(accountant, reverse.Locator("button.btn"));
+        Assert.Equal(["800.00|payment", "-800.00|reversal"], (await W.QueryAsync<(decimal Amount, string Kind)>(
+            "select amount, kind from core.claim_payment where claim_id = @claimId order by created_at", new { claimId })).Select(r => $"{r.Amount:0.00}|{r.Kind}"));
+        Assert.Equal(800m, await W.ScalarAsync<decimal>("select sum(change) from core.claim_reserve where claim_id = @claimId", new { claimId }));
+        Assert.Equal(0, await accountant.Locator("form[action*='ReverseClaimPayment']").CountAsync());
+    }
+
+    [Fact]
+    public async Task A_change_in_the_originals_open_month_corrects_it_numbered_on_approval_and_the_card_shows_both_premiums()
+    {
+        // The old program's PRs #207/#218/#225/#211 through the screens: a 400.00 policy of this month, a −80.00 change entered on
+        // the change form, approved on the pending list; the original is corrected to 320.00, 4 × 80.00, and keeps its number.
+        var holder = await W.ClientAsync();
+        var first = new DateOnly(Today.Year, Today.Month, 1);
+        var o = await W.PendingPolicyAsync(holder, first, premium: 400m, schedule: [(0, 100m), (31, 100m), (61, 100m), (92, 100m)]);
+        Assert.Equal("done", (await Insurance.Application.Services.PolicyActions.ApprovePolicyAsync(W.App, await W.UserAsync("operations_head"), o.Id.ToString())).Outcome);
+
+        var sales = await app.SignedInPageAsync("sales");
+        await sales.GotoAsync(app.BaseUrl + $"/policies/{o.Id}/endorse");
+        await TypeDateAsync(sales, "change_on", Today);
+        await sales.FillAsync("#reason", "შემცირება ბრაუზერიდან");
+        await sales.CheckAsync("input[name=cov_damage_on]");
+        await sales.FillAsync("input[name=cov_damage_delta]", "-80");
+        await SubmitAsync(sales, sales.Locator("main form[method=post] button.btn").Last);
+        await AtAsync(sales, "/policies/[0-9a-f-]{36}\\?issued=1$");
+        Assert.Contains($"{o.Number}/მოთხოვნა-1", await sales.InnerTextAsync("main"));
+
+        var head = await app.SignedInPageAsync("operations_head");
+        await head.GotoAsync(app.BaseUrl + "/policies/pending");
+        await SubmitAsync(head, head.Locator("tr", new() { HasText = $"{o.Number}/მოთხოვნა-1" }).Locator("button.btn"));
+        Assert.Contains($"{o.Number}/შესწორება-1", await head.InnerTextAsync("main"));
+        Assert.Equal("80.00/80.00/80.00/80.00", await W.ScheduleTextAsync(o.Id));
+
+        await head.GotoAsync(app.BaseUrl + $"/policies/{o.Id}");
+        var coverage = head.Locator("table", new() { HasText = Insurance.Application.Texts.PolicyTexts.CoverageColumns.CurrentPremium }).Locator("tbody tr").First;
+        var cells = await coverage.Locator("td").AllInnerTextsAsync();
+        Assert.Equal(["400.00", "400.00", "320.00"], cells.TakeLast(3));
+        await head.GotoAsync(app.BaseUrl + $"/policies?q={Uri.EscapeDataString(o.Number)}");
+        var listed = await head.InnerTextAsync("main");
+        Assert.Contains("320.00 GEL", listed);
+        Assert.DoesNotContain($"{o.Number}/შესწორება-1", listed);
     }
 
     [Fact]
