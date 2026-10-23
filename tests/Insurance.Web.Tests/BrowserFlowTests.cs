@@ -41,10 +41,14 @@ public sealed class BrowserFlowTests(BrowserApp app) : IClassFixture<BrowserApp>
 
     /// <summary>
     /// The workspace's own screens (the home page and the policies list, Codex's Angular shell) read their rows from the page's JSON
-    /// handler after the page has loaded; their loading note is gone once the rows are drawn.
+    /// handler after the page has loaded. The list counts as drawn when the row of the policy looked for is there and the loading note is
+    /// gone — the note alone is also absent before Angular has started (Codex R004-02).
     /// </summary>
-    private static async Task LoadedAsync(IPage page) =>
+    private static async Task LoadedAsync(IPage page, string number)
+    {
+        await page.Locator("main tr", new() { HasText = number }).First.WaitForAsync();
         await page.WaitForFunctionAsync("() => !document.querySelector('main [role=status]')?.textContent?.includes('იტვირთება')");
+    }
 
     private static string NewTaxId() => "0" + Random.Shared.NextInt64(1_000_000_000L, 9_999_999_999L).ToString(System.Globalization.CultureInfo.InvariantCulture);
 
@@ -205,7 +209,7 @@ public sealed class BrowserFlowTests(BrowserApp app) : IClassFixture<BrowserApp>
         // The list's rows come late on purpose (as on a slow server, CI run 40014359740): the test reads them once drawn.
         await head.RouteAsync("**/policies?*handler=Data*", async route => { await Task.Delay(1500); await route.ContinueAsync(); });
         await head.GotoAsync(app.BaseUrl + $"/policies?q={Uri.EscapeDataString(o.Number)}");
-        await LoadedAsync(head);
+        await LoadedAsync(head, o.Number);
         var listed = await head.InnerTextAsync("main");
         Assert.Contains("320.00 GEL", listed);
         Assert.DoesNotContain($"{o.Number}/შესწორება-1", listed);
@@ -219,7 +223,7 @@ public sealed class BrowserFlowTests(BrowserApp app) : IClassFixture<BrowserApp>
         var viewer = await app.SignedInPageAsync("viewer");
 
         await viewer.GotoAsync(app.BaseUrl + "/policies");
-        await LoadedAsync(viewer);
+        await LoadedAsync(viewer, policy.Number);
         Assert.Contains(policy.Number, await viewer.InnerTextAsync("main"));
         Assert.Equal(0, await viewer.Locator("main a[href='/policies/new']").CountAsync());
         await viewer.GotoAsync(app.BaseUrl + $"/policies/{policy.Id}");

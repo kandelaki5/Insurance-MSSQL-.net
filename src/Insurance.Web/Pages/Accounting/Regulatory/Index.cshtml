@@ -140,11 +140,11 @@ else
 <h3>@T.Balance</h3>
 <table style="max-width: 760px">
     <tbody>
-    @foreach (var (code, row, kept) in FinancialAnnex.BalanceLines)
+    @foreach (var (code, row, coverage) in FinancialAnnex.BalanceLines)
     {
         <tr>
-            <td>@code @T.BalanceLines[code]@(kept ? "" : $" — {T.NotKept}")</td>
-            <td class="num">@(kept ? G(m.N1Value(FinancialAnnex.BalanceSheet, $"E{row}")) : T.Empty)</td>
+            <td>@code @T.BalanceLines[code]@(coverage switch { FinancialAnnex.BalanceCoverage.Partly => $" — {T.PartlyKept}", FinancialAnnex.BalanceCoverage.NotKept => $" — {T.NotKept}", _ => "" })</td>
+            <td class="num">@(coverage == FinancialAnnex.BalanceCoverage.NotKept ? T.Empty : G(m.N1Value(FinancialAnnex.BalanceSheet, $"E{row}")))</td>
         </tr>
     }
     </tbody>

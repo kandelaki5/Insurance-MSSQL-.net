@@ -2,7 +2,9 @@ using System.Net;
 using Dapper;
 using Insurance.Application.Services;
 using Insurance.Application.Texts;
+using Insurance.Domain.Regulatory;
 using Insurance.Integration.Tests;
+using RegulatoryTexts = Insurance.Application.Texts.RegulatoryTexts;
 
 namespace Insurance.Web.Tests.Reports;
 
@@ -162,5 +164,43 @@ public sealed class RiCommissionPageTests
         // October: before the cancellation, 945.53; nothing accrued yet in September: 0.
         Assert.Equal([RegulatoryTexts.N14Lines["E26"], "945.53"], ReportSite.Cells(ReportSite.Decode(await ReportSite.PageAsync(client, "/accounting/regulatory?month=2026-10")), RegulatoryTexts.N14Lines["E26"]));
         Assert.Equal([RegulatoryTexts.N14Lines["E26"], "0.00"], ReportSite.Cells(ReportSite.Decode(await ReportSite.PageAsync(client, "/accounting/regulatory?month=2026-09")), RegulatoryTexts.N14Lines["E26"]));
+    }
+    /// <summary>
+    /// Codex R004-01 (INS-DOTNET-MSSQL-004): the balance's 00070, reinsurance receivables, sums N1-4 00140 among its inputs, so the preview
+    /// shows the figure the file carries, marked as holding only the reinsurer's commission — never "not kept" with the figure hidden.
+    /// The subform, the balance on the page and the balance in the file agree at the start, after a partial settlement and after its reversal.
+    /// </summary>
+    [Fact]
+    public async Task Balance_00070_shows_the_commission_receivable_as_the_file_does_partly_kept_before_and_after_a_partial_settlement_and_its_reversal()
+    {
+        var (site, ri) = await SiteAsync();
+        await using var _s = site;
+        var (client, accountant) = await site.SignedInAsync("accountant");
+        static decimal Number(Value v) => decimal.Parse(ReservesPlacement.Shown(v)!, System.Globalization.CultureInfo.InvariantCulture);
+        var balanceLabel = $"00070 {RegulatoryTexts.BalanceLines["00070"]} — {RegulatoryTexts.PartlyKept}";
+        async Task<(string N14, string Balance, decimal FileN14, decimal FileBalance)> FiguresAsync()
+        {
+            var html = ReportSite.Decode(await ReportSite.PageAsync(client, "/accounting/regulatory?month=2026-12"));
+            var file = await client.GetAsync("/accounting/regulatory/form1/xlsx?month=2026-12");
+            Assert.Equal(HttpStatusCode.OK, file.StatusCode);
+            var wb = TemplateWorkbook.Open(await file.Content.ReadAsByteArrayAsync());
+            return (ReportSite.Cells(html, RegulatoryTexts.N14Lines["E26"])[^1], ReportSite.Cells(html, balanceLabel)[^1],
+                Number(wb.ValueOf(FinancialAnnex.ReceivablesSheet, FinancialAnnex.N14RiCommission)), Number(wb.ValueOf(FinancialAnnex.BalanceSheet, "E15")));
+        }
+        // At the start: 300.00 USD at 2.7015 = 810.45 everywhere.
+        Assert.Equal(("810.45", "810.45", 810.45m, 810.45m), await FiguresAsync());
+        // A partial settlement of 100.00 USD: 200.00 USD left, 540.30.
+        var me = new CurrentUser(accountant, "a", "a", "accountant", "accountant");
+        Assert.Equal("ok", (await RiCommissionLedger.RecordAsync(site.World.App, me, Uuid.Text(ri.Front), "2026-12-01", "offset", "USD", "100.00", null, null)).Outcome);
+        Assert.Equal(("540.30", "540.30", 540.30m, 540.30m), await FiguresAsync());
+        // Its reversal: back to 810.45.
+        Guid settlement;
+        await using (var c = await site.World.Database.OpenAdminAsync())
+            settlement = await c.ExecuteScalarAsync<Guid>("select id from core.ri_commission_settlement");
+        Assert.Equal("reversed", (await RiCommissionLedger.ReverseAsync(site.World.App, me, Uuid.Text(settlement), "2026-12-05")).Outcome);
+        Assert.Equal(("810.45", "810.45", 810.45m, 810.45m), await FiguresAsync());
+        // 00210 stays not kept, its figure not shown.
+        var page = ReportSite.Decode(await ReportSite.PageAsync(client, "/accounting/regulatory?month=2026-12"));
+        Assert.Equal(RegulatoryTexts.Empty, ReportSite.Cells(page, $"00210 {RegulatoryTexts.BalanceLines["00210"]} — {RegulatoryTexts.NotKept}")[^1]);
     }
 }

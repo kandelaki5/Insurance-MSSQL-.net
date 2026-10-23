@@ -1080,6 +1080,13 @@
     ]
    ],
    "origin": "Insurance-Software PR #366 head d251848 (form 1 profit and loss; owner 20.10.2026 and 21.10.2026, docs/05 ბ6)"
+  },
+  {
+   "kind": "text",
+   "ts": "(rewrite) regulatory balance: a line partly kept (00070)",
+   "cs": "RegulatoryTexts.PartlyKept",
+   "value": "ნაწილობრივ: აქ მხოლოდ გადამზღვევლის საკომისიოს მოთხოვნაა (N1-4 00140); გადაზღვევის სხვა მოთხოვნები პროგრამაში არ აღირიცხება",
+   "origin": "rewrite, Codex R004-01 (INS-DOTNET-MSSQL-004, 24.10.2026): balance 00070 shown with what it holds; wording proposed by Claude, not approved by the owner"
   }
  ]
 }

@@ -90,6 +90,10 @@ public static class RegulatoryTexts
         ("00270", "გადავადებული საკომისიო შემოსავალი"));
 
     public const string NotKept = "პროგრამაში არ აღირიცხება (Excel-ში შაბლონის ფორმულა ცარიელი უჯრებიდან 0-ს აჩვენებს)";
+
+    // Codex R004-01 (24.10.2026): balance 00070 holds the reinsurer's commission receivable only. Wording proposed by Claude, not approved
+    // by the owner (tests/parity/cases/common-texts-after-baseline.json).
+    public const string PartlyKept = "ნაწილობრივ: აქ მხოლოდ გადამზღვევლის საკომისიოს მოთხოვნაა (N1-4 00140); გადაზღვევის სხვა მოთხოვნები პროგრამაში არ აღირიცხება";
     public const string ReceivableControl = "შედარება: N1-4-ის მოთხოვნები ბრუტო (პირდაპირი + ბროკერი + აგენტი) და თვის ანგარიშის დავალიანება ლარში";
     public const string Form11 = "ფორმა 11. სადაზღვევო რეზერვები";
     public const string Form12 = "ფორმა 12. ინვესტირებას დაქვემდებარებული რეზერვები (შაბლონის ფორმულებით)";

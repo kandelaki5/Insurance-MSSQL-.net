@@ -37,11 +37,28 @@ public static class FinancialAnnex
     public static readonly IReadOnlyList<string> HeaderSheets = [BalanceSheet, ReceivablesSheet, ReservesSheet];
     /// <summary>Info's cells filled from the settings and the date.</summary>
     public static class InfoCells { public const string Name = "D6", Period = "D7", Address = "D11", Phone = "D12", Email = "D14"; }
-    /// <summary>The balance's insurance lines (formulas from the subforms), for the preview: code, row, and whether the program fills what it sums
-    /// (00070 reinsurance receivables, 00210 other insurance liabilities: not kept — their formula's 0 is the template's over empty inputs, not
-    /// a figure of the program; 00130 and 00270, the deferred commission, come from N1-8, which the profit and loss fills — PR #366).</summary>
-    public static readonly IReadOnlyList<(string Code, int Row, bool Filled)> BalanceLines =
-        [("00060", 14, true), ("00070", 15, false), ("00120", 20, true), ("00130", 21, true), ("00200", 30, true), ("00210", 31, false), ("00270", 37, true)];
+    /// <summary>How much of what a balance line sums the program fills.</summary>
+    public enum BalanceCoverage
+    {
+        /// <summary>Every input the line sums is the program's.</summary>
+        Kept,
+        /// <summary>Some of its inputs are the program's, the others are left empty: the figure is shown, with what it does not hold.</summary>
+        Partly,
+        /// <summary>None: the formula's 0 is the template's over empty inputs, not a figure of the program.</summary>
+        NotKept,
+    }
+
+    /// <summary>
+    /// The balance's insurance lines (formulas from the subforms), for the preview: code, row and coverage. 00070, reinsurance receivables,
+    /// is partly kept: of N1-4's reinsurance receivables the program fills only 00140, the reinsurer's commission receivable (PR #362; Codex
+    /// R004-01: the figure was hidden though the file carried it). 00210, other insurance liabilities, is not kept. 00130 and 00270, the
+    /// deferred commission, come from N1-8, which the profit and loss fills (PR #366).
+    /// </summary>
+    public static readonly IReadOnlyList<(string Code, int Row, BalanceCoverage Coverage)> BalanceLines =
+    [
+        ("00060", 14, BalanceCoverage.Kept), ("00070", 15, BalanceCoverage.Partly), ("00120", 20, BalanceCoverage.Kept), ("00130", 21, BalanceCoverage.Kept),
+        ("00200", 30, BalanceCoverage.Kept), ("00210", 31, BalanceCoverage.NotKept), ("00270", 37, BalanceCoverage.Kept),
+    ];
 
     private static string Ddmmyyyy(string iso) => $"{JsSemantics.Slice(iso, 8, 10)}.{JsSemantics.Slice(iso, 5, 7)}.{JsSemantics.Slice(iso, 0, 4)}";
 
