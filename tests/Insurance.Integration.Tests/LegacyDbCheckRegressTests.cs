@@ -633,6 +633,14 @@ public sealed class LegacyDbCheckRegressTests(TestDatabase db) : IClassFixture<T
         var d20 = (await SubrogationReportStore.CaseCardAsync(w.App, f.D20, today, today))!;
         Assert.Equal(CaseStatus.PartiallyReceived, d20.Header.StatusNow);
         Assert.Equal([MovementKind.Confirmed, MovementKind.Received, MovementKind.Received, MovementKind.Reversal], d20.History.Select(h => h.Kind));
+        // H87: the history is shown by day, not in the order written.
+        var claimH = await ClaimAsync(r, "damage");
+        await PayAsync(r, claimH, r.D(7, 1), 1000m);
+        var (h87, _) = await OpenedAsync(r, claimH, r.D(7, 1));
+        Assert.True((await MoveAsync(r, h87, DocumentedMovement.Claimed, 100m, r.D(7, 20))).Ok);
+        Assert.True((await MoveAsync(r, h87, DocumentedMovement.Claimed, 50m, r.D(7, 5))).Ok);
+        Assert.Equal([r.D(7, 20), r.D(7, 5)], await w.RowsAsync<DateOnly>("select booked_on from core.subrogation_movement where case_id = @h87 order by created_at", new { h87 }));
+        Assert.Equal([r.D(7, 5), r.D(7, 20)], (await SubrogationReportStore.CaseCardAsync(w.App, h87, today, today))!.History.Select(x => x.BookedOn));
     }
 
     [Fact]
