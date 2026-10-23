@@ -1,5 +1,7 @@
 import { Component, input } from '@angular/core';
 const paths: Record<string, string> = {
+  moon: 'M20.9 13a9 9 0 0 1-9.9-9.9A9 9 0 1 0 20.9 13Z',
+  sun: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M12 2v2 M12 20v2 M2 12h2 M20 12h2 M4.9 4.9l1.4 1.4 M17.7 17.7l1.4 1.4 M4.9 19.1l1.4-1.4 M17.7 6.3l1.4-1.4',
   logout: 'M9 5H3v14h6 M14 8l4 4-4 4 M7 12h11',
   file: 'M14 2H5v20h14V7z M14 2v5h5 M7 12h8 M7 16h8',
   settings:

@@ -1,6 +1,7 @@
-import { Component, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { Icon } from './icon';
+import { ThemeService } from './theme';
 @Component({
   selector: 'app-root',
   imports: [RouterOutlet, Icon],
@@ -62,6 +63,17 @@ import { Icon } from './icon';
           ><strong>{{ title }}</strong>
         </div>
         <div class="topbar-right">
+          <button
+            type="button"
+            class="theme-toggle"
+            [attr.aria-label]="theme.dark() ? 'ღია თემაზე გადასვლა' : 'მუქ თემაზე გადასვლა'"
+            [attr.title]="theme.dark() ? 'ღია თემაზე გადასვლა' : 'მუქ თემაზე გადასვლა'"
+            [attr.aria-pressed]="theme.dark()"
+            (click)="theme.toggle()"
+          >
+            <ui-icon [name]="theme.dark() ? 'sun' : 'moon'" />
+            <span>{{ theme.dark() ? 'ღია თემა' : 'მუქი თემა' }}</span>
+          </button>
           <span class="demo-pill"><span></span>დემოს სამუშაო სივრცე</span
           ><span class="top-date">{{ today }}</span
           ><span class="avatar small-avatar">{{ initials }}</span>
@@ -74,6 +86,7 @@ import { Icon } from './icon';
     </div>`,
 })
 export class App {
+  readonly theme = inject(ThemeService);
   readonly menuOpen = signal(false);
   private root = document.querySelector('app-root')!;
   readonly fullName = this.root.getAttribute('data-full-name') ?? 'მომხმარებელი';

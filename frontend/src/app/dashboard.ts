@@ -257,7 +257,11 @@ export class Dashboard {
   }
   donut() {
     return (
-      'conic-gradient(#8970df 0% ' + this.percent() + '%, #eeeaf8 ' + this.percent() + '% 100%)'
+      'conic-gradient(var(--chart-paid) 0% ' +
+      this.percent() +
+      '%, var(--chart-track) ' +
+      this.percent() +
+      '% 100%)'
     );
   }
 }
