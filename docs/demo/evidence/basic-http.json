@@ -1,0 +1,72 @@
+{
+  "LoginStatus": 200,
+  "LoginFormPresent": true,
+  "Title": "სისტემაში შესვლა — სადაზღვევო სისტემა",
+  "SignInStatus": 302,
+  "RedirectLocation": "/",
+  "SessionCreated": true,
+  "ReturnedToLogin": false,
+  "Pages": [
+    {
+      "Path": "/parties",
+      "FinalPath": "/parties",
+      "Status": 200
+    },
+    {
+      "Path": "/policies",
+      "FinalPath": "/policies",
+      "Status": 200
+    },
+    {
+      "Path": "/payments/overdue",
+      "FinalPath": "/payments/overdue",
+      "Status": 200
+    },
+    {
+      "Path": "/claims",
+      "FinalPath": "/claims",
+      "Status": 200
+    },
+    {
+      "Path": "/accounting/premium-report",
+      "FinalPath": "/accounting/premium-report",
+      "Status": 200
+    },
+    {
+      "Path": "/accounting/regulatory",
+      "FinalPath": "/accounting/regulatory",
+      "Status": 200
+    }
+  ],
+  "HomeStatus": 200,
+  "HomeTitle": "მთავარი — სადაზღვევო სისტემა",
+  "SessionCookieSecure": true,
+  "DemoContentChecks": [
+    {
+      "Path": "/parties",
+      "ExpectedDemoRecordVisible": true,
+      "Status": 200
+    },
+    {
+      "Path": "/policies",
+      "ExpectedDemoRecordVisible": true,
+      "Status": 200
+    },
+    {
+      "Path": "/policies/pending",
+      "ExpectedDemoRecordVisible": true,
+      "Status": 200
+    },
+    {
+      "Path": "/claims",
+      "ExpectedDemoRecordVisible": true,
+      "Status": 200
+    },
+    {
+      "Path": "/payments/overdue",
+      "ExpectedDemoRecordVisible": true,
+      "Status": 200
+    }
+  ],
+  "OctoberReportStatus": 200
+}
