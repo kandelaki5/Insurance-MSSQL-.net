@@ -25,9 +25,11 @@ public static class Form6SourceReader
             """)).ToList();
         // The classes of the policy lines placed with a treaty by the day (a facultative placement lists no class of its own).
         var placedClasses = (await db.QueryAsync<Form6TreatyClass>($"""
-            select distinct {U("c.treaty_id")} as TreatyId, l.class_code as ClassCode
-            from core.premium_cession c join core.premium_transaction t on t.id = c.premium_transaction_id join core.policy_line l on l.id = t.policy_line_id
-            where c.booked_on <= @asOf
+            select TreatyId, ClassCode from (
+              select distinct {U("c.treaty_id")} as TreatyId, l.class_code as ClassCode
+              from core.premium_cession c join core.premium_transaction t on t.id = c.premium_transaction_id join core.policy_line l on l.id = t.policy_line_id
+              where c.booked_on <= @asOf
+            ) placed
             order by TreatyId collate Latin1_General_BIN2, ClassCode
             """, new { asOf })).ToList();
         var classes = (await db.QueryAsync<Form6Class>("select code as Code, name_ka as NameKa, sort_order as SortOrder from core.insurance_class order by sort_order")).ToList();

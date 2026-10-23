@@ -14,7 +14,7 @@ namespace Insurance.Integration.Tests.Reports;
 /// fictional world's rows — the same ones the old code read from its own PostgreSQL schema — are inserted into a fresh SQL Server
 /// database in the order they were made, and every report the old code gave over them (the monthly premium report for 13 months,
 /// the impairment report and its exact N1-4 totals on six dates, the premium report by policy for six periods, the bordereau of
-/// each of five treaties for five periods) must come out of the new code with the same figures: every field the old report has,
+/// each of five treaties for five periods, form 6's rows on five quarter days) must come out of the new code with the same figures: every field the old report has,
 /// money to the tetri, rates and shares to their last digit, texts and dates as written. The National Bank is refused on both sides.
 /// </summary>
 public sealed class ReportParityTests
@@ -140,12 +140,13 @@ public sealed class ReportParityTests
                 "impairmentExact" => await w.App.ReadTxAsync(tx => ImpairmentReport.BuildTotalsExactAsync(tx, rates, D(args[0]))),
                 "policyPremium" => await w.App.ReadTxAsync(tx => PolicyPremiumReport.BuildAsync(tx, D(args[0]), D(args[1]))),
                 "bordereau" => await w.App.ReadTxAsync(tx => Bordereau.BuildAsync(tx, rates, Guid.Parse(args[0]), D(args[1]), D(args[2]))),
+                "form6" => await w.App.ReadTxAsync(tx => RegulatoryForms.Form6RowsAsync(tx, args[0])),
                 _ => throw new InvalidOperationException(fn),
             };
             Compare(call["result"], Canonical(report), $"{fn}({string.Join(", ", args)})", differences);
             count++;
         }
-        Assert.Equal(56, count);
+        Assert.Equal(61, count);
         Assert.True(differences.Count == 0, string.Join(" || ", differences));
         Assert.All(nbg.Requests, r => Assert.Contains("nbg.gov.ge", r));
     }

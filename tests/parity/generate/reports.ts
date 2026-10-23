@@ -1,6 +1,6 @@
 // Parity cases for the reports of slice S3: the old program's own report functions (src/lib/premium-report.ts buildPremiumReport,
 // impairment-report.ts buildImpairmentReport / buildImpairmentTotalsExact, policy-premium-report.ts buildPolicyPremiumReport and
-// bordereau.ts buildBordereau) run over fixed fictional worlds in a real PostgreSQL database with the old schema (its own
+// bordereau.ts buildBordereau, regulatory/form6-source.ts readForm6Source → form6Rows) run over fixed fictional worlds in a real PostgreSQL database with the old schema (its own
 // migrations, its own triggers), through its own db.ts. Each world is a set of raw table rows made by a seeded PRNG: GEL, USD and
 // EUR policies of several classes, cancellations and changes, instalments owed by clients, brokers and agents, receipts, late
 // allocations and reversals, cessions to quota, surplus, excess-of-loss and facultative treaties, claims with reserves, payments,
@@ -54,6 +54,9 @@ const { buildPremiumReport } = await legacy('src/lib/premium-report.ts');
 const { buildImpairmentReport, buildImpairmentTotalsExact } = await legacy('src/lib/impairment-report.ts');
 const { buildPolicyPremiumReport } = await legacy('src/lib/policy-premium-report.ts');
 const { buildBordereau } = await legacy('src/lib/bordereau.ts');
+const { readForm6Source } = await legacy('src/lib/regulatory/form6-source.ts');
+const { form6Rows } = await legacy('src/lib/regulatory/form6.ts');
+const { reinsuranceTexts } = await legacy('src/i18n/reinsurance.ts');
 
 // ---------------------------------------------------------------- a seeded world
 function prng(seed: number) {
@@ -138,7 +141,7 @@ function world(seed: number) {
     for (const c of classes) add('ri_treaty_class', { treaty_id: id, class_code: c });
     return id;
   };
-  const tQuota = treaty('RQ-1', 'quota_share', 'GEL', ['5.1'], { ceded_percent: '30.0000', commission_percent: '20.00', broker_percent: '2.50', broker_party_id: brokerParty });
+  const tQuota = treaty('RQ-1', 'quota_share', 'GEL', ['5.1'], { ceded_percent: '30.0000', commission_percent: '20.00', broker_percent: '2.50', broker_party_id: brokerParty, reinsurer_rating: 'A+', rating_agency: 'S&P' });
   const tUsd = treaty('RQ-2', 'quota_share', 'USD', ['6.1', '13'], { ceded_percent: '25.0000', commission_percent: '15.00' });
   const tSurplus = treaty('RS-1', 'surplus', 'GEL', ['9.1'], { retention: '50000.00', lines: 3, commission_percent: '12.50' });
   const tXl = treaty('RX-1', 'excess_of_loss', 'USD', ['5.1'], { priority: '1000.00', treaty_limit: '5000.00', treaty_premium: `${r.int(800, 2400)}.${String(r.int(0, 99)).padStart(2, '0')}` });
@@ -377,6 +380,8 @@ for (const seed of [20261023, 20261024, 20261025]) {
   for (const id of Object.values(treaties))
     for (const [from, to] of [['2026-01-01', '2026-03-31'], ['2026-04-01', '2026-06-30'], ['2026-07-01', '2026-09-30'], ['2026-10-01', '2026-12-31'], ['2026-01-01', '2026-12-31']])
       calls.push({ fn: 'bordereau', args: [id, from, to], result: json(await buildBordereau(id, from, to)) });
+  for (const d of ['2026-03-31', '2026-06-30', '2026-09-30', '2026-12-31', '2027-12-31'])
+    calls.push({ fn: 'form6', args: [d], result: json(form6Rows(await readForm6Source(d), d, reinsuranceTexts.kinds)) });
   await current.end();
   await server.unsafe(`drop database if exists ${name} with (force)`);
   cases.push({ seed, rows: ordered.map(({ table, row }) => ({ t: table, r: row })), calls });
