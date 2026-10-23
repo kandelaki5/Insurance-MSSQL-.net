@@ -37,8 +37,9 @@ public sealed class BrowserFoundationTests(BrowserApp app) : IClassFixture<Brows
         await typed.FillAsync("");
         await typed.PressSequentiallyAsync("14102026");
         await page.ClickAsync("button.theme-toggle");
+        // Angular redraws the button after the click: wait for its state rather than read it at once (CI run 40030076010).
+        await Assertions.Expect(page.Locator("button.theme-toggle")).ToHaveAttributeAsync("aria-pressed", "true");
         Assert.Equal("dark", await page.EvaluateAsync<string>("() => document.documentElement.dataset.theme"));
-        Assert.Equal("true", await page.GetAttributeAsync("button.theme-toggle", "aria-pressed"));
         Assert.Equal("14/10/2026", await typed.InputValueAsync());
         Assert.EndsWith("/reference/rates", page.Url);
         await page.ReloadAsync();
@@ -47,6 +48,7 @@ public sealed class BrowserFoundationTests(BrowserApp app) : IClassFixture<Brows
         await page.WaitForURLAsync(app.BaseUrl + "/reference/classes");
         Assert.Equal("dark", await page.EvaluateAsync<string>("() => document.documentElement.dataset.theme"));
         await page.ClickAsync("button.theme-toggle");
+        await Assertions.Expect(page.Locator("button.theme-toggle")).ToHaveAttributeAsync("aria-pressed", "false");
         Assert.Equal("light", await page.EvaluateAsync<string>("() => localStorage.getItem('aguli-color-theme')"));
     }
 

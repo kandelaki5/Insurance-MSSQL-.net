@@ -166,8 +166,9 @@ public sealed class PermissionStorageTests(TestDatabase db) : IClassFixture<Test
         // The admin's own decision the same way, beside another user's.
         await Decide(w.Beka, "allow");
         Assert.True((await AsAdmin(w, tx => PermissionStore.SetUserDecisionAsync(tx, w.Admin, Key, "deny"))).Changed);
-        Assert.Equal([(w.Beka, "allow"), (w.Admin, "deny")], (await c.QueryAsync<(Guid, string)>(
-            "select user_id, decision from core.user_permission where user_id in (@beka, @admin) order by created_at", new { beka = w.Beka, admin = w.Admin })).ToList());
+        // Both decisions, whatever their order: two rows written at once can share their created_at on a coarse clock (CI).
+        Assert.Equal(new[] { (w.Beka, "allow"), (w.Admin, "deny") }.OrderBy(r => r.Item2, StringComparer.Ordinal), (await c.QueryAsync<(Guid, string)>(
+            "select user_id, decision from core.user_permission where user_id in (@beka, @admin)", new { beka = w.Beka, admin = w.Admin })).OrderBy(r => r.Item2, StringComparer.Ordinal));
     }
 
     [Fact]
