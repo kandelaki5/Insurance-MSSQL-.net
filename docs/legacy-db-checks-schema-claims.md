@@ -250,6 +250,24 @@ Table rows (a row may group several cases of one kind, as listed in it); the hel
 | NOT TESTED | 3 |
 | OTHER GROUP | 10 |
 
+## OTHER GROUP rows after the merge of all groups
+
+The ten OTHER GROUP rows above are proved by the other areas' tests (all on real SQL Server):
+
+| Row | Test | Verdict |
+|---|---|---|
+| issuePolicy 20 at once, own policy and contract numbers | Policies.LegacyIssueConcurrencyTests.Twenty_issues_at_once_get_twenty_policy_and_contract_numbers_each_policy_on_its_own_contract | PASS |
+| issuePolicy refuses a sanctions-blocked client (AG-P6) | Policies.LegacyIssueConcurrencyTests.A_sanctions_blocked_client_is_refused_by_its_own_rows_while_another_clients_policy_is_issued_at_the_same_moment | PASS |
+| issuePolicy with the contract series run out | Policies.IssueSeriesExhaustedTests.An_exhausted_contract_series_writes_nothing | PASS |
+| confirmImport with the policy series run out; first gets the last number, second refused | Policies.ImportEndorseSeriesExhaustedTests.ConfirmImport_with_the_policy_series_run_out_writes_no_contract_and_moves_no_counter, …ConfirmImport_of_two_policies_with_one_number_left_rolls_the_first_policy_and_the_contract_back | PASS |
+| endorsePolicy with the policy series run out | Policies.ImportEndorseSeriesExhaustedTests.EndorsePolicy_with_the_policy_series_run_out_issues_no_change_and_moves_no_counter (negative control: the same change is issued once numbers are left) | PASS |
+| registerComplaint / registerCase with their series run out | Web: IntermediaryComplaintTests.A_run_out_complaint_series_says_so_and_writes_nothing, AmlTests.A_run_out_case_series_says_so_and_writes_nothing | PASS |
+| createTreaty with its series run out | reinsurance slice (see MIGRATION-COVERAGE.md) | see coverage |
+| H04 negative control / H04 (two receipts on one policy) | Policies.PaymentConcurrencyTests.Two_receipts_on_one_policy_settle_it_once, …Negative_control_without_the_policy_lock_two_receipts_settle_one_instalment_twice | PASS |
+| H11 negative control / H11 | AmlSuspensionAcceptanceTests.H11_a_suspension_waits_for_a_receipt_in_flight_and_the_next_receipt_is_refused, …H11_negative_control_with_the_check_outside_the_transaction_a_receipt_commits_after_the_suspension | PASS |
+| oral instruction 24 h without the letter; late letter; officer resumes | AmlSuspensionAcceptanceTests.An_oral_instruction_without_the_letter_stays_in_force_after_24_hours_until_the_officer_lifts_it | PASS |
+| H13 negative control / H13 | AmlSuspensionAcceptanceTests.H13_a_suspension_of_one_policy_against_a_receipt_on_it_does_not_deadlock_and_no_receipt_slips_past_it (the legacy order: the receipt commits first); the PostgreSQL deadlock of the old lock order has no SQL Server counterpart (see the claim-target row above) | PASS |
+
 ## Defects found and fixed (each test fails on the code before the fix)
 
 1. **core.next_number moved an exhausted series' counter when called outside a transaction** (`database/migrations/0001_foundation.sql`).
