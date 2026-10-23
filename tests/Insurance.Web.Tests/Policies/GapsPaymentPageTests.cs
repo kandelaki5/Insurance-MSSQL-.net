@@ -305,3 +305,58 @@ public sealed partial class GapsPaymentPageTests(PolicyWebApp app) : IClassFixtu
         Assert.Equal(ledger, await Gaps.LedgerAsync(W));
     }
 }
+
+/// <summary>
+/// A USD or EUR schedule row without today's rate is the error it was (legacy payment-shared-page.test.ts,
+/// PAYMENT_PAGE_EMPTY_FOREIGN_MISSING_RATE_REGRESSION_20261019): a zero row, one reduced to zero today, a positive one, one
+/// with only a credit after today — the page fails, nothing is written; with today's rate stored, the page and its debt.
+/// Its own site and database: today's rates are stored at the end. The National Bank is unreachable (PolicyWebApp);
+/// that it is asked exactly once is not counted here.
+/// </summary>
+public sealed class GapsPaymentPageForeignRowTests(PolicyWebApp app) : IClassFixture<PolicyWebApp>
+{
+    private World W => app.W;
+
+    [Fact]
+    public async Task A_USD_or_EUR_schedule_row_without_a_rate_today_is_an_error_the_same_row_with_todays_rate_shows_its_debt()
+    {
+        var admin = await W.UserAsync();
+        var (acc, _) = await app.SignedInAsync("accountant");
+        var b = Gaps.MonthStart;
+        var cases = new List<(string Currency, Guid Policy, string Owed)>();
+        foreach (var currency in new[] { "USD", "EUR" })
+        {
+            async Task<(Guid Id, List<Guid> Inst)> PolicyAsync(params (int Day, decimal Amount)[] schedule)
+            {
+                var p = await W.PendingPolicyAsync(await W.ClientAsync(), b, currency, 2.7m, premium: 100.01m, schedule: [.. schedule]);
+                Assert.Equal("done", (await PolicyActions.ApprovePolicyAsync(W.App, admin, p.Id.ToString())).Outcome);
+                return (p.Id, await W.QueryAsync<Guid>("select id from core.installment where policy_id = @id order by due_on", new { id = p.Id }));
+            }
+            var zero = await PolicyAsync((0, 0m));
+            cases.Add((currency, zero.Id, "0.00"));
+            var reduced = await PolicyAsync((0, 100m));
+            await W.App.AsUserAsync(admin.Id, tx => tx.ExecuteAsync("insert core.installment_adjustment (installment_id, booked_on, change, reason) values (@i, @today, -100, N'შემცირება')", new { i = reduced.Inst[0], today = World.Today }));
+            cases.Add((currency, reduced.Id, "0.00"));
+            var positive = await PolicyAsync((0, 100m), (b.AddMonths(2).DayNumber - b.DayNumber, 0.01m));
+            cases.Add((currency, positive.Id, "100.01"));
+            // Only a credit after today: a receipt dated ten days on, 10.00 of it on the row.
+            var later = await PolicyAsync((0, 100m));
+            var holder = await W.ScalarAsync<Guid>("select c.policyholder_id from core.policy p join core.contract c on c.id = p.contract_id where p.id = @id", new { id = later.Id });
+            var receipt = await W.ReceiptAsync(holder, World.Today.AddDays(10), 27m);
+            await W.App.AsUserAsync(admin.Id, tx => tx.ExecuteAsync("insert core.payment_allocation (payment_id, installment_id, amount, amount_gel, rate, booked_on) values (@receipt, @i, 10, 27, 2.7, @on)",
+                new { receipt, i = later.Inst[0], on = World.Today.AddDays(10) }));
+            cases.Add((currency, later.Id, "100.00"));
+        }
+        var ledger = await Gaps.LedgerAsync(W);
+        foreach (var (currency, policy, _) in cases)
+        {
+            var response = await acc.GetAsync($"/policies/{policy}/payment");
+            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+            Assert.Contains($"No {currency} rate for {Gaps.Iso(World.Today)}", WebUtility.HtmlDecode(await response.Content.ReadAsStringAsync()));
+        }
+        Assert.Equal(ledger, await Gaps.LedgerAsync(W));
+        foreach (var currency in new[] { "USD", "EUR" }) await W.RateAsync(currency, World.Today, 2.7m);
+        foreach (var (currency, policy, owed) in cases)
+            Assert.Contains($"{BillingTexts.Payment.OutstandingNow}: {owed} {currency}", await HtmlAsync(acc, $"/policies/{policy}/payment"));
+    }
+}
