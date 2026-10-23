@@ -68,7 +68,42 @@ public sealed partial class PolicyModel : AppPageModel
     {
         if (value.ValueKind == JsonValueKind.String && AmountText().IsMatch(value.GetString()!)) return PolicyCard.Stored(decimal.Parse(value.GetString()!, CultureInfo.InvariantCulture));
         var number = value.ValueKind == JsonValueKind.Number ? value.GetDouble() : Insurance.Domain.Common.JsNumber.Parse(value.ValueKind == JsonValueKind.String ? value.GetString()! : value.GetRawText());
-        return double.IsFinite(number) ? number.ToString("#,##0.00", CultureInfo.InvariantCulture) : "NaN";
+        return double.IsFinite(number) ? LocaleFixed2(number) : "NaN";
+    }
+
+    /// <summary>
+    /// A finite double as en-US toLocaleString with two decimals: the number's shortest round-trip decimal digits (as
+    /// JavaScript's), rounded half away from zero to the tetri, grouped. .NET's custom format strings keep only 15
+    /// significant digits, so 90071992547408.01 came out as …408.00 where the legacy page showed …408.02.
+    /// </summary>
+    public static string LocaleFixed2(double number)
+    {
+        var text = number.ToString("R", CultureInfo.InvariantCulture);
+        var negative = text.StartsWith('-');
+        if (negative) text = text[1..];
+        var exponent = 0;
+        if (text.IndexOfAny(['E', 'e']) is var e and >= 0)
+        {
+            exponent = int.Parse(text[(e + 1)..], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture);
+            text = text[..e];
+        }
+        if (text.IndexOf('.') is var dot and >= 0)
+        {
+            exponent -= text.Length - dot - 1;
+            text = text.Remove(dot, 1);
+        }
+        // value = digits × 10^exponent; in tetri, half away from zero.
+        var digits = System.Numerics.BigInteger.Parse(text, CultureInfo.InvariantCulture);
+        var shift = exponent + 2;
+        System.Numerics.BigInteger tetri;
+        if (shift >= 0) tetri = digits * System.Numerics.BigInteger.Pow(10, shift);
+        else
+        {
+            var divisor = System.Numerics.BigInteger.Pow(10, -shift);
+            tetri = System.Numerics.BigInteger.DivRem(digits, divisor, out var rest);
+            if (rest * 2 >= divisor) tetri += 1;
+        }
+        return PolicyCard.Grouped(negative ? -tetri : tetri);
     }
 
     public static string Money(decimal value) => PolicyCard.Stored(value);
