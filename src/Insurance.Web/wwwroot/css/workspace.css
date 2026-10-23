@@ -1,0 +1,137 @@
+/* Real server-rendered pages share the approved Angular design. */
+:root{--border:#e7e5ef;--accent:#8064c5;--accent-hover:#6c51b0;--danger:#b85263;--success:#438e73;--radius:12px}
+#server-content{font-size:13px;line-height:1.65;min-width:0;max-width:100%;overflow-x:auto}
+#server-content h1{font-size:25px;font-weight:650;margin:0 0 24px;color:#4e465f;letter-spacing:-.5px}
+#server-content h2{font-size:15px;font-weight:600;margin:0 0 16px;color:#73617f}
+#server-content a{color:#8163b9}#server-content a:hover{text-decoration:underline}
+#server-content .card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:23px 25px;margin-bottom:22px;box-shadow:0 4px 24px #28245404}
+#server-content .toolbar{display:flex;gap:12px;align-items:center;margin-bottom:23px;flex-wrap:wrap;padding:17px;background:#fff;border:1px solid var(--border);border-radius:12px}
+#server-content .spacer{flex:1}#server-content .note{font-size:12px;color:#8f819d;line-height:1.9;margin:-10px 0 24px;max-width:850px}
+#server-content table{ width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+#server-content th, #server-content td{ text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+#server-content th{ font-size: 12px; color: var(--muted); font-weight: 600; background: #fafbfc; }
+#server-content tr:last-child td{ border-bottom: 0; }
+#server-content td.num, #server-content th.num{ text-align: right; font-variant-numeric: tabular-nums; }
+#server-content td.child{ padding-left: 32px; color: #3a4556; }
+#server-content .empty{ color: var(--muted); padding: 24px; text-align: center; }
+
+#server-content label{ display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+#server-content input[type='text'], #server-content input[type='password'], #server-content input[type='date'], #server-content input[type='email'], #server-content input[type='number'], #server-content input[type='search'], #server-content select{
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+  background: #fff;
+  color: var(--text);
+}
+#server-content input:focus, #server-content select:focus, #server-content textarea:focus{ outline: 2px solid rgba(31, 95, 191, 0.25); border-color: var(--accent); }
+#server-content /* Date field typed as dd/mm/yyyy (src/app/date-input.tsx): the browser's own picker stays hidden behind the button. */
+.date-input{ position: relative; display: block; width: 100%; }
+#server-content .date-input > input[type='text']{ padding-right: 34px; }
+#server-content .date-input-picker{ position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; border: 0; padding: 0; }
+#server-content .date-input-button{ position: absolute; right: 6px; top: 50%; transform: translateY(-50%); display: flex; padding: 4px; border: 0; background: none; color: var(--muted); cursor: pointer; }
+#server-content .date-input-button:hover{ color: var(--accent); }
+#server-content .date-input-button:disabled{ cursor: default; opacity: 0.5; }
+#server-content textarea{ width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font: inherit; resize: vertical; }
+#server-content .grid{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 18px; }
+#server-content .grid .wide{ grid-column: span 2; }
+#server-content .check{ display: flex; align-items: center; gap: 8px; padding-top: 22px; }
+#server-content .check label{ margin: 0; font-size: 14px; color: var(--text); }
+#server-content .field-error{ color: var(--danger); font-size: 12px; margin-top: 3px; }
+#server-content /* A label only screen readers read (the permissions panel's choice selects). */
+.visually-hidden{ position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+#server-content .btn{
+  display: inline-block;
+  background: var(--accent);
+  color: #fff;
+  border: 0;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+#server-content .btn:hover{ background: var(--accent-hover); text-decoration: none; }
+#server-content .btn.secondary{ background: #fff; color: var(--text); border: 1px solid var(--border); }
+#server-content .btn.secondary:hover{ background: #f4f5f7; }
+#server-content .btn:disabled{ opacity: 0.6; cursor: default; }
+
+#server-content .badge{ display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; background: #eef1f6; color: #3a4556; }
+#server-content .badge.high{ background: #fde8e6; color: var(--danger); }
+#server-content .badge.low{ background: #e3f6ec; color: var(--success); }
+#server-content .alert{ padding: 10px 14px; border-radius: 6px; margin-bottom: 14px; }
+#server-content .alert.error{ background: #fde8e6; color: var(--danger); }
+#server-content .alert.ok{ background: #e3f6ec; color: var(--success); }
+
+#server-content .stats{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+#server-content .stat .value{ font-size: 28px; font-weight: 600; }
+#server-content .stat .label{ color: var(--muted); }
+
+#server-content .login{ min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+#server-content .login .card{ width: 340px; }
+#server-content .login .field{ margin-bottom: 14px; }
+
+#server-content .changes{ margin: 0; padding: 0; list-style: none; }
+#server-content .changes .old{ color: var(--muted); text-decoration: line-through; }
+
+@media (max-width: 900px) {
+  #server-content .shell{ flex-direction: column; }
+  #server-content .sidebar{ width: 100%; }
+  #server-content .grid, #server-content .stats{ grid-template-columns: 1fr; }
+  #server-content .grid .wide{ grid-column: auto; }
+  #server-content .content{ padding: 18px 16px; }
+}
+
+#server-content .hint{ color: var(--muted); font-size: 12px; margin-top: 3px; }
+#server-content .static{ padding: 8px 0; }
+#server-content .row-actions{ display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+#server-content .inline-form{ display: flex; gap: 6px; align-items: center; }
+#server-content .inline-form input{ width: 170px; }
+#server-content .row-actions .btn{ padding: 6px 10px; font-weight: 500; white-space: nowrap; }
+
+#server-content table.plain{ border: 0; }
+#server-content table.plain th{ background: none; }
+#server-content table.plain td{ vertical-align: middle; }
+#server-content table.plain input[type=number]{ min-width: 110px; }
+#server-content .total{ margin: 12px 0 0; text-align: right; font-size: 15px; }
+#server-content h2.section{ margin-top: 22px; }
+#server-content .facts{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 18px; margin: 0; }
+#server-content .facts dt{ font-size: 12px; color: var(--muted); }
+#server-content .facts dd{ margin: 0; }
+@media (max-width: 900px) { #server-content .facts { grid-template-columns: 1fr; } }
+
+#server-content .alert.warn{ background: #fff4e0; color: #8a5a00; }
+#server-content .badge.warn{ background: #fff4e0; color: #8a5a00; }
+
+#server-content .btn.danger{ background: var(--danger); }
+#server-content .btn.danger:hover{ background: #8f1d13; }
+
+#server-content .total-row td{ background: #fafbfc; }
+
+#server-content table{border-color:#e9e5f1;border-radius:12px;font-size:12px}
+#server-content th{background:#f9f7fc;color:#8d7ca0;font-size:11px;font-weight:500;padding:15px 17px}
+#server-content td{padding:17px;vertical-align:middle;border-color:#f0ebf6;color:#6d607c}
+#server-content tbody tr:hover{background:#fcfaff}
+#server-content input,#server-content select,#server-content textarea{border-color:#e5dfee;border-radius:8px;font-size:12px;padding:11px 12px}
+#server-content label{font-size:11px;color:#9582a2;margin-bottom:8px}
+#server-content .btn{font-size:12px;border-radius:9px;padding:11px 17px;font-weight:500;color:#fff}
+#server-content .btn.secondary{color:#8c77a0}#server-content .btn.danger{background:#bc6878}
+#server-content .badge{padding:4px 9px;border-radius:7px;font-size:10px}
+#server-content .badge.low{background:#ecf6ef;color:#719b80}#server-content .badge.warn,#server-content .alert.warn{background:#fff3e3;color:#b48a58}
+#server-content .alert{border-radius:10px;padding:14px 17px;font-size:12px;line-height:1.9}
+#server-content .alert.error{background:#fcf0f1;color:#b05e6b}#server-content .alert.ok{background:#edf7f1;color:#649078}
+#server-content .hint{font-size:11px;color:#a392af;line-height:1.8}
+#server-content .facts{background:#fcfaff;border:1px solid #efe9f6;border-radius:12px;padding:20px;gap:17px}
+#server-content .facts dt{font-size:10px;color:#a28caf}#server-content .facts dd{font-size:13px;color:#71607d}
+#server-content .visually-hidden{left:0;top:0}
+#server-content .section{margin-top:29px}
+#server-content .changes li{padding:10px 0;border-bottom:1px solid #f0eaf5}
+.native-heading{font-size:10px;color:#a18eb7;margin-bottom:14px}.native-breadcrumb{display:flex;gap:8px;align-items:center;margin-bottom:20px;font-size:10px;color:#ab9bb9}.native-breadcrumb a{color:#9b83b7}.native-breadcrumb span{color:#d1c4db}
+.sidebar .native-nav{overflow:auto;flex:1;min-height:180px;margin:10px -8px 0;padding:0 8px;scrollbar-width:thin;scrollbar-color:#e7e0f2 transparent}
+.sidebar .native-nav .nav-group{font-size:9px;color:#aaa0b6;padding:20px 14px 8px}
+.sidebar .native-nav a{padding:10px 13px;font-size:11px;margin-bottom:3px}
+.sidebar .sidebar-bottom{margin-top:0;padding-top:0}.sidebar .profile{margin-top:14px;padding:17px 0}.profile .logout{color:#af9ebd;font-size:10px;margin-left:auto}
+.workspace-loaded{display:none}.workspace-error{padding:35px;background:#fff;border:1px solid #ecdfeb;border-radius:14px;color:#a77a8a;line-height:2}.workspace-error a{color:#805fba;text-decoration:underline}
+@media(max-width:760px){#server-content .toolbar form{flex-wrap:wrap}#server-content .toolbar form>*{max-width:100%}#server-content .grid,#server-content .facts{grid-template-columns:1fr}#server-content .grid .wide{grid-column:auto}#server-content .card{padding:18px}#server-content h1{font-size:22px}#server-content .toolbar .btn{font-size:11px}#server-content td{font-size:11px;padding:14px}.sidebar .native-nav{min-height:160px}}

@@ -1,12 +1,27 @@
 using Insurance.Application.Services;
 using Insurance.Application.Texts;
 using Insurance.Web.Infrastructure;
+using Microsoft.AspNetCore.Mvc;
+using Dapper;
 
 namespace Insurance.Web.Pages;
 
 /// <summary>The home page with the reminders (legacy (app)/page.tsx).</summary>
 public sealed class IndexModel : AppPageModel
 {
+    public sealed record Portfolio(int Active, int AllPolicies, decimal ActivePremiumGel, decimal CededGel);
+    public async Task<IActionResult> OnGetDataAsync()
+    {
+        await OnGetAsync();
+        var today=Db.Today();
+        var portfolio=await Db.ReadAsync(c=>c.QuerySingleAsync<Portfolio>("""
+            select (select count(*) from core.policy where status=N'active') as Active,
+                   (select count(*) from core.policy) as AllPolicies,
+                   (select coalesce(sum(l.premium_gel),0) from core.policy_line l join core.policy p on p.id=l.policy_id where p.status=N'active') as ActivePremiumGel,
+                   (select coalesce(sum(amount_gel),0) from core.premium_cession where booked_on<=@today) as CededGel
+            """,new {today}));
+        return new JsonResult(new { Totals, LastRates, Reminders, Portfolio=portfolio, AsOf=today });
+    }
     public sealed record Counts(int Parties, int Classes, int Unrated, int Reviews, int Complaints, int Pending);
 
     public sealed record RateRow(string Currency, decimal Rate, DateOnly RateDate);
