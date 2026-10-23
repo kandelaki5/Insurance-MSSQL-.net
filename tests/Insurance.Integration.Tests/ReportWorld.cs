@@ -84,19 +84,20 @@ public sealed class ReportWorld : IAsyncDisposable
     public async Task<PolicyRef> PolicyAsync(string number, string from, string to, IReadOnlyList<LineSpec> lines,
         IReadOnlyList<(string Due, decimal Amount, string Debtor)>? installments = null, string currency = "GEL", decimal rate = 1m,
         string? bookedOn = null, Guid? holder = null, Guid? replaces = null, string? cancelledOn = null, string status = "active", bool issueRows = true,
-        string? contractNumber = null)
+        string? contractNumber = null, Guid? contractId = null)
     {
         var party = holder ?? await PartyAsync($"დამზღვევი {number} (გამოგონილი)");
-        var contract = Guid.NewGuid();
+        var contract = contractId ?? Guid.NewGuid();
         var policy = Guid.NewGuid();
         var lineIds = new List<Guid>();
         var issues = new List<Guid>();
         var insts = new List<Guid>();
         await WriteAsync(async tx =>
         {
-            await tx.ExecuteAsync("""
-                insert core.contract (id, number, signed_on, policyholder_id, created_at, created_by) values (@contract, @contractNumber, @from, @party, @at, @user)
-                """, new { contract, contractNumber = contractNumber ?? "C-" + number, from = D(from), party, at = At(), user = Admin });
+            if (contractId is null)
+                await tx.ExecuteAsync("""
+                    insert core.contract (id, number, signed_on, policyholder_id, created_at, created_by) values (@contract, @contractNumber, @from, @party, @at, @user)
+                    """, new { contract, contractNumber = contractNumber ?? "C-" + number, from = D(from), party, at = At(), user = Admin });
             await tx.ExecuteAsync("""
                 insert core.policy (id, contract_id, number, issued_on, effective_from, effective_to, status, premium_currency, premium_rate, created_at, created_by,
                                     segment, approved_at, approved_by, replaces_policy_id, cancelled_on)
@@ -130,6 +131,15 @@ public sealed class ReportWorld : IAsyncDisposable
             return 0;
         });
         return new PolicyRef(policy, number, party, lineIds, issues, insts);
+    }
+
+    /// <summary>A contract of a policyholder, for several policies.</summary>
+    public async Task<Guid> ContractAsync(string number, Guid holder, string signedOn = "2025-01-01")
+    {
+        var id = Guid.NewGuid();
+        await ExecAsync("insert core.contract (id, number, signed_on, policyholder_id, created_at, created_by) values (@id, @number, @signedOn, @holder, @at, @user)",
+            new { id, number, signedOn = D(signedOn), holder, at = At(), user = Admin });
+        return id;
     }
 
     /// <summary>One premium ledger row (a cancellation or a correction linked to the row it cancels).</summary>
