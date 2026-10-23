@@ -407,7 +407,9 @@ public sealed class GapsCardLegacyDayTests(LegacyDaySite s) : IClassFixture<Lega
         // 1000.00 × 13.25 % = 132.50; the label names each intermediary with its percent as the old page wrote it.
         var c = await CommissionOfAsync([Tx(0, "1000.00", "2026-10-01", "2026-10-01", "2026-10-02")], ["12.50", "0.75"]);
         Assert.Equal(("132.50", "0.00"), (c.Written, c.Deferred));
-        Assert.Contains("ტესტი აგენტი 1 (12.5%), ტესტი აგენტი 2 (0.75%)", c.Html, StringComparison.Ordinal);
+        // The legacy card reads the intermediaries without an order (no ORDER BY there either), so either order is the old page's.
+        Assert.True(c.Html.Contains("ტესტი აგენტი 1 (12.5%), ტესტი აგენტი 2 (0.75%)", StringComparison.Ordinal)
+            || c.Html.Contains("ტესტი აგენტი 2 (0.75%), ტესტი აგენტი 1 (12.5%)", StringComparison.Ordinal), "the label names each intermediary with its own percent");
         // 0.03 × 33.33 % = 0.009999 → 0.01.
         Assert.Equal("0.01", (await CommissionOfAsync([Tx(0, "0.03", "2026-10-01", "2026-10-01", "2026-10-02")], ["33.33"])).Written);
         // Three 0.01 at 50 %: 0.005 → 0.01 each, 0.03 in all (rounded once on the 0.03 it would be 0.02).
