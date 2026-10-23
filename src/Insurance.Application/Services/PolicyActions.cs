@@ -44,9 +44,9 @@ public static class PolicyActions
     /// A new vehicle policy awaiting approval, under a new contract (legacy issuePolicy): validated as the form and the
     /// import validate it; the client may not be suspended (FMS); the premium is fixed in GEL at the effective-date rate.
     /// </summary>
-    public static async Task<FormOutcome> IssuePolicyAsync(Db db, Rates rates, CurrentUser user, IReadOnlyDictionary<string, string> values, Func<string, bool> included)
+    public static async Task<FormAnswer> IssuePolicyAsync(Db db, Rates rates, CurrentUser user, IReadOnlyDictionary<string, string> values, Func<string, bool> included)
     {
-        if (!user.CanWrite) return FormOutcome.Refused(Ka.Common.ReadOnly);
+        if (!user.CanWrite) return FormAnswer.Refused(Ka.Common.ReadOnly);
         var context = await db.ReadTxAsync(async tx =>
         {
             // A product id that is not a uuid finds no product (legacy: the uuid cast failed, the form had a hidden field).
@@ -57,7 +57,7 @@ public static class PolicyActions
             var holder = await PolicyholderAsync(tx, V(values, "policyholder_id_number") ?? "");
             return new IssueContext(p, coverages, holder?.Holder);
         });
-        if (context is null) return FormOutcome.Refused(PolicyTexts.Errors.Coverages);
+        if (context is null) return FormAnswer.Refused(PolicyTexts.Errors.Coverages);
         var today = Rates.TodayInTbilisi();
         var (errors, input) = PolicyIssue.ValidateVehiclePolicy(values, included, context.Coverages, context.Holder, context.Product, today);
         if (context.Holder is { } holder && await db.ReadTxAsync(tx => Aml.BlockingSuspensionAsync(tx, holder.Id)) is not null)
@@ -68,7 +68,7 @@ public static class PolicyActions
             rate = await rates.RateOnAsync(input.Currency.ToString(), input.From);
             if (rate is null) errors["currency"] = PolicyTexts.Errors.Rate;
         }
-        if (input is null || rate is not { } fixedRate || errors.Count > 0) return new FormOutcome(errors, null, null);
+        if (input is null || rate is not { } fixedRate || errors.Count > 0) return new FormAnswer(errors, null, null);
 
         Guid policyId;
         try
@@ -85,9 +85,9 @@ public static class PolicyActions
         }
         catch (Exception e) when (SeriesExhausted(e))
         {
-            return FormOutcome.Refused(Ka.Common.SeriesExhausted);
+            return FormAnswer.Refused(Ka.Common.SeriesExhausted);
         }
-        return FormOutcome.GoTo($"/policies/{Uuid.Text(policyId)}?issued=1");
+        return FormAnswer.GoTo($"/policies/{Uuid.Text(policyId)}?issued=1");
     }
 
     // ---------------------------------------------------------------- approve
@@ -187,16 +187,16 @@ public static class PolicyActions
     // ---------------------------------------------------------------- cancel
 
     /// <summary>Cancels an active policy from a date (legacy cancelPolicy): validation, then PolicyCancel in one transaction.</summary>
-    public static async Task<FormOutcome> CancelPolicyAsync(Db db, CurrentUser user, IReadOnlyDictionary<string, string> values)
+    public static async Task<FormAnswer> CancelPolicyAsync(Db db, CurrentUser user, IReadOnlyDictionary<string, string> values)
     {
-        if (!user.CanWrite) return FormOutcome.Refused(Ka.Common.ReadOnly);
-        if (!Uuid.TryParse(V(values, "policy_id"), out var id)) return FormOutcome.Refused(PolicyTexts.Cancel.Errors.NotActive);
+        if (!user.CanWrite) return FormAnswer.Refused(Ka.Common.ReadOnly);
+        if (!Uuid.TryParse(V(values, "policy_id"), out var id)) return FormAnswer.Refused(PolicyTexts.Cancel.Errors.NotActive);
         var cancelText = V(values, "cancel_on") ?? "";
         var reason = V(values, "reason");
         var errors = new Dictionary<string, string>(StringComparer.Ordinal);
         if (!Dates.IsIsoDate(cancelText)) errors["cancel_on"] = PolicyTexts.Cancel.Errors.Date;
         if (string.IsNullOrEmpty(reason)) errors["reason"] = PolicyTexts.Cancel.Errors.Reason;
-        if (errors.Count > 0) return FormOutcome.Invalid(errors);
+        if (errors.Count > 0) return FormAnswer.Invalid(errors);
 
         PolicyCancel.CancelOutcome outcome;
         try
@@ -205,13 +205,13 @@ public static class PolicyActions
         }
         catch (Exception e) when (DbError.From(e)?.Code == DbError.CheckViolation)
         {
-            return FormOutcome.Invalid(new Dictionary<string, string> { ["cancel_on"] = PolicyTexts.Cancel.Errors.PeriodClosed });
+            return FormAnswer.Invalid(new Dictionary<string, string> { ["cancel_on"] = PolicyTexts.Cancel.Errors.PeriodClosed });
         }
         return outcome switch
         {
-            PolicyCancel.CancelOutcome.NotActive => FormOutcome.Refused(PolicyTexts.Cancel.Errors.NotActive),
-            PolicyCancel.CancelOutcome.OutsideTerm => FormOutcome.Invalid(new Dictionary<string, string> { ["cancel_on"] = PolicyTexts.Cancel.Errors.OutsideTerm }),
-            _ => FormOutcome.GoTo($"/policies/{Uuid.Text(id)}?cancelled=1"),
+            PolicyCancel.CancelOutcome.NotActive => FormAnswer.Refused(PolicyTexts.Cancel.Errors.NotActive),
+            PolicyCancel.CancelOutcome.OutsideTerm => FormAnswer.Invalid(new Dictionary<string, string> { ["cancel_on"] = PolicyTexts.Cancel.Errors.OutsideTerm }),
+            _ => FormAnswer.GoTo($"/policies/{Uuid.Text(id)}?cancelled=1"),
         };
     }
 
@@ -234,16 +234,16 @@ public static class PolicyActions
     /// coverage, possibly negative) and fixes its own exchange rate. It awaits approval like any policy. A positive
     /// difference is due on the change date; a negative one reduces the original's schedule only on approval (H01).
     /// </summary>
-    public static async Task<FormOutcome> EndorsePolicyAsync(Db db, Rates rates, CurrentUser user, IReadOnlyDictionary<string, string> values, Func<string, bool> included)
+    public static async Task<FormAnswer> EndorsePolicyAsync(Db db, Rates rates, CurrentUser user, IReadOnlyDictionary<string, string> values, Func<string, bool> included)
     {
-        if (!user.CanWrite) return FormOutcome.Refused(Ka.Common.ReadOnly);
-        if (!Uuid.TryParse(V(values, "policy_id"), out var originalId)) return FormOutcome.Refused(PolicyTexts.Endorse.Errors.NotActive);
+        if (!user.CanWrite) return FormAnswer.Refused(Ka.Common.ReadOnly);
+        if (!Uuid.TryParse(V(values, "policy_id"), out var originalId)) return FormAnswer.Refused(PolicyTexts.Endorse.Errors.NotActive);
         var original = await db.ReadTxAsync(tx => tx.QuerySingleOrDefaultAsync<OriginalPolicy>("""
             select p.id as Id, p.contract_id as ContractId, p.status as Status, p.effective_from as EffectiveFrom, p.effective_to as EffectiveTo,
                    p.premium_currency as PremiumCurrency, p.product_id as ProductId, pr.code as ProductCode, p.segment as Segment, p.cancel_grace_days as CancelGraceDays
             from core.policy p left join core.product pr on pr.id = p.product_id where p.id = @originalId
             """, new { originalId }));
-        if (original is not { Status: "active", ProductId: { } productId }) return FormOutcome.Refused(PolicyTexts.Endorse.Errors.NotActive);
+        if (original is not { Status: "active", ProductId: { } productId }) return FormAnswer.Refused(PolicyTexts.Endorse.Errors.NotActive);
         var coverages = await db.ReadTxAsync(tx => CoveragesAsync(tx, productId));
 
         var errors = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -273,7 +273,7 @@ public static class PolicyActions
             rate = await rates.RateOnAsync(currencyText, changeOn);
             if (rate is null) errors["change_on"] = PolicyTexts.Endorse.Errors.Rate;
         }
-        if (errors.Count > 0 || rate is not { } fixedRate) return FormOutcome.Invalid(errors);
+        if (errors.Count > 0 || rate is not { } fixedRate) return FormAnswer.Invalid(errors);
         var currency = Billing.ParseCurrency(currencyText);
         var today = Rates.TodayInTbilisi();
         var totalDelta = lines.Sum(l => l.DeltaMinor);
@@ -343,9 +343,9 @@ public static class PolicyActions
         }
         catch (Exception e) when (SeriesExhausted(e))
         {
-            return FormOutcome.Refused(Ka.Common.SeriesExhausted);
+            return FormAnswer.Refused(Ka.Common.SeriesExhausted);
         }
-        return FormOutcome.GoTo($"/policies/{Uuid.Text(newId)}?issued=1");
+        return FormAnswer.GoTo($"/policies/{Uuid.Text(newId)}?issued=1");
     }
 
     // ---------------------------------------------------------------- facultative

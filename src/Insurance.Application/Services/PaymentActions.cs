@@ -23,11 +23,11 @@ public static partial class PaymentActions
     private static readonly BigInteger RateScale = 1_000_000;
 
     /// <summary>The outcome of a form action: field errors and a message to show the form again with, or where to go.</summary>
-    public sealed record FormOutcome(IReadOnlyDictionary<string, string> Errors, string? Message, string? Redirect)
+    public sealed record FormAnswer(IReadOnlyDictionary<string, string> Errors, string? Message, string? Redirect)
     {
-        public static FormOutcome Refused(string message) => new(new Dictionary<string, string>(), message, null);
-        public static FormOutcome Invalid(Dictionary<string, string> errors) => new(errors, null, null);
-        public static FormOutcome GoTo(string url) => new(new Dictionary<string, string>(), null, url);
+        public static FormAnswer Refused(string message) => new(new Dictionary<string, string>(), message, null);
+        public static FormAnswer Invalid(Dictionary<string, string> errors) => new(errors, null, null);
+        public static FormAnswer GoTo(string url) => new(new Dictionary<string, string>(), null, url);
     }
 
     [GeneratedRegex(@"^\+?([0-9]*)(?:[.,]([0-9]*))?(?:[eE]([+-]?)([0-9]+))?\z")]
@@ -172,16 +172,16 @@ public static partial class PaymentActions
     /// locked so two clerks cannot settle the same instalment twice; the suspension check under the client's lock is
     /// the binding one. The allocation is booked on the Tbilisi day it is made, the receipt keeps its own date.
     /// </summary>
-    public static async Task<FormOutcome> RecordPaymentAsync(Db db, Rates rates, CurrentUser user, IReadOnlyDictionary<string, string> values)
+    public static async Task<FormAnswer> RecordPaymentAsync(Db db, Rates rates, CurrentUser user, IReadOnlyDictionary<string, string> values)
     {
         string? V(string key) => values.TryGetValue(key, out var v) ? v : null;
-        if (!await PermissionStore.HasPermissionAsync(db, user, "premium.receipt.create")) return FormOutcome.Refused(BillingTexts.Payment.NotAllowed);
-        if (!Uuid.TryParse(V("policy_id") ?? "", out var policyId)) return FormOutcome.Refused(BillingTexts.Payment.NotPayable);
+        if (!await PermissionStore.HasPermissionAsync(db, user, "premium.receipt.create")) return FormAnswer.Refused(BillingTexts.Payment.NotAllowed);
+        if (!Uuid.TryParse(V("policy_id") ?? "", out var policyId)) return FormAnswer.Refused(BillingTexts.Payment.NotPayable);
         var policy = await db.ReadTxAsync(tx => tx.QuerySingleOrDefaultAsync<PolicyRow>($"{PolicySelect} where p.id = @policyId", new { policyId }));
-        if (policy is null || policy.Status == "draft") return FormOutcome.Refused(BillingTexts.Payment.NotPayable);
+        if (policy is null || policy.Status == "draft") return FormAnswer.Refused(BillingTexts.Payment.NotPayable);
         var targets = Targets([policy.Id], policy.Number, V("reference"));
         if (await db.ReadTxAsync(tx => Aml.BlockingSuspensionAsync(tx, policy.PolicyholderId, targets)) is not null)
-            return FormOutcome.Refused(AmlTexts.Suspension.Blocked);
+            return FormAnswer.Refused(AmlTexts.Suspension.Blocked);
 
         var errors = new Dictionary<string, string>(StringComparer.Ordinal);
         var gelMinor = AmountInTetri(V("amount_gel") ?? "");
@@ -198,7 +198,7 @@ public static partial class PaymentActions
             rate = await rates.RateOnAsync(policy.Currency, Dates.ParseIsoDate(receivedText));
             if (rate is null) errors["received_on"] = BillingTexts.Payment.Errors.Rate;
         }
-        if (errors.Count > 0 || rate is not { } paymentRate) return FormOutcome.Invalid(errors);
+        if (errors.Count > 0 || rate is not { } paymentRate) return FormAnswer.Invalid(errors);
         var receivedOn = Dates.ParseIsoDate(receivedText);
         var gel = gelMinor!.Value;
         var reference = string.IsNullOrEmpty(V("reference")) ? null : V("reference");
@@ -229,14 +229,14 @@ public static partial class PaymentActions
         catch (Exception e) when (IsCode(e, DbError.CheckViolation))
         {
             // The database refuses movements dated in a closed accounting month.
-            return FormOutcome.Invalid(new Dictionary<string, string> { ["received_on"] = BillingTexts.Payment.Errors.PeriodClosed });
+            return FormAnswer.Invalid(new Dictionary<string, string> { ["received_on"] = BillingTexts.Payment.Errors.PeriodClosed });
         }
         return outcome switch
         {
-            "not-allowed" => FormOutcome.Refused(BillingTexts.Payment.NotAllowed),
-            "nothing-owed" => FormOutcome.Refused(BillingTexts.Payment.Errors.NothingOwed),
-            "suspended" => FormOutcome.Refused(AmlTexts.Suspension.Blocked),
-            BigInteger left => FormOutcome.GoTo($"/policies/{Uuid.Text(policy.Id)}?paid={left.ToString(CultureInfo.InvariantCulture)}"),
+            "not-allowed" => FormAnswer.Refused(BillingTexts.Payment.NotAllowed),
+            "nothing-owed" => FormAnswer.Refused(BillingTexts.Payment.Errors.NothingOwed),
+            "suspended" => FormAnswer.Refused(AmlTexts.Suspension.Blocked),
+            BigInteger left => FormAnswer.GoTo($"/policies/{Uuid.Text(policy.Id)}?paid={left.ToString(CultureInfo.InvariantCulture)}"),
             _ => throw new InvalidOperationException("unexpected receipt outcome"),
         };
     }

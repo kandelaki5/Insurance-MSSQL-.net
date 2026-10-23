@@ -215,13 +215,13 @@ public sealed class World(TestDatabase db)
     /// <summary>A form as the legacy actions received it: field → value.</summary>
     public static Dictionary<string, string> Form(params (string Key, string Value)[] fields) => fields.ToDictionary(f => f.Key, f => f.Value, StringComparer.Ordinal);
 
-    public Task<PaymentActions.FormOutcome> PayAsync(CurrentUser user, Guid policyId, string amount, DateOnly on, string method = "bank", string? reference = null) =>
+    public Task<PaymentActions.FormAnswer> PayAsync(CurrentUser user, Guid policyId, string amount, DateOnly on, string method = "bank", string? reference = null) =>
         PaymentActions.RecordPaymentAsync(App, Rates, user, Form(("policy_id", policyId.ToString()), ("amount_gel", amount), ("received_on", Dates.ToIso(on)), ("method", method), ("reference", reference ?? "")));
 
-    public Task<PaymentActions.FormOutcome> CancelAsync(CurrentUser user, Guid policyId, DateOnly on, string reason = "გაუქმება") =>
+    public Task<PaymentActions.FormAnswer> CancelAsync(CurrentUser user, Guid policyId, DateOnly on, string reason = "გაუქმება") =>
         PolicyActions.CancelPolicyAsync(App, user, Form(("policy_id", policyId.ToString()), ("cancel_on", Dates.ToIso(on)), ("reason", reason)));
 
-    public Task<PaymentActions.FormOutcome> EndorseAsync(CurrentUser user, Guid policyId, DateOnly on, string delta, string reason = "ცვლილება", string coverage = "damage") =>
+    public Task<PaymentActions.FormAnswer> EndorseAsync(CurrentUser user, Guid policyId, DateOnly on, string delta, string reason = "ცვლილება", string coverage = "damage") =>
         PolicyActions.EndorsePolicyAsync(App, Rates, user, Form(("policy_id", policyId.ToString()), ("change_on", Dates.ToIso(on)), ("reason", reason),
             ($"cov_{coverage}_on", "on"), ($"cov_{coverage}_delta", delta)), code => code == coverage);
 
