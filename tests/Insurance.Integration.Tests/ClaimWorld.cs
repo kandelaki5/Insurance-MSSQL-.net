@@ -179,8 +179,9 @@ public sealed class ClaimWorld(TestDatabase db)
             : Form(("claim_id", claimId.ToString()), ("decision", "approve"), ("approved_amount", amount)), today);
 
     public Task<FormOutcome> PayAsync(CurrentUser user, Guid claimId, string amount, DateOnly paidOn, DateOnly today, params (string, string)[] more) =>
-        ClaimActions.PayClaimAsync(App, Rates, user, Form([("claim_id", claimId.ToString()), ("amount", amount), ("paid_on", D(paidOn)), ("payee_kind", "policyholder"),
-            ("total_loss_mode", "none"), .. more]), today);
+        ClaimActions.PayClaimAsync(App, Rates, user, Form([("claim_id", claimId.ToString()), ("amount", amount), ("paid_on", D(paidOn)),
+            .. more.Any(m => m.Item1 == "payee_kind") ? Array.Empty<(string, string)>() : [("payee_kind", "policyholder")],
+            .. more.Any(m => m.Item1 == "total_loss_mode") ? Array.Empty<(string, string)>() : [("total_loss_mode", "none")], .. more]), today);
 
     public async Task CloseMonthAsync(Guid actor, DateOnly month)
     {
