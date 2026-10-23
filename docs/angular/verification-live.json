@@ -1,0 +1,189 @@
+{
+  "login": true,
+  "anonymousApiDenied": true,
+  "exactBalance": true,
+  "activePremiumGel": 51900.0,
+  "csrf": true,
+  "pages": [
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": ""
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "policies"
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "policies/new"
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "policies/pending"
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "policies/import"
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "parties"
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "parties/new?kind=person"
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "claims"
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "claims/new"
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "complaints"
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "intermediaries"
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "payments/overdue"
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "reinsurance/treaties"
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "reinsurance/treaties/new"
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "reference/classes"
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "reference/rates"
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "accounting/periods"
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "accounting/premium-report"
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "accounting/policy-premium"
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "accounting/impairment"
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "accounting/regulatory"
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "audit"
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "finance/panel"
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "users"
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "settings"
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "settings/products"
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "compliance/sanctions"
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "compliance/aml-cases"
+    },
+    {
+      "status": 200,
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "path": "compliance/aml-report"
+    }
+  ],
+  "search": true,
+  "active": 12,
+  "policyCount": 14,
+  "checkedAt": "2026-10-23T18:50:18.9810275+00:00",
+  "base": "https://agulisoft-001-site1.ktempurl.com/",
+  "reinsuranceCededGel": 2400
+}

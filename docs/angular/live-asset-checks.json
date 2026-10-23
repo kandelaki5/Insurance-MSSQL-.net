@@ -1,0 +1,22 @@
+[
+  {
+    "matches": true,
+    "path": "ui/main.js",
+    "sha256": "3063C2F8D9B26F1D7A30DA6E7786A8CC74910D30195994CB7C1D27B273CA27DE"
+  },
+  {
+    "matches": true,
+    "path": "ui/styles.css",
+    "sha256": "6FC7887C84DF37C762DAC57AD1C7706D5D1454DCE2CFEFA9463884EB8822D73C"
+  },
+  {
+    "matches": true,
+    "path": "css/workspace.css",
+    "sha256": "72640017B6B4BAC89DBDBEF3E6A4CDC602D92FD501CE999A5A5BED079EC69B4B"
+  },
+  {
+    "matches": true,
+    "path": "css/login.css",
+    "sha256": "89DB4A4A8D6B785C98155FF128432373602D7FE3F3A781BB15A0735C51378488"
+  }
+]

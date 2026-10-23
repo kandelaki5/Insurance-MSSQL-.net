@@ -1,0 +1,15 @@
+{
+  "files": [
+    "Insurance.Web.dll",
+    "Insurance.Web.pdb",
+    "wwwroot/ui/main.js",
+    "wwwroot/ui/styles.css",
+    "wwwroot/ui/3rdpartylicenses.txt",
+    "wwwroot/css/workspace.css",
+    "wwwroot/css/login.css"
+  ],
+  "sha256": "ba5b12054ca5425de29b3b3e50f958b2960baea67fb46f9bf4ca2cde7bf78587",
+  "bytes": 888472,
+  "configurationIncluded": false,
+  "databaseChanges": false
+}
