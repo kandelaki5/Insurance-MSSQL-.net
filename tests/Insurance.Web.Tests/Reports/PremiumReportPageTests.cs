@@ -182,6 +182,35 @@ public sealed class PremiumReportPageTests
         Assert.StartsWith("/login", refused.Headers.Location!.ToString());
     }
 
+    [Fact]
+    public async Task A_recovery_written_by_the_real_action_is_on_the_page_in_the_month_received_once()
+    {
+        // legacy claim-recovery-monthly-report.test.ts and claim-recovery-report-page.test.ts: one GEL CASCO claim, reserve 1000.00 (02.10.2026),
+        // payment 900.00 (06.10.2026), a regress of 7.50 received 30.09.2026; the admin records a salvage of 50.00 received 31.10.2026.
+        await using var site = await ReportSite.CreateAsync();
+        var w = site.World;
+        var p = await w.PolicyAsync("P-REC", "2026-09-01", "2027-09-01", [new LineSpec("5.1", 0m, 0m)], issueRows: false);
+        var claim = await w.ClaimAsync(p.Id, p.Lines[0], "GEL", "2026-09-20", "2026-09-25");
+        await w.ReserveAsync(claim.Id, "2026-10-02", 1000m);
+        await w.ClaimPaymentAsync(claim.Id, "2026-10-06", 900m);
+        await w.RecoveryAsync(claim.Id, "subrogation", "2026-09-30", 7.50m);
+        var admin = new CurrentUser(w.Admin, "test.admin", "სატესტო ადმინი", "admin", "ადმინისტრატორი");
+        Assert.Null(await ClaimActions.AddRecoveryAsync(w.App, admin, new PostedForm([new("claim_id", claim.Id.ToString()), new("kind", "salvage"), new("received_on", "2026-10-31"),
+            new("amount_gel", "50.00"), new("note", "ოქტომბრის გადარჩენილი ქონება")])));
+        var (client, _) = await site.SignedInAsync("accountant");
+        var before = await w.FingerprintAsync();
+        string[] Row(string paid, string rbns, string recovered) => ["5.1", Casco, paid, rbns, "0.00", recovered, "0.00", "0.00"];
+        string[] Total(string paid, string rbns, string recovered) => ["სულ", paid, rbns, "0.00", recovered, "0.00", "0.00"];
+        foreach (var (month, paid, rbns, recovered) in new[] { ("2026-09", "0.00", "0.00", "7.50"), ("2026-10", "900.00", "1,000.00", "50.00"), ("2026-11", "0.00", "1,000.00", "0.00") })
+        {
+            var tables = Tables(await ReportSite.PageAsync(client, $"/accounting/premium-report?month={month}"));
+            Assert.Equal([[Ka.Common.NoData]], tables[0].Rows);
+            Assert.Equal([Row(paid, rbns, recovered), Total(paid, rbns, recovered)], tables[1].Rows);
+            Assert.Equal(2, tables.Count);
+        }
+        Assert.Equal(before, await w.FingerprintAsync());
+    }
+
     private sealed class TableComparer : IEqualityComparer<Table>
     {
         public bool Equals(Table? x, Table? y) => x is not null && y is not null && x.Header.SequenceEqual(y.Header)
