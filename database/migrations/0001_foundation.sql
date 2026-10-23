@@ -290,7 +290,9 @@ GO
 
 -- Takes the next number of a series, e.g. 'CAS000001'; safe under concurrent use (the row lock of the
 -- update). A series that does not exist gives null; one that has run out refuses (NU001) and, with the
--- rest of the transaction, takes no number.
+-- rest of the transaction, takes no number. The counter moves only when the number fits, so a refusal
+-- leaves it where it was even when the procedure is called outside a transaction (where SQL Server would
+-- commit the update on its own before the refusal; legacy select core.next_number(...) rolled it back).
 create procedure core.next_number @seq nvarchar(100), @number nvarchar(200) output
 as
 begin
@@ -299,20 +301,21 @@ begin
   update core.number_sequence
   set next_value = next_value + 1
   output deleted.next_value, inserted.prefix, inserted.padding into @taken
-  where code = @seq;
+  where code = @seq and len(convert(nvarchar(20), next_value)) <= padding;
   declare @value bigint, @prefix nvarchar(50), @padding int;
   select @value = taken, @prefix = prefix, @padding = padding from @taken;
   if @value is null
   begin
-    set @number = null;
-    return;
-  end
-  declare @digits nvarchar(20) = convert(nvarchar(20), @value);
-  if len(@digits) > @padding
-  begin
-    declare @m nvarchar(300) = concat(N'[NU001] number series ', @seq, N' has run out: ', @digits, N' does not fit in ', @padding, N' digits');
+    select @value = next_value, @padding = padding from core.number_sequence where code = @seq;
+    if @value is null
+    begin
+      set @number = null;
+      return;
+    end
+    declare @m nvarchar(300) = concat(N'[NU001] number series ', @seq, N' has run out: ', @value, N' does not fit in ', @padding, N' digits');
     exec core.fail @m;
   end
+  declare @digits nvarchar(20) = convert(nvarchar(20), @value);
   set @number = @prefix + case when @padding > len(@digits) then replicate(N'0', @padding - len(@digits)) else N'' end + @digits;
 end;
 GO
