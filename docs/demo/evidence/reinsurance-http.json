@@ -1,0 +1,69 @@
+{
+  "LoginStatus": 200,
+  "LoginFormPresent": true,
+  "Title": "სისტემაში შესვლა — სადაზღვევო სისტემა",
+  "SignInStatus": 302,
+  "RedirectLocation": "/",
+  "SessionCreated": true,
+  "ReturnedToLogin": false,
+  "Pages": [
+    {
+      "Path": "/parties",
+      "Status": 200,
+      "FinalPath": "/parties"
+    },
+    {
+      "Path": "/policies",
+      "Status": 200,
+      "FinalPath": "/policies"
+    },
+    {
+      "Path": "/payments/overdue",
+      "Status": 200,
+      "FinalPath": "/payments/overdue"
+    },
+    {
+      "Path": "/claims",
+      "Status": 200,
+      "FinalPath": "/claims"
+    },
+    {
+      "Path": "/accounting/premium-report",
+      "Status": 200,
+      "FinalPath": "/accounting/premium-report"
+    },
+    {
+      "Path": "/accounting/regulatory",
+      "Status": 200,
+      "FinalPath": "/accounting/regulatory"
+    }
+  ],
+  "HomeStatus": 200,
+  "HomeTitle": "მთავარი — სადაზღვევო სისტემა",
+  "SessionCookieSecure": true,
+  "ReinsuranceContentChecks": [
+    {
+      "Path": "/reinsurance/treaties",
+      "ExpectedRecordVisible": true,
+      "Status": 200
+    },
+    {
+      "Path": "/reinsurance/treaties/84799ae0-d6ff-4ab4-9534-a5e966d83dea",
+      "ExpectedRecordVisible": true,
+      "Status": 200
+    },
+    {
+      "Path": "/reinsurance/treaties/84799ae0-d6ff-4ab4-9534-a5e966d83dea/bordereau?from=2026-10-01&to=2026-10-31",
+      "ExpectedRecordVisible": true,
+      "Status": 200
+    },
+    {
+      "Path": "/claims/d5cd9711-60ae-486f-bbb3-3c2091ab0f68",
+      "ExpectedRecordVisible": true,
+      "Status": 200
+    }
+  ],
+  "ReinsuranceAmountsRendered": true,
+  "ReinsuranceExcelStatus": 200,
+  "ReinsuranceExcelBytes": 22710
+}
