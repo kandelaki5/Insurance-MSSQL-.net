@@ -6,5 +6,7 @@
   <ItemGroup>
     <!-- The official regulator templates, as the owner gave them (their SHA-256 is checked when they are filled). -->
     <EmbeddedResource Include="Regulatory\Templates\*.xlsx;Regulatory\Templates\SHA256SUMS" LogicalName="Insurance.Domain.Regulatory.Templates.%(Filename)%(Extension)" />
+    <!-- JavaScript's toUpperCase table of the old program's runtime (JsText). -->
+    <EmbeddedResource Include="Common\JsUpper.txt" LogicalName="Insurance.Domain.Common.JsUpper.txt" />
   </ItemGroup>
 </Project>

@@ -35,8 +35,6 @@ public sealed record OperationTargets(
 public static class Suspension
 {
     private static readonly TimeSpan Hour = TimeSpan.FromHours(1);
-    private static readonly TimeSpan TbilisiOffset = TimeSpan.FromHours(4);
-    private static readonly TimeZoneInfo Tbilisi = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tbilisi");
 
     /// <summary>Orthodox Easter Sunday (Julian computus, Meeus) as a Gregorian date.</summary>
     public static DateOnly OrthodoxEaster(int year)
@@ -69,9 +67,6 @@ public static class Suspension
         return day is DayOfWeek.Sunday or DayOfWeek.Saturday || (holidays ?? GeorgianHolidays)(date.Year).Contains(date);
     }
 
-    // The calendar day in Tbilisi of an instant (the old code asked Intl for the Asia/Tbilisi date).
-    private static DateOnly TbilisiDate(DateTimeOffset instant) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(instant, Tbilisi).DateTime);
-
     /// <summary>
     /// When a suspension that started at `startedAt` ends: `hours` of running time counted only on
     /// working days. Time inside a non-working day is skipped entirely (the clock pauses at the
@@ -83,9 +78,9 @@ public static class Suspension
         var cursor = startedAt.ToUniversalTime();
         for (var guard = 0; guard < 100 && remaining > TimeSpan.Zero; guard++)
         {
-            var day = TbilisiDate(cursor);
-            // The next midnight is taken at +04:00, as the old code wrote it.
-            var nextMidnight = new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue), TbilisiOffset).AddDays(1).ToUniversalTime();
+            // The day and its next midnight both in Georgia's +04:00 (TbilisiTime), the same on every system.
+            var day = TbilisiTime.Date(cursor);
+            var nextMidnight = TbilisiTime.Midnight(day.AddDays(1)).ToUniversalTime();
             if (IsNonWorkingDay(day, holidays)) { cursor = nextMidnight; continue; }
             var untilMidnight = nextMidnight - cursor;
             if (untilMidnight >= remaining) return cursor + remaining;

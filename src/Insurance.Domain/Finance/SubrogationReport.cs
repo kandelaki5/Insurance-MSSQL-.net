@@ -280,8 +280,6 @@ public static class SubrogationReport
     public static DateOnly TodayInTbilisi(DateTimeOffset? now = null) =>
         TbilisiDay((now ?? DateTimeOffset.UtcNow).ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture));
 
-    private static readonly TimeZoneInfo Tbilisi = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tbilisi");
-
     /// <summary>
     /// The calendar day in Tbilisi of a timestamp: the day a change counts from. The timestamp is ISO 8601 text; one
     /// without an offset is taken as UTC (the old code's Date.parse took it in the server's own time zone).
@@ -292,7 +290,7 @@ public static class SubrogationReport
         {
             throw new ArgumentException($"not a timestamp: {at}");
         }
-        return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(instant, Tbilisi).DateTime);
+        return Insurance.Domain.Common.TbilisiTime.Date(instant);
     }
 
     /// <summary>

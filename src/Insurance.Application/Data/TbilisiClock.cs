@@ -6,7 +6,5 @@ namespace Insurance.Application.Data;
 /// </summary>
 public static class TbilisiClock
 {
-    private static readonly TimeZoneInfo Zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tbilisi");
-
-    public static DateOnly Day(DateTimeOffset instant) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(instant, Zone).DateTime);
+    public static DateOnly Day(DateTimeOffset instant) => Insurance.Domain.Common.TbilisiTime.Date(instant);
 }

@@ -226,15 +226,51 @@ public class ComplianceParityTests
     public void IsNonWorkingDay() => Parity.All(Cases("isNonWorkingDay"), c =>
         Parity.Diff(c.GetProperty("out").GetBoolean(), Suspension.IsNonWorkingDay(c.GetProperty("in").Date())));
 
-    [Fact(DisplayName = "parity: suspensionEnd")]
-    public void SuspensionEnd() => Parity.All(Cases("suspensionEnd"), c =>
+    /// <summary>
+    /// The old code took the Tbilisi day of an instant from the system's time-zone data and its next midnight at +04:00; the
+    /// rewrite takes both at Georgia's +04:00 (TbilisiTime), so the answer no longer hangs on the operating system (Codex
+    /// R04: on Windows 12 of these cases came out otherwise). The two agree on every case from 27 March 2005, when +04:00
+    /// came into force. Before it the old answers mixed that day's offset (+03, or +05 in summer) with a +04:00 midnight —
+    /// one 48-hour suspension of 18.03.2005 ended after 7 hours — so there each answer of the rewrite is instead checked to
+    /// hold exactly the hours asked of working time (or to stop where the old walk's 100-day limit stops it), and the cases
+    /// where the two part are counted and all lie before that day.
+    /// </summary>
+    [Fact(DisplayName = "parity: suspensionEnd, equal from 27.03.2005 on; earlier ones hold their working hours (R04)")]
+    public void SuspensionEnd()
     {
-        var i = c.GetProperty("in");
-        var start = DateTimeOffset.Parse(i.GetProperty("startedAt").Str(), CultureInfo.InvariantCulture);
-        var hours = i.GetProperty("hours");
-        var end = hours.ValueKind == JsonValueKind.Null ? Suspension.SuspensionEnd(start) : Suspension.SuspensionEnd(start, hours.GetInt32());
-        return Parity.Diff(c.GetProperty("out").Str(), Parity.Iso(end));
-    });
+        var parted = new List<string>();
+        Parity.All(Cases("suspensionEnd"), c =>
+        {
+            var i = c.GetProperty("in");
+            var start = DateTimeOffset.Parse(i.GetProperty("startedAt").Str(), CultureInfo.InvariantCulture);
+            var hours = i.GetProperty("hours");
+            var h = hours.ValueKind == JsonValueKind.Null ? 72 : hours.GetInt32();
+            var end = hours.ValueKind == JsonValueKind.Null ? Suspension.SuspensionEnd(start) : Suspension.SuspensionEnd(start, h);
+            if (Parity.Diff(c.GetProperty("out").Str(), Parity.Iso(end)) is not { } difference) return null;
+            if (start >= TbilisiTime.Since) return difference;
+            parted.Add($"{Parity.Iso(start)}/{h}");
+            // The walk looks at 100 days at most, as the old one did: hours it cannot find in them end at that 100th day's end.
+            var horizon = TbilisiTime.Midnight(TbilisiTime.Date(start).AddDays(100));
+            if (TimeSpan.FromHours(h) > WorkingTime(start, horizon)) return Parity.Diff(Parity.Iso(horizon), Parity.Iso(end));
+            return Parity.Diff(TimeSpan.FromHours(Math.Max(h, 0)), WorkingTime(start, end));
+        });
+        Assert.Equal(12, parted.Count);
+        Assert.All(parted, p => Assert.True(string.CompareOrdinal(p, "2005-03-27") < 0, p));
+    }
+
+    /// <summary>Working time between two instants, summed day by day at +04:00 (an oracle independent of SuspensionEnd's walk).</summary>
+    private static TimeSpan WorkingTime(DateTimeOffset from, DateTimeOffset to)
+    {
+        var total = TimeSpan.Zero;
+        for (var day = TbilisiTime.Date(from); TbilisiTime.Midnight(day) < to; day = day.AddDays(1))
+        {
+            if (Suspension.IsNonWorkingDay(day)) continue;
+            var a = TbilisiTime.Midnight(day) > from ? TbilisiTime.Midnight(day) : from;
+            var b = TbilisiTime.Midnight(day.AddDays(1)) < to ? TbilisiTime.Midnight(day.AddDays(1)) : to;
+            if (b > a) total += b - a;
+        }
+        return total;
+    }
 
     [Fact(DisplayName = "parity: writtenConfirmationDeadline")]
     public void WrittenConfirmationDeadline() => Parity.All(Cases("writtenConfirmationDeadline"), c =>
