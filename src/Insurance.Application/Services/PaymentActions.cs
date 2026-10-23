@@ -187,7 +187,7 @@ public static partial class PaymentActions
         var gelMinor = AmountInTetri(V("amount_gel") ?? "");
         if (gelMinor is not { } gm || gm <= 0 || gm > Numeric18_2Max) errors["amount_gel"] = BillingTexts.Payment.Errors.Amount;
         var receivedText = V("received_on") ?? "";
-        var today = Rates.TodayInTbilisi();
+        var today = db.Today();
         if (!Dates.IsIsoDate(receivedText) || Dates.ParseIsoDate(receivedText) > today) errors["received_on"] = BillingTexts.Payment.Errors.Date;
         var method = V("method") ?? "";
         if (!BillingTexts.Payment.Methods.ContainsKey(method)) errors["method"] = BillingTexts.Payment.Errors.Method;
@@ -211,7 +211,7 @@ public static partial class PaymentActions
                 if (!await PermissionStore.HasPermissionAsync(tx, user, "premium.receipt.create")) return (object)"not-allowed";
                 await LockPolicyAsync(tx, policy.Id);
                 if (await Aml.SuspensionInTransactionAsync(tx, policy.PolicyholderId, targets) is not null) return "suspended";
-                var bookedOn = Rates.TodayInTbilisi();
+                var bookedOn = tx.Today();
                 var balances = await BalancesAsync(tx, policy.Id, bookedOn);
                 if (!balances.Any(b => b.Outstanding > 0)) return "nothing-owed";
 
@@ -254,7 +254,7 @@ public static partial class PaymentActions
         string Back(string outcome, string extra = "") => $"/policies/{policyText}?advance={outcome}{extra}";
         if (!user.CanWrite) return Back("read-only");
         if (!Uuid.TryParse(paymentText, out var paymentId)) return Back("not-found");
-        var bookedOn = Rates.TodayInTbilisi();
+        var bookedOn = db.Today();
 
         object outcome;
         try
@@ -312,7 +312,7 @@ public static partial class PaymentActions
         string Back(string outcome, string extra = "") => $"/policies/{policyText}?advance={outcome}{extra}";
         if (!user.CanWrite) return Back("read-only");
         if (!Uuid.TryParse(paymentText, out var paymentId)) return Back("not-found");
-        var bookedOn = Rates.TodayInTbilisi();
+        var bookedOn = db.Today();
 
         object outcome;
         try
@@ -429,7 +429,7 @@ public static partial class PaymentActions
         if (!user.CanWrite) return null;
         var reason = Insurance.Domain.Common.JsText.Trim(reasonText ?? "");
         if (!Uuid.TryParse(paymentText, out var paymentId) || !Uuid.TryParse(policyText, out var policyId) || reason == "") return null;
-        var today = Rates.TodayInTbilisi();
+        var today = db.Today();
 
         ReversalPlan? plan = null;
         try
@@ -605,7 +605,7 @@ public static partial class PaymentActions
         var method = methodText ?? "bank";
         var reference = Insurance.Domain.Common.JsText.Trim(referenceText ?? "") is { Length: > 0 } r ? r : null;
         if (!Uuid.TryParse(policyText, out var policyId) || !BillingTexts.Payment.Methods.ContainsKey(method)) return null;
-        var today = Rates.TodayInTbilisi();
+        var today = db.Today();
 
         string? outcome = null;
         RefundPlan? plan = null;

@@ -58,7 +58,7 @@ public sealed class IndexModel(Rates rates) : AppPageModel
     public async Task<IActionResult> OnGetAsync()
     {
         if (Me.RoleCode is not ("admin" or "accountant")) return Redirect("/");
-        Month = Insurance.Application.Services.PremiumReport.ReportMonth(Query("month"));
+        Month = Insurance.Application.Services.PremiumReport.ReportMonth(Query("month"), Db.Today());
         // Form 6 is quarterly: the quarter asked for, else the month's own; its date is the quarter's last day.
         var asked = Query("quarter");
         Quarter = !string.IsNullOrEmpty(asked) && Insurance.Domain.Regulatory.Form6.QuarterEnd(asked) is not null ? asked : Insurance.Domain.Regulatory.Form6.QuarterOf(Month);

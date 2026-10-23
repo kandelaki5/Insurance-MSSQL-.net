@@ -23,7 +23,7 @@ public sealed class IndexModel : AppPageModel
         Filter = filter is not null && Ka.Party.Filters.ContainsKey(filter) ? filter : "all";
         // % and _ match anything, as in PostgreSQL's like; [ is only literal there, so it is escaped here.
         var pattern = $"%{Q.ToLowerInvariant().Replace("[", "[[]", StringComparison.Ordinal)}%";
-        Today = Rates.TodayInTbilisi();
+        Today = Db.Today();
         Soon = Today.AddDays(30);
         Rows = (await Db.ReadTxAsync(tx => tx.QueryAsync<Row>("""
             select top (200) id as Id, kind as Kind, display_name as DisplayName, coalesce(tax_id, foreign_id) as IdNumber, segment as Segment,

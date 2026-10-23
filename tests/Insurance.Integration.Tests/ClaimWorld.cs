@@ -29,7 +29,7 @@ public sealed class NoNetwork : IHttpClientFactory
 /// </summary>
 public sealed class ClaimWorld(TestDatabase db, ICommandInterceptor? interceptor = null)
 {
-    public Db App { get; } = interceptor is null ? db.App : new(new DbOptions { ConnectionString = db.AppConnection, Interceptor = interceptor });
+    public Db App { get; } = interceptor is null ? db.App : new(new DbOptions { ConnectionString = db.AppConnection, Interceptor = interceptor, Clock = db.Clock });
     public NoNetwork Network { get; } = new();
     public Rates Rates => new(App, Network);
     public TestDatabase Database => db;

@@ -11,7 +11,7 @@ public sealed class PremiumReportModel(Rates rates) : AppPageModel
 
     public async Task OnGetAsync()
     {
-        Month = PremiumReport.ReportMonth(Query("month") ?? "");
+        Month = PremiumReport.ReportMonth(Query("month") ?? "", Db.Today());
         Report = await Db.ReadTxAsync(tx => PremiumReport.BuildAsync(tx, rates, Month));
     }
 }

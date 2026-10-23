@@ -25,7 +25,7 @@ public sealed class CardModel : AppPageModel
     /// <summary>The decision form's values: the case as stored, or what was posted after a decision (legacy useActionState).</summary>
     public IReadOnlyDictionary<string, string> Decision { get; private set; } = new Dictionary<string, string>();
 
-    public SuspensionSectionView Section => new(AmlTexts.Suspension.Title, Case.PartyId, Case.Id, Suspensions, Writable, $"/compliance/aml-cases/{Case.Id}", false, Query("suspension") == "target");
+    public SuspensionSectionView Section => new(AmlTexts.Suspension.Title, Case.PartyId, Case.Id, Suspensions, Writable, $"/compliance/aml-cases/{Case.Id}", false, Query("suspension") == "target", Db.Now());
 
     private static string Local(string column) => $"format(switchoffset({column}, '+04:00'), 'yyyy-MM-ddTHH:mm')";
 
@@ -87,7 +87,7 @@ public sealed class CardModel : AppPageModel
         var decision = values.GetValueOrDefault("decision") ?? "";
         if (PermissionPanel.Uuid(caseText) is not { } caseId) return await ShowAsync(id, values);
         var t = AmlTexts.Cases.Errors.ByKey;
-        var today = Rates.TodayInTbilisi();
+        var today = Db.Today();
         if (decision is "examine" or "report" && V("examination") is null) Errors["examination"] = t["examination"];
         var suspicionAt = Aml.TbilisiInstant(values.GetValueOrDefault("suspicion_at"));
         var strSentAt = Aml.TbilisiInstant(values.GetValueOrDefault("str_sent_at"));

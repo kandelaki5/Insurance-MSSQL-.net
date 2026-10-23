@@ -13,7 +13,7 @@ public sealed class IndexModel : AppPageModel
     public async Task<IActionResult> OnGetAsync()
     {
         if (!Aml.CanSeeAml(Me)) return Redirect("/");
-        var (period, half) = Application.Services.AmlReport.ParsePeriod(Query("year"), Query("half"), Rates.TodayInTbilisi());
+        var (period, half) = Application.Services.AmlReport.ParsePeriod(Query("year"), Query("half"), Db.Today());
         HalfValue = half;
         Report = await Db.ReadTxAsync(tx => Application.Services.AmlReport.BuildAsync(tx, period));
         return Page();

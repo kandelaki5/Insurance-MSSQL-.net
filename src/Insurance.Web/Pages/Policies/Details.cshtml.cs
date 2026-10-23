@@ -82,7 +82,7 @@ public sealed class DetailsModel(Rates rates) : AppPageModel
     private async Task<bool> LoadAsync(Guid id)
     {
         // One reporting day for the whole card, taken once (Codex PR #18 review, item 3).
-        Today = Rates.TodayInTbilisi();
+        Today = Db.Today();
         var policy = await Db.ReadAsync(c => c.QuerySingleOrDefaultAsync<PolicyRow>("""
             select p.id as Id, p.number as Number, c.number as ContractNumber, h.id as PolicyholderId, h.display_name as Policyholder, h.segment as Segment,
                    pr.name_ka as Product, p.issued_on as IssuedOn, p.effective_from as EffectiveFrom, p.effective_to as EffectiveTo, p.status as Status,
@@ -173,7 +173,7 @@ public sealed class DetailsModel(Rates rates) : AppPageModel
             AdvancesGel = advances.Aggregate(BigInteger.Zero, (s, r) => s + PaymentActions.Exact(r.AvailableGel));
             // Overpayments on the client's other policies that could pay this one (owner, 07.10.2026): shown from issue on.
             ReleasableGel = Me.CanWrite && policy.Status != "draft"
-                ? (await Billing.LoadReleasableAsync(tx, policy.PolicyholderId, Rates.TodayInTbilisi(), id)).Aggregate(BigInteger.Zero, (s, r) => s + PaymentActions.Exact(r.ExcessGel))
+                ? (await Billing.LoadReleasableAsync(tx, policy.PolicyholderId, Db.Today(), id)).Aggregate(BigInteger.Zero, (s, r) => s + PaymentActions.Exact(r.ExcessGel))
                 : 0;
             Cessions = (await tx.QueryAsync<Cession>("""
                 select c.id as Id, tr.id as TreatyId, tr.number as TreatyNumber, tr.name as TreatyName, tr.kind as Kind, l.class_code as ClassCode,

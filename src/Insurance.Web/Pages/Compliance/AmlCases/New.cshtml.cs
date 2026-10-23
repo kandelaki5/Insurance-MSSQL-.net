@@ -22,7 +22,7 @@ public sealed class NewModel : AppPageModel
     {
         if (!Aml.IsComplianceRole(Me)) return Redirect("/compliance/aml-cases");
         await LoadAsync();
-        Values["opened_on"] = Fmt.Iso(Rates.TodayInTbilisi());
+        Values["opened_on"] = Fmt.Iso(Db.Today());
         Values["source"] = "monitoring";
         Values["party_id_number"] = Query("party") ?? "";
         return Page();
@@ -45,7 +45,7 @@ public sealed class NewModel : AppPageModel
             "select top (1) id from core.party where tax_id = @number or foreign_id = @number", new { number }));
         if (partyId is null) Errors["party_id_number"] = t["party"];
         var openedOn = values.GetValueOrDefault("opened_on") ?? "";
-        if (!Dates.IsIsoDate(openedOn) || string.CompareOrdinal(openedOn, Fmt.Iso(Rates.TodayInTbilisi())) > 0) Errors["opened_on"] = t["openedOn"];
+        if (!Dates.IsIsoDate(openedOn) || string.CompareOrdinal(openedOn, Fmt.Iso(Db.Today())) > 0) Errors["opened_on"] = t["openedOn"];
         if (V("description") is null) Errors["description"] = t["description"];
         var source = V("source") is { } s && AmlTexts.Cases.Sources.ContainsKey(s) ? s : "monitoring";
         if (Errors.Count > 0) return await ShowAsync();

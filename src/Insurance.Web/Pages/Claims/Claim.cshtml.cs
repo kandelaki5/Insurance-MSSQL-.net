@@ -17,7 +17,8 @@ public sealed class ClaimModel(Rates rates) : AppPageModel
 {
     public Guid Id { get; private set; }
     public ClaimReads.ClaimPage Data { get; private set; } = null!;
-    public DateOnly Today { get; } = Rates.TodayInTbilisi();
+    private DateOnly? today;
+    public DateOnly Today => today ??= Db.Today();
 
     /// <summary>The form a refused post came from ("pay" or "coverage"): only it shows the values as typed and its errors.</summary>
     public string? PostedFormName { get; private set; }
@@ -91,19 +92,19 @@ public sealed class ClaimModel(Rates rates) : AppPageModel
 
     public async Task<IActionResult> OnPostPayClaimAsync(Guid id)
     {
-        var outcome = await ClaimActions.PayClaimAsync(Db, rates, Me, Request.PostedForm(), Rates.TodayInTbilisi());
+        var outcome = await ClaimActions.PayClaimAsync(Db, rates, Me, Request.PostedForm(), Db.Today());
         return outcome.RedirectTo is { } to ? Redirect(to) : await RefusedAsync(id, outcome, "pay");
     }
 
     public async Task<IActionResult> OnPostChangeReserveAsync() =>
-        Stay(await ClaimActions.ChangeReserveAsync(Db, Me, Request.PostedForm(), Rates.TodayInTbilisi()));
+        Stay(await ClaimActions.ChangeReserveAsync(Db, Me, Request.PostedForm(), Db.Today()));
 
     public async Task<IActionResult> OnPostApproveReserveRequestAsync() =>
         Stay(await ClaimActions.ApproveReserveRequestAsync(Db, Me, Request.PostedForm()));
 
     public async Task<IActionResult> OnPostDecideAsync()
     {
-        await ClaimActions.DecideClaimAsync(Db, Me, Request.PostedForm(), Rates.TodayInTbilisi());
+        await ClaimActions.DecideClaimAsync(Db, Me, Request.PostedForm(), Db.Today());
         return Stay(null);
     }
 
@@ -115,7 +116,7 @@ public sealed class ClaimModel(Rates rates) : AppPageModel
         Stay(await ClaimActions.AddRecoveryAsync(Db, Me, Request.PostedForm()));
 
     public async Task<IActionResult> OnPostReverseClaimPaymentAsync() =>
-        Stay(await ClaimActions.ReverseClaimPaymentAsync(Db, Me, Request.PostedForm(), Rates.TodayInTbilisi()));
+        Stay(await ClaimActions.ReverseClaimPaymentAsync(Db, Me, Request.PostedForm(), Db.Today()));
 
     /// <summary>A value of the form a refused post came from, else the form's own starting value.</summary>
     public string FormValue(string form, string name, string fallback) => PostedFormName == form ? Value(name) : fallback;

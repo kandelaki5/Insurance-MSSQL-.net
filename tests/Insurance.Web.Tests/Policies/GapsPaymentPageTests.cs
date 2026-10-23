@@ -185,6 +185,56 @@ public sealed partial class GapsPaymentPageTests(PolicyWebApp app) : IClassFixtu
         Assert.Contains("50.00", Insurance.Web.Tests.Html.Text(Part(after, BillingTexts.Payment.Advances.Title)));
     }
 
+    /// <summary>
+    /// Scenario 3 on the legacy days, on a site of its own: S from 01.09.2026 (150.00) and T from 01.10.2026 (100.00) of one client; a receipt
+    /// of 150.00 received 07.09.2026 never allocated (the legacy fixture, written directly); September and October then closed by the real
+    /// close, the database's clock standing on 03.11.2026 (the legacy TODAY). The allocation is booked 03.11: October as it was.
+    /// </summary>
+    [Fact]
+    public async Task Scenario_3_on_the_legacy_days_September_and_October_closed_today_03_11_100_of_the_07_09_receipt_settles_T_booked_03_11_50_left_October_as_it_was()
+    {
+        var site = new PolicyWebApp();
+        await site.InitializeAsync();
+        try
+        {
+            var w = site.W;
+            var admin = await w.UserAsync();
+            var (accountant, accId) = await site.SignedInAsync("accountant");
+            var acc = await site.UserOfAsync(accId);
+            await Gaps.DecideAsync(w, acc.Id, Receipt, "deny");
+            var holder = await w.ClientAsync();
+            var s = await w.PendingPolicyAsync(holder, new DateOnly(2026, 9, 1), premium: 150m, schedule: [(0, 150m)]);
+            var t = await w.PendingPolicyAsync(holder, new DateOnly(2026, 10, 1), premium: 100m, schedule: [(0, 100m)]);
+            foreach (var x in new[] { s, t }) Assert.Equal("done", (await PolicyActions.ApprovePolicyAsync(w.App, admin, x.Id.ToString())).Outcome);
+            var t1 = await w.ScalarAsync<Guid>("select id from core.installment where policy_id = @id", new { id = t.Id });
+            var r = await w.ReceiptAsync(holder, new DateOnly(2026, 9, 7), 150m, reference: "R-0907");
+            Gaps.On(w, new DateOnly(2026, 11, 3));
+            foreach (var month in new[] { "2026-09-01", "2026-10-01" })
+                Assert.Equal(new PeriodClose.Answer("done", month), await PeriodClose.CloseAsync(w.App, acc, month));
+            var octoberBefore = Gaps.Shape(await Gaps.MonthReportAsync(w, new DateOnly(2026, 10, 1)));
+            var page = await RawAsync(accountant, $"/policies/{t.Id}/payment");
+            Assert.False(HasReceiptForm(page));
+            var forms = FormFields(Part(page, BillingTexts.Payment.Advances.Title));
+            Assert.Equal([new Dictionary<string, string> { ["policy_id"] = t.Id.ToString(), ["payment_id"] = r.ToString() }], forms);
+            Assert.Contains("150.00", Insurance.Web.Tests.Html.Text(Part(page, BillingTexts.Payment.Advances.Title)));
+            // S owes its 150.00 too — the advance goes to T only, the page's policy; booked today, 03.11 (the first open month).
+            Assert.Equal($"/policies/{t.Id}?advance=allocated&gel=10000&left=5000",
+                Location(await WebApp.PostFormAsync(accountant, $"/policies/{t.Id}/payment?handler=Allocate", forms[0], $"/policies/{t.Id}/payment")));
+            Assert.Equal([(t1, 100m, 100m, 1m, new DateOnly(2026, 11, 3))], await w.QueryAsync<(Guid, decimal, decimal, decimal, DateOnly)>(
+                "select installment_id, amount, amount_gel, rate, booked_on from core.payment_allocation where payment_id = @r", new { r }));
+            Assert.Equal([(new DateOnly(2026, 9, 7), 150m)], await w.QueryAsync<(DateOnly, decimal)>("select received_on, amount_gel from core.payment"));
+            var after = await RawAsync(accountant, $"/policies/{t.Id}/payment");
+            Assert.Equal("0.00", OwedOn(after));
+            Assert.Equal(forms, FormFields(Part(after, BillingTexts.Payment.Advances.Title)));
+            Assert.Contains("50.00", Insurance.Web.Tests.Html.Text(Part(after, BillingTexts.Payment.Advances.Title)));
+            Assert.Equal(octoberBefore, Gaps.Shape(await Gaps.MonthReportAsync(w, new DateOnly(2026, 10, 1))));
+        }
+        finally
+        {
+            await site.DisposeAsync();
+        }
+    }
+
     [Fact]
     public async Task Scenario_4_a_reductions_overpayment_moved_to_the_other_policy_minus_50_on_S_and_plus_50_on_T_the_receipt_unchanged_T_owes_50()
     {

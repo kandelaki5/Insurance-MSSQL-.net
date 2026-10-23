@@ -16,7 +16,7 @@ public sealed class OverdueModel(Rates rates) : AppPageModel
 
     public async Task OnGetAsync()
     {
-        Today = Rates.TodayInTbilisi();
+        Today = Db.Today();
         var today = Today;
         var (policies, installments, allocations) = await Db.ReadTxAsync(async tx =>
         {

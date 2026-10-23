@@ -48,7 +48,7 @@ public sealed class NewModel(Rates rates) : AppPageModel
     {
         if (!Me.CanWrite) return Redirect("/policies");
         if (!await LoadAsync()) return Redirect("/policies");
-        var today = Rates.TodayInTbilisi();
+        var today = Db.Today();
         Values["effective_from"] = Dates.ToIso(today);
         Values["effective_to"] = Dates.ToIso(OneYearAfter(today));
         Values["currency"] = "GEL";

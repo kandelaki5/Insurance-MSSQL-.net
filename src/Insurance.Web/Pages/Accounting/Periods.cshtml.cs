@@ -36,7 +36,7 @@ public sealed class PeriodsModel : AppPageModel
 
     private async Task LoadAsync()
     {
-        var today = Rates.TodayInTbilisi();
+        var today = Db.Today();
         var currentMonth = new DateOnly(today.Year, today.Month, 1);
         // The closing deadline is the company's own setting (owner, 06.10.2026); 5 days until it is set.
         var (settings, first, closed) = await Db.ReadTxAsync(async tx =>

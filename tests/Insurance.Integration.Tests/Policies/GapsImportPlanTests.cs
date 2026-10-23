@@ -44,8 +44,9 @@ public sealed class OneDayNbg(string date, params (string Code, decimal Quantity
 /// excess attributed to the other policy, the shared receipt reversed, the second USD start rate fetched from the bank.
 /// The import and approval cases keep the legacy dates (01.10.2026 and 15.10.2026): the report of a month with no receipt
 /// does not depend on today. The receipt cases run on the first of today's month with receipts received and entered
-/// today (legacy 07.10.2026 and 07.11.2026): the month boundary between the receipt and its later attribution or reversal
-/// cannot be reproduced without a settable clock, so those figures are checked in one month (docs/legacy-tests-gaps-b.md).
+/// today (legacy 07.10.2026 and 07.11.2026), their figures checked in one month; the tests at the end run the same cases on the
+/// legacy days, the database's clock (DbOptions.Clock) standing on each action's day, with the month boundary between the receipt
+/// and its later attribution, reversal or registration (docs/legacy-tests-gaps-b.md).
 /// </summary>
 public sealed class GapsImportPlanTests(TestDatabase db) : IClassFixture<TestDatabase>
 {
@@ -323,5 +324,216 @@ public sealed class GapsImportPlanTests(TestDatabase db) : IClassFixture<TestDat
             Assert.Equal(before, await LedgerAsync(w));
             Assert.Equal(numbers, await w.ScalarAsync<string>("select string_agg(concat(code, '=', next_value), ',') within group (order by code) from core.number_sequence"));
             Assert.Equal(0, await w.ScalarAsync<int>("select (select count(*) from core.contract where policyholder_id = @holder) + (select count(*) from core.insured_object)", new { holder }));
+        });
+
+    // ================================================================ the legacy days, on the database's clock (DbOptions.Clock)
+
+    /// <summary>The whole month of the two GEL policies (the legacy month(…) helper): premium, IBNR 80.00 and one GEL receivable at the month's end.</summary>
+    private static void GelMonth(PremiumReport.Report r, DateOnly from, int issued, BigInteger written, BigInteger earned, BigInteger unearned, BigInteger outstanding, BigInteger overdue)
+    {
+        Assert.Equal((Month(from), from, MonthEnd(from)), (r.Month, r.From, r.To));
+        Premium(r, issued, written, earned, unearned, 8000);
+        Assert.Equal([new PremiumReport.ReceivableRow("GEL", outstanding, overdue, outstanding, 1m, MonthEnd(from))], r.Receivables);
+    }
+
+    /// <summary>The legacy chain on its days: imported and both approved on 01.10.2026, 1 300.00 on the first policy received and entered 07.10.2026.</summary>
+    private static async Task<(Imported I, Guid Receipt)> Legacy1300Async(World w)
+    {
+        On(w, D(2026, 10, 1));
+        var i = await ImportAsync(w, Georgian, D(2026, 10, 1));
+        await ApproveBothAsync(w, i);
+        await DecideAsync(w, i.Underwriter.Id, "premium.receipt.create", "allow");
+        On(w, D(2026, 10, 7));
+        Assert.Equal($"/policies/{i.First}?paid=10000", (await w.PayAsync(i.Underwriter, i.First, "1300.00", D(2026, 10, 7), reference: "IMPORT-PAY-1300")).Redirect);
+        return (i, await w.ScalarAsync<Guid>("select id from core.payment where reference = N'IMPORT-PAY-1300'"));
+    }
+
+    [Fact]
+    public async Task The_1300_receipts_100_left_allocated_to_the_second_policy_on_07_11_booked_07_11_October_as_reported_November_owes_300_nothing_overdue() =>
+        await OwnDatabaseAsync(async w =>
+        {
+            var (i, receipt) = await Legacy1300Async(w);
+            // October after the receipt, by hand (tetri): 2 policies, 160000, earned 13589, UPR 146411, IBNR 8000; owed 160000 − 120000
+            // = 40000, the second policy's 01.10 instalment (10000) overdue. September empty.
+            var october = await MonthReportAsync(w, D(2026, 10, 1));
+            GelMonth(october, D(2026, 10, 1), 2, 160000, 13589, 146411, 40000, 10000);
+            Empty(await MonthReportAsync(w, D(2026, 9, 1)));
+            var advance = Assert.Single(await w.App.ReadTxAsync(tx => Billing.LoadAdvancesAsync(tx, i.Holder)));
+            Assert.Equal((receipt, D(2026, 10, 7), 1300m, 100m), (advance.Id, advance.ReceivedOn, advance.AmountGel, advance.AvailableGel));
+            // The real AllocateReceipt on 07.11.2026: the 100.00 left goes to the second policy's oldest unpaid instalment.
+            On(w, D(2026, 11, 7));
+            Assert.Equal($"/policies/{i.Second}?advance=allocated&gel=10000&left=0",
+                await PaymentActions.AllocateReceiptAsync(w.App, w.Rates, i.Underwriter, i.Second.ToString(), receipt.ToString()));
+            var before = await LedgerAsync(w);
+            var octoberAfter = await MonthReportAsync(w, D(2026, 10, 1));
+            var november = await MonthReportAsync(w, D(2026, 11, 1));
+            // October exactly as reported. November (61 days by 30.11): earned per row 15041 + 5014 + 5014 + 1671 = 26740 − 13589 = 13151,
+            // UPR 160000 − 26740 = 133260; owed 160000 − 130000 = 30000; the second's 01.10 now paid, its next due 01.01 — nothing overdue.
+            Assert.Equal(Shape(october), Shape(octoberAfter));
+            GelMonth(november, D(2026, 11, 1), 0, 0, 13151, 133260, 30000, 0);
+            Assert.Equal(before, await LedgerAsync(w));
+            // The raw rows: eleven allocations on the first policy booked 07.10, one of 100.00 on the second's 01.10 booked 07.11; nothing left.
+            Assert.Equal([(i.First, D(2026, 10, 1), 200m, D(2026, 10, 7)), .. Enumerable.Range(1, 10).Select(k => (i.First, D(2026, 10, 1).AddMonths(k), 100m, D(2026, 10, 7))),
+                    (i.Second, D(2026, 10, 1), 100m, D(2026, 11, 7))],
+                await w.QueryAsync<(Guid, DateOnly, decimal, DateOnly)>("""
+                    select i.policy_id, i.due_on, a.amount, a.booked_on from core.payment_allocation a join core.installment i on i.id = a.installment_id
+                    where a.payment_id = @receipt order by a.booked_on, i.due_on
+                    """, new { receipt }));
+            Assert.Equal([(D(2026, 10, 7), 1300m)], await w.QueryAsync<(DateOnly, decimal)>("select received_on, amount_gel from core.payment"));
+            Assert.Empty(await w.App.ReadTxAsync(tx => Billing.LoadAdvancesAsync(tx, i.Holder)));
+        });
+
+    [Fact]
+    public async Task The_shared_1300_receipt_reversed_on_10_11_a_mirror_of_it_and_its_twelve_lines_booked_10_11_October_as_reported_November_owes_1600_with_400_overdue() =>
+        await OwnDatabaseAsync(async w =>
+        {
+            var (i, receipt) = await Legacy1300Async(w);
+            On(w, D(2026, 11, 7));
+            Assert.Equal($"/policies/{i.Second}?advance=allocated&gel=10000&left=0",
+                await PaymentActions.AllocateReceiptAsync(w.App, w.Rates, i.Underwriter, i.Second.ToString(), receipt.ToString()));
+            // Before the reversal, as accepted: October 40000 / 10000; November 30000 / 0; one receipt, twelve allocations, 1 300.00.
+            var october = await MonthReportAsync(w, D(2026, 10, 1));
+            GelMonth(october, D(2026, 10, 1), 2, 160000, 13589, 146411, 40000, 10000);
+            GelMonth(await MonthReportAsync(w, D(2026, 11, 1)), D(2026, 11, 1), 0, 0, 13151, 133260, 30000, 0);
+            var originals = await w.QueryAsync<(Guid Installment, decimal Amount, decimal AmountGel, decimal Rate)>(
+                "select installment_id, amount, amount_gel, rate from core.payment_allocation where payment_id = @receipt", new { receipt });
+            Assert.Equal((12, 1300m), (originals.Count, originals.Sum(o => o.AmountGel)));
+            // The real reversePayment on 10.11.2026, from the second policy's card.
+            On(w, D(2026, 11, 10));
+            const string reason = "შეცდომით შეტანილი ქვითარი — ორი პოლისი";
+            Assert.Null(await PaymentActions.ReversePaymentAsync(w.App, i.Underwriter, receipt.ToString(), i.Second.ToString(), reason));
+            var before = await LedgerAsync(w);
+            // By hand: October unchanged; November owes everything again, 160000; due by 30.11 and unpaid: the first's 01.10 (20000) and
+            // 01.11 (10000), the second's 01.10 (10000) — overdue 40000; earned 13151, UPR 133260, IBNR 8000 as before. September empty.
+            Assert.Equal(Shape(october), Shape(await MonthReportAsync(w, D(2026, 10, 1))));
+            GelMonth(await MonthReportAsync(w, D(2026, 11, 1)), D(2026, 11, 1), 0, 0, 13151, 133260, 160000, 40000);
+            Empty(await MonthReportAsync(w, D(2026, 9, 1)));
+            Assert.Equal(before, await LedgerAsync(w));
+            // The raw rows: the mirror −1 300.00 dated 10.11 and a mirror of each of the twelve allocations, booked 10.11, sign opposite.
+            var mirror = Assert.Single(await w.QueryAsync<(Guid Id, DateOnly ReceivedOn, decimal AmountGel, string Method, string Kind, Guid Payer, string Reference, Guid CreatedBy)>(
+                "select id, received_on, amount_gel, method, kind, payer_party_id, reference, created_by from core.payment where reverses_payment_id = @receipt", new { receipt }));
+            Assert.Equal((D(2026, 11, 10), -1300m, "bank", "reversal", i.Holder, reason, i.Underwriter.Id), (mirror.ReceivedOn, mirror.AmountGel, mirror.Method, mirror.Kind, mirror.Payer, mirror.Reference, mirror.CreatedBy));
+            var mirrors = await w.QueryAsync<(Guid Installment, decimal Amount, decimal AmountGel, decimal Rate, DateOnly BookedOn)>(
+                "select installment_id, amount, amount_gel, rate, booked_on from core.payment_allocation where payment_id = @id", new { id = mirror.Id });
+            Assert.Equal(originals.Select(o => (o.Installment, -o.Amount, -o.AmountGel, o.Rate, D(2026, 11, 10))).OrderBy(x => x.Installment).ToList(), mirrors.OrderBy(x => x.Installment).ToList());
+            Assert.Empty(await w.App.ReadTxAsync(tx => Billing.LoadAdvancesAsync(tx, i.Holder)));
+            // A second reversal adds nothing.
+            Assert.Null(await PaymentActions.ReversePaymentAsync(w.App, i.Underwriter, receipt.ToString(), i.Second.ToString(), reason));
+            Assert.Equal(before, await LedgerAsync(w));
+            Assert.Equal((2, 24), (await w.ScalarAsync<int>("select count(*) from core.payment"), await w.ScalarAsync<int>("select count(*) from core.payment_allocation")));
+        });
+
+    /// <summary>
+    /// The USD chain on its legacy days: September closed by the real close (accountant, 20.10.2026), the two USD policies imported by
+    /// the underwriter on 20.10.2026 with 15.10's rate fetched from the bank (280 / 100), both approved on 20.10.2026. Stored: 01.10 2.70,
+    /// 20.10 2.90, 31.10 3.00, 30.11 3.50 and <paramref name="extra"/>.
+    /// </summary>
+    private static async Task<(Imported I, OneDayNbg Nbg)> LegacyUsdAsync(World w, params (DateOnly Day, decimal Rate)[] extra)
+    {
+        await w.RateAsync("USD", D(2026, 10, 1), 2.7m);
+        await w.RateAsync("USD", D(2026, 10, 20), 2.9m);
+        await w.RateAsync("USD", D(2026, 10, 31), 3.0m);
+        await w.RateAsync("USD", D(2026, 11, 30), 3.5m);
+        foreach (var (day, rate) in extra) await w.RateAsync("USD", day, rate);
+        On(w, D(2026, 10, 20));
+        var accountant = await w.UserAsync("accountant");
+        Assert.Equal(new PeriodClose.Answer("done", "2026-09-01"), await PeriodClose.CloseAsync(w.App, accountant, "2026-09-01"));
+        var nbg = new OneDayNbg("2026-10-15", ("USD", 100m, 280m), ("EUR", 1m, 3.1m));
+        var i = await ImportAsync(w, UsdCsv, D(2026, 10, 1), new Rates(w.App, nbg));
+        await ApproveBothAsync(w, i);
+        await DecideAsync(w, i.Underwriter.Id, "premium.receipt.create", "allow");
+        Assert.Equal([$"{Rates.NbgUrl}?currencies=USD&currencies=EUR&date=2026-10-15"], nbg.Requests);
+        return (i, nbg);
+    }
+
+    /// <summary>October of the two USD policies, by hand (tetri): written 436000, earned 20638 + 6879 + 3912 + 1304 = 32733, UPR 403267; owed 160000 cents USD, 30000 overdue, at 3.00 480000; IBNR 21800.</summary>
+    private static void UsdOctober(PremiumReport.Report r)
+    {
+        Assert.Equal(("2026-10", D(2026, 10, 1), D(2026, 10, 31)), (r.Month, r.From, r.To));
+        Premium(r, 2, 436000, 32733, 403267, 21800);
+        Assert.Equal([new PremiumReport.ReceivableRow("USD", 160000, 30000, 480000, 3m, D(2026, 10, 31))], r.Receivables);
+    }
+
+    /// <summary>November of the two USD policies, by hand (tetri): earned by 30.11 per row 40611 + 13537 + 10816 + 3605 = 68569 − 32733 = 35836, UPR 367431; IBNR 21800; the receivable at 30.11's 3.50.</summary>
+    private static void UsdNovember(PremiumReport.Report r, BigInteger outstanding, BigInteger overdue, BigInteger outstandingGel)
+    {
+        Assert.Equal(("2026-11", D(2026, 11, 1), D(2026, 11, 30)), (r.Month, r.From, r.To));
+        Premium(r, 0, 0, 35836, 367431, 21800);
+        Assert.Equal([new PremiumReport.ReceivableRow("USD", outstanding, overdue, outstandingGel, 3.5m, D(2026, 11, 30))], r.Receivables);
+    }
+
+    [Fact]
+    public async Task A_late_GEL_receipt_600_received_31_10_registered_07_11_on_the_imported_USD_policy_200_USD_at_31_10s_3_booked_07_11_October_as_reported_November_1400_USD_200_overdue_4900_at_3_5() =>
+        await OwnDatabaseAsync(async w =>
+        {
+            var (i, nbg) = await LegacyUsdAsync(w, (D(2026, 11, 7), 3.2m));
+            var octoberBefore = await MonthReportAsync(w, D(2026, 10, 1));
+            UsdOctober(octoberBefore);
+            // The real recordPayment on 07.11.2026: 600.00 GEL by bank, received 31.10, on the first policy.
+            On(w, D(2026, 11, 7));
+            Assert.Equal($"/policies/{i.First}?paid=0", (await PaymentActions.RecordPaymentAsync(w.App, new Rates(w.App, nbg), i.Underwriter, World.Form(
+                ("policy_id", i.First.ToString()), ("amount_gel", "600.00"), ("received_on", "2026-10-31"), ("method", "bank"), ("reference", "IMPORT-USD-600")))).Redirect);
+            // By hand: 31.10's 3.00 — 600.00 / 3.00 = 200.00 USD on the first policy's 01.10 instalment of 200.00, booked 07.11; not 07.11's 3.20,
+            // not 30.11's 3.50, not the premium's 2.70. Nothing left over, nothing on the second policy; the bank not asked again.
+            var receipt = Assert.Single(await w.QueryAsync<(Guid Id, string Kind, DateOnly ReceivedOn, decimal AmountGel, string Method, Guid Payer, string Reference, Guid CreatedBy, Guid? Reverses)>(
+                "select id, kind, received_on, amount_gel, method, payer_party_id, reference, created_by, reverses_payment_id from core.payment"));
+            Assert.Equal(("receipt", D(2026, 10, 31), 600m, "bank", i.Holder, "IMPORT-USD-600", i.Underwriter.Id, (Guid?)null),
+                (receipt.Kind, receipt.ReceivedOn, receipt.AmountGel, receipt.Method, receipt.Payer, receipt.Reference, receipt.CreatedBy, receipt.Reverses));
+            Assert.Equal([(receipt.Id, i.First, D(2026, 10, 1), 200m, 600m, 3m, D(2026, 11, 7))], await w.QueryAsync<(Guid, Guid, DateOnly, decimal, decimal, decimal, DateOnly)>("""
+                select a.payment_id, i.policy_id, i.due_on, a.amount, a.amount_gel, a.rate, a.booked_on from core.payment_allocation a join core.installment i on i.id = a.installment_id
+                """));
+            Assert.Single(nbg.Requests);
+            Assert.Empty(await w.App.ReadTxAsync(tx => Billing.LoadAdvancesAsync(tx, i.Holder)));
+            // The premium rows and the policies as approved.
+            Assert.Equal([(900m, 2430m, D(2026, 10, 1)), (300m, 810m, D(2026, 10, 1)), (300m, 840m, D(2026, 10, 15)), (100m, 280m, D(2026, 10, 15))],
+                await w.QueryAsync<(decimal, decimal, DateOnly)>("select amount, amount_gel, booked_on from core.premium_transaction order by booked_on, amount desc"));
+            var before = await LedgerAsync(w);
+            // The reports: October exactly as before (the allocation is booked 07.11), September empty, November owes 160000 − 20000 = 140000
+            // cents USD; due by 30.11 unpaid: the first's 01.11 100 and the second's 15.10 100 — 20000; at 3.50 490000.
+            var octoberAfter = await MonthReportAsync(w, D(2026, 10, 1));
+            Assert.Equal(Shape(octoberBefore), Shape(octoberAfter));
+            Empty(await MonthReportAsync(w, D(2026, 9, 1)));
+            UsdNovember(await MonthReportAsync(w, D(2026, 11, 1)), 140000, 20000, 490000);
+            Assert.Equal(before, await LedgerAsync(w));
+        });
+
+    [Fact]
+    public async Task A_GEL_receipt_600_received_07_11_refused_on_10_11_bank_503_then_sent_again_bank_300_per_100_one_receipt_200_USD_at_3_booked_10_11_November_1400_USD_200_overdue_4900() =>
+        await OwnDatabaseAsync(async w =>
+        {
+            var (i, _) = await LegacyUsdAsync(w, (D(2026, 11, 10), 3.2m));
+            Assert.Equal(7, await w.ScalarAsync<int>("select count(*) from core.exchange_rate"));
+            Empty(await MonthReportAsync(w, D(2026, 9, 1)));
+            UsdOctober(await MonthReportAsync(w, D(2026, 10, 1)));
+            UsdNovember(await MonthReportAsync(w, D(2026, 11, 1)), 160000, 40000, 560000);
+            var form = World.Form(("policy_id", i.First.ToString()), ("amount_gel", "600.00"), ("received_on", "2026-11-07"), ("method", "bank"), ("reference", "IMPORT-USD-RETRY"));
+            // First attempt on 10.11.2026: 07.11 is not stored and the bank answers 503 — the received-on field's message, nothing written.
+            On(w, D(2026, 11, 10));
+            var bank = new OneDayNbg("2026-11-07", ("USD", 100m, 300m), ("EUR", 1m, 3.1m)) { Failures = 1 };
+            var ledger = await LedgerAsync(w);
+            var refused = await PaymentActions.RecordPaymentAsync(w.App, new Rates(w.App, bank), i.Underwriter, form);
+            Assert.Null(refused.Redirect);
+            Assert.Equal([("received_on", Insurance.Application.Texts.BillingTexts.Payment.Errors.Rate)], refused.Errors.Select(e => (e.Key, e.Value)));
+            Assert.Equal(ledger, await LedgerAsync(w));
+            Assert.Equal(7, await w.ScalarAsync<int>("select count(*) from core.exchange_rate"));
+            Assert.Equal([$"{Rates.NbgUrl}?currencies=USD&currencies=EUR&date=2026-11-07"], bank.Requests);
+            UsdOctober(await MonthReportAsync(w, D(2026, 10, 1)));
+            UsdNovember(await MonthReportAsync(w, D(2026, 11, 1)), 160000, 40000, 560000);
+            // Second attempt, the same form, the same day: the bank answers USD 300 per 100 — 3.000000 stored with EUR 3.10, read again;
+            // 600.00 / 3.00 = 200.00 USD on the first policy's 01.10 instalment, booked 10.11 (not 10.11's 3.20).
+            Assert.Equal($"/policies/{i.First}?paid=0", (await PaymentActions.RecordPaymentAsync(w.App, new Rates(w.App, bank), i.Underwriter, form)).Redirect);
+            Assert.Equal(2, bank.Requests.Count);
+            Assert.Equal([("EUR", 3.1m), ("USD", 3m)], await w.QueryAsync<(string, decimal)>("select currency, rate from core.exchange_rate where rate_date = '2026-11-07' order by currency"));
+            Assert.Equal(9, await w.ScalarAsync<int>("select count(*) from core.exchange_rate"));
+            var receipt = Assert.Single(await w.QueryAsync<(Guid Id, DateOnly ReceivedOn, decimal AmountGel, string Reference)>("select id, received_on, amount_gel, reference from core.payment"));
+            Assert.Equal((D(2026, 11, 7), 600m, "IMPORT-USD-RETRY"), (receipt.ReceivedOn, receipt.AmountGel, receipt.Reference));
+            Assert.Equal([(i.First, D(2026, 10, 1), 200m, 600m, 3m, D(2026, 11, 10))], await w.QueryAsync<(Guid, DateOnly, decimal, decimal, decimal, DateOnly)>("""
+                select i.policy_id, i.due_on, a.amount, a.amount_gel, a.rate, a.booked_on from core.payment_allocation a join core.installment i on i.id = a.installment_id
+                """));
+            Assert.Empty(await w.App.ReadTxAsync(tx => Billing.LoadAdvancesAsync(tx, i.Holder)));
+            // The reports: September empty, October as before, November owes 1 400 USD — 200 overdue (the first's 01.11, the second's 15.10) — 4 900.00 at 3.50.
+            Empty(await MonthReportAsync(w, D(2026, 9, 1)));
+            UsdOctober(await MonthReportAsync(w, D(2026, 10, 1)));
+            UsdNovember(await MonthReportAsync(w, D(2026, 11, 1)), 140000, 20000, 490000);
         });
 }

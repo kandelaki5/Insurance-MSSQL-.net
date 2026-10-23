@@ -27,7 +27,7 @@ public static class PeriodClose
         // A malformed or impossible month (2026-00-01, 2026-13-01) never reaches the database.
         if (!Month.IsMonthStart(periodStart)) return Of("invalid");
         var start = Dates.ParseIsoDate(periodStart);
-        var now = today ?? Rates.TodayInTbilisi();
+        var now = today ?? db.Today();
         if (start >= new DateOnly(now.Year, now.Month, 1)) return Of("not-ended");
 
         var outcome = await db.AsUserAsync(user.Id, async tx =>

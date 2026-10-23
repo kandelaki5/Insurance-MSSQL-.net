@@ -19,7 +19,7 @@ public sealed class IndexModel : AppPageModel
 
     public async Task OnGetAsync()
     {
-        var today = Rates.TodayInTbilisi();
+        var today = Db.Today();
         var soon = today.AddDays(30);
         await Db.ReadTxAsync(async tx =>
         {
@@ -44,8 +44,8 @@ public sealed class IndexModel : AppPageModel
                 ? await tx.QuerySingleOrDefaultAsync<int>("""
                     select count(*) from core.fms_suspension
                     where kind = N'oral' and written_confirmed_at is null and lifted_at is null
-                      and ends_at > sysdatetimeoffset() and sysdatetimeoffset() >= dateadd(hour, 24, instructed_at)
-                    """)
+                      and ends_at > @now and @now >= dateadd(hour, 24, instructed_at)
+                    """, new { now = tx.Now() })
                 : 0;
             Reminders = new[]
             {

@@ -35,7 +35,7 @@ public sealed partial class PolicyWebApp : IAsyncLifetime
         {
             b.UseEnvironment("Development");
             b.UseSetting("ConnectionStrings:Insurance", Db.AppConnection);
-            b.ConfigureTestServices(s => s.AddHttpClient("nbg").ConfigurePrimaryHttpMessageHandler(() => new Refuse()));
+            b.ConfigureTestServices(s => s.AddSingleton(Db.Options).AddHttpClient("nbg").ConfigurePrimaryHttpMessageHandler(() => new Refuse()));
         });
     }
 

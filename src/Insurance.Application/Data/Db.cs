@@ -15,6 +15,15 @@ public sealed class Db(DbOptions options)
 
     public string ConnectionString => options.ConnectionString;
 
+    /// <summary>The clock of this Db's options: the system clock in production, a test's own clock in a test.</summary>
+    public TimeProvider Clock => options.Clock;
+
+    /// <summary>The current instant by this Db's clock.</summary>
+    public DateTimeOffset Now() => options.Clock.GetUtcNow();
+
+    /// <summary>Today's date in Tbilisi by this Db's clock (legacy todayInTbilisi()).</summary>
+    public DateOnly Today() => TbilisiClock.Day(Now());
+
     public async Task<SqlConnection> OpenAsync(CancellationToken ct = default)
     {
         var connection = new SqlConnection(options.ConnectionString);
@@ -34,7 +43,7 @@ public sealed class Db(DbOptions options)
     public async Task<T> ReadTxAsync<T>(Func<Tx, Task<T>> work, CancellationToken ct = default)
     {
         await using var connection = await OpenAsync(ct);
-        return await work(new Tx(connection, null));
+        return await work(new Tx(connection, null, options.Clock));
     }
 
     /// <summary>Runs <paramref name="work"/> in one transaction attributed to <paramref name="userId"/>; commits when it returns, rolls back when it throws.</summary>
@@ -46,7 +55,7 @@ public sealed class Db(DbOptions options)
     {
         await using var connection = await OpenAsync(ct);
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Snapshot, ct);
-        var result = await work(new Tx(connection, transaction));
+        var result = await work(new Tx(connection, transaction, options.Clock));
         await transaction.CommitAsync(ct);
         return result;
     }
@@ -59,7 +68,7 @@ public sealed class Db(DbOptions options)
     {
         await using var connection = await OpenAsync(ct);
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
-        var tx = new Tx(connection, transaction);
+        var tx = new Tx(connection, transaction, options.Clock);
         try
         {
             // XACT_ABORT: any error rolls the whole transaction back, as in PostgreSQL where an error aborts it.

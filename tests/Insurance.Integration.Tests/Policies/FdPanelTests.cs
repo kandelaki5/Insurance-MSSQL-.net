@@ -44,9 +44,9 @@ public sealed class FdPanelTests(TestDatabase db) : IClassFixture<TestDatabase>
         Assert.Empty(empty.Receivables);
         Assert.Equal("1,234,567.89", PremiumReport.ReportMoney(123456789));
         Assert.Equal("-0.01", PremiumReport.ReportMoney(-1));
-        Assert.Equal(Rates.TodayInTbilisi().ToString("yyyy-MM"), PremiumReport.ReportMonth("2025-13"));
-        Assert.Equal("2025-03", PremiumReport.ReportMonth("2025-03"));
-        Assert.Equal(Rates.TodayInTbilisi().ToString("yyyy-MM"), PremiumReport.ReportMonth(null));
+        Assert.Equal(Rates.TodayInTbilisi().ToString("yyyy-MM"), PremiumReport.ReportMonth("2025-13", Rates.TodayInTbilisi()));
+        Assert.Equal("2025-03", PremiumReport.ReportMonth("2025-03", Rates.TodayInTbilisi()));
+        Assert.Equal(Rates.TodayInTbilisi().ToString("yyyy-MM"), PremiumReport.ReportMonth(null, Rates.TodayInTbilisi()));
     }
 
     private async Task<Guid> RefundRequestAsync(Guid policyId, Guid payer, Guid by, decimal amount, DateTimeOffset at)

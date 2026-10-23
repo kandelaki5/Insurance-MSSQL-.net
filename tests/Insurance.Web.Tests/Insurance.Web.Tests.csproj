@@ -16,12 +16,14 @@
   <ItemGroup>
     <!-- The same fresh-database fixture as the integration tests. -->
     <Compile Include="..\Insurance.Integration.Tests\TestDatabase.cs" Link="TestDatabase.cs" />
+    <Compile Include="..\Insurance.Integration.Tests\TestClock.cs" Link="TestClock.cs" />
     <!-- Fictional rows for the policy, payment and claim pages' tests (World and ClaimWorld use Fixtures). -->
     <Compile Include="..\Insurance.Integration.Tests\Fixtures.cs" Link="Fixtures.cs" />
     <Compile Include="..\Insurance.Integration.Tests\ClaimWorld.cs" Link="ClaimWorld.cs" />
     <Compile Include="..\Insurance.Integration.Tests\Policies\World.cs" Link="Policies\World.cs" />
     <!-- The gap tests' helpers: a database of its own, an armed fault, permission decisions (docs/legacy-tests-gaps-b.md). -->
     <Compile Include="..\Insurance.Integration.Tests\Policies\GapsSupport.cs" Link="Policies\GapsSupport.cs" />
+    <Compile Include="..\Insurance.Integration.Tests\Policies\LegacyDays.cs" Link="Policies\LegacyDays.cs" />
     <Compile Include="..\Insurance.Integration.Tests\ComplianceFixtures.cs" Link="ComplianceFixtures.cs" />
     <!-- The command interceptor of the failure-injection tests (DbOptions.Interceptor). -->
     <Compile Include="..\Insurance.Integration.Tests\FailureInjection\Faults.cs" Link="FailureInjection\Faults.cs" />

@@ -37,7 +37,7 @@ public sealed class EndorseModel(Rates rates) : AppPageModel
             order by pc.sort_order
             """, new { id, productId }));
         Coverages = rows.Select(c => new Coverage(c.Code, c.NameKa, c.ClassCode, Show(c.SumInsured), Show(c.Deductible), Show(c.Premium), c.Premium is not null)).ToList();
-        var today = Rates.TodayInTbilisi();
+        var today = Db.Today();
         Values.TryAdd("change_on", Dates.ToIso(today < p.EffectiveFrom ? p.EffectiveFrom : today >= p.EffectiveTo ? Dates.AddDays(p.EffectiveTo, -1) : today));
         Number = p.Number;
         Currency = p.PremiumCurrency.Trim();

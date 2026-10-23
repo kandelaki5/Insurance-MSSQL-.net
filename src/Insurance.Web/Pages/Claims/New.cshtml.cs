@@ -12,7 +12,8 @@ public sealed class NewModel : AppPageModel
     public ClaimReads.PolicyForNew? Policy { get; private set; }
     public IReadOnlyList<ClaimReads.CoverageLine> Lines { get; private set; } = [];
     public bool Usable => Policy is { Status: "active" or "cancelled" };
-    public DateOnly Today { get; } = Rates.TodayInTbilisi();
+    private DateOnly? today;
+    public DateOnly Today => today ??= Db.Today();
 
     /// <summary>The form's one-off key: a second submit opens the event the first one registered (docs/07 §10).</summary>
     public string RequestKey { get; private set; } = Guid.NewGuid().ToString();

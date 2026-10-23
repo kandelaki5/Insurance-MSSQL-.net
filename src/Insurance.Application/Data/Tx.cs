@@ -5,10 +5,19 @@ namespace Insurance.Application.Data;
 
 /// <summary>One open transaction: the connection and the transaction travel together to every query.</summary>
 /// <remarks>A read outside a transaction uses a Tx without one (Db.ReadTxAsync): each statement then sees what was committed when it started.</remarks>
-public sealed class Tx(SqlConnection connection, SqlTransaction? transaction)
+public sealed class Tx(SqlConnection connection, SqlTransaction? transaction, TimeProvider? clock = null)
 {
     public SqlConnection Connection { get; } = connection;
     public SqlTransaction? Transaction { get; } = transaction;
+
+    /// <summary>The clock of the Db that opened this Tx (<see cref="DbOptions.Clock"/>); the system clock for a Tx made by hand.</summary>
+    public TimeProvider Clock { get; } = clock ?? TimeProvider.System;
+
+    /// <summary>The current instant by this Tx's clock.</summary>
+    public DateTimeOffset Now() => Clock.GetUtcNow();
+
+    /// <summary>Today's date in Tbilisi by this Tx's clock.</summary>
+    public DateOnly Today() => TbilisiClock.Day(Now());
 
     public Task<int> ExecuteAsync(string sql, object? param = null) =>
         Connection.ExecuteAsync(sql, param, Transaction);

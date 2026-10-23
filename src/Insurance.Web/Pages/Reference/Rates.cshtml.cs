@@ -12,7 +12,8 @@ public sealed class RatesModel(Rates rates) : AppPageModel
     public sealed record Row(DateOnly RateDate, decimal? Usd, decimal? Eur);
 
     public IReadOnlyList<Row> Rows { get; private set; } = [];
-    public string Today { get; } = Fmt.Iso(Rates.TodayInTbilisi());
+    private string? today;
+    public string Today => today ??= Fmt.Iso(Db.Today());
 
     public async Task OnGetAsync() => await LoadAsync();
 

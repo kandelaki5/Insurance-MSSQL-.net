@@ -21,7 +21,7 @@ public sealed class ImpairmentModel(Rates rates) : AppPageModel
     public async Task<IActionResult> OnGetAsync()
     {
         if (Me.RoleCode is not ("admin" or "accountant")) return Redirect("/");
-        var asOf = AsOf(Query("date"), Rates.TodayInTbilisi());
+        var asOf = AsOf(Query("date"), Db.Today());
         Report = await Db.ReadTxAsync(tx => ImpairmentReport.BuildAsync(tx, rates, asOf));
         return Page();
     }

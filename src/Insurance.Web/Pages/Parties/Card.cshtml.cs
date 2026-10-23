@@ -62,7 +62,7 @@ public sealed class CardModel : AppPageModel
 
     public PartyFormView PartyFormModel => PartyFormState ?? new PartyFormView(Kind, Initial, new Dictionary<string, string>(), null, !Me.CanWrite);
 
-    public SuspensionSectionView SuspensionSection => new(AmlTexts.Suspension.Title, Id, null, SuspensionRows, Aml.IsComplianceRole(Me), $"/parties/{Id}", false, TargetError);
+    public SuspensionSectionView SuspensionSection => new(AmlTexts.Suspension.Title, Id, null, SuspensionRows, Aml.IsComplianceRole(Me), $"/parties/{Id}", false, TargetError, Db.Now());
 
     public ScreeningTableView ScreeningTable => new(ScreeningRows.Take(20).ToList(), Me.CanWrite, $"/parties/{Id}", false);
 
@@ -107,7 +107,7 @@ public sealed class CardModel : AppPageModel
             ReviewOn = row["risk_review_on"] is DateTime r ? DateOnly.FromDateTime(r) : null;
             IdNumberForCase = (string?)row["tax_id"] ?? (string?)row["foreign_id"] ?? "";
 
-            Today = Rates.TodayInTbilisi();
+            Today = Db.Today();
             Risk = await PartyRisk.ComputePartyRiskAsync(tx, partyId, Today);
             Kyc = await PartyKyc.LoadKycStatusAsync(tx, partyId, Today);
             ComplianceRole = Me.RoleCode is "admin" or "operations_head" or "accountant";
@@ -217,7 +217,7 @@ public sealed class CardModel : AppPageModel
         if (!Me.CanWrite) return await ShowAsync(id);
         if (PermissionPanel.Uuid(Form("id")) is not { } ownerId || PermissionPanel.Uuid(Form("party_id")) is not { } partyId) return await ShowAsync(id);
         var action = Form("action") ?? "";
-        var today = Rates.TodayInTbilisi();
+        var today = Db.Today();
         var source = JsText.Trim(Form("verification_source") ?? "");
         await Db.AsUserAsync(Me.Id, async tx =>
         {
@@ -244,7 +244,7 @@ public sealed class CardModel : AppPageModel
             return await ShowAsync(id);
         }
         if (PermissionPanel.Uuid(Form("party_id")) is not { } partyId) return await ShowAsync(id);
-        var today = Rates.TodayInTbilisi();
+        var today = Db.Today();
         var computed = await Db.ReadTxAsync(tx => PartyRisk.ComputePartyRiskAsync(tx, partyId, today));
         if (computed is null) return await ShowAsync(id);
 

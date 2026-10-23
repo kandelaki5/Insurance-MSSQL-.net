@@ -204,7 +204,7 @@ public static class SanctionsScreening
         var (entries, generatedAt) = await LoadEntriesAsync(tx);
         if (entries.Count == 0) return new ScreeningResult(0, 0);
         var subjects = await SubjectsOfAsync(tx, partyId);
-        var today = Rates.TodayInTbilisi();
+        var today = tx.Today();
         var hits = 0;
         foreach (var s in subjects)
         {
@@ -254,7 +254,7 @@ public static class SanctionsScreening
     {
         var row = await tx.QuerySingleOrDefaultAsync<(Guid PartyId, string Outcome)?>("select party_id, outcome from core.sanctions_screening where id = @id", new { id });
         if (row is not { } r) return;
-        var today = Rates.TodayInTbilisi();
+        var today = tx.Today();
         if (decision == "dismiss" && r.Outcome == "possible")
         {
             await tx.ExecuteAsync("update core.sanctions_screening set outcome = N'false_positive', decided_by = @userId, decided_at = sysdatetimeoffset(), note = @note where id = @id", new { userId, note, id });

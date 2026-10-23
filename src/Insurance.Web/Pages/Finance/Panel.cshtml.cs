@@ -38,7 +38,7 @@ public sealed class PanelModel(Rates rates, ILogger<PanelModel> log) : AppPageMo
         Allowed = Permissions.EvaluatePermission(Me.Subject, "finance.panel.view", inputs.Overrides, inputs.Groups).Allowed;
         if (!Allowed) return;
         Cursor = FdPanel.ParseCursor(Query);
-        Month = PremiumReport.ReportMonth(Query("month"));
+        Month = PremiumReport.ReportMonth(Query("month"), Db.Today());
         var reads = new Dictionary<string, FdPanel.QueueRead>(StringComparer.Ordinal);
         foreach (var queue in FdPanel.Queues)
             reads[queue] = await Db.ReadTxAsync(tx => FdPanel.ReadPendingQueueAsync(tx, queue, Cursor[queue],

@@ -47,7 +47,7 @@ public sealed class CancelModel : AppPageModel
         MinDate = p.EffectiveFrom;
         MaxDate = Dates.AddDays(p.EffectiveTo, -1);
         // The form starts on today (moved into the cover).
-        var startOn = CancelPreview.CancellationPreview(ledger, Rates.TodayInTbilisi(), 0, cover).On;
+        var startOn = CancelPreview.CancellationPreview(ledger, Db.Today(), 0, cover).On;
         StartOn = Dates.ToIso(startOn);
         Values.TryAdd("cancel_on", StartOn);
         var on = shownDate is not null && Dates.IsIsoDate(shownDate) ? Dates.ParseIsoDate(shownDate) : startOn;

@@ -17,7 +17,7 @@ public sealed class IndexModel : AppPageModel
     {
         var requested = Query("status") ?? "";
         Status = ComplaintTexts.Statuses.ContainsKey(requested) ? requested : "";
-        Today = Rates.TodayInTbilisi();
+        Today = Db.Today();
         Rows = (await Db.ReadTxAsync(tx => tx.QueryAsync<Row>("""
             select top (300) c.id as Id, c.number as Number, c.received_on as ReceivedOn, c.channel as Channel, c.customer_name as CustomerName,
                    p.number as PolicyNumber, c.category as Category, c.status as Status, c.responded_on as RespondedOn

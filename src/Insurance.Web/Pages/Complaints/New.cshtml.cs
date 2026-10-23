@@ -14,7 +14,7 @@ public sealed class NewModel : AppPageModel
     public IActionResult OnGet()
     {
         if (!Me.CanWrite) return Redirect("/complaints");
-        Values["received_on"] = Fmt.Iso(Rates.TodayInTbilisi());
+        Values["received_on"] = Fmt.Iso(Db.Today());
         Values["channel"] = "written";
         return Page();
     }
@@ -32,7 +32,7 @@ public sealed class NewModel : AppPageModel
         }
         string? V(string key) => values.TryGetValue(key, out var v) && v != "" ? v : null;
         var e = ComplaintTexts.Errors.ByKey;
-        var today = Rates.TodayInTbilisi();
+        var today = Db.Today();
         var receivedOn = values.GetValueOrDefault("received_on") ?? "";
         if (!Dates.IsIsoDate(receivedOn) || string.CompareOrdinal(receivedOn, Fmt.Iso(today)) > 0) Errors["received_on"] = e["receivedOn"];
         var channel = V("channel") is { } ch && ComplaintTexts.Channels.ContainsKey(ch) ? ch : "written";

@@ -37,18 +37,18 @@ public sealed class FaultSite : IAsyncLifetime, IAsyncDisposable
     public static FaultSite Over(TestDatabase db)
     {
         var site = new FaultSite(db, owned: false);
-        site.Factory = Build(db.AppConnection, site.Faults, site.Nbg);
+        site.Factory = Build(db.AppConnection, site.Faults, site.Nbg, db.Clock);
         return site;
     }
 
-    public static WebApplicationFactory<Program> Build(string connection, ICommandInterceptor interceptor, IHttpClientFactory nbg) =>
+    public static WebApplicationFactory<Program> Build(string connection, ICommandInterceptor interceptor, IHttpClientFactory nbg, TimeProvider clock) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
         {
             b.UseEnvironment("Development");
             b.UseSetting("ConnectionStrings:Insurance", connection);
             b.ConfigureTestServices(s =>
             {
-                s.AddSingleton(new DbOptions { ConnectionString = connection, Interceptor = interceptor });
+                s.AddSingleton(new DbOptions { ConnectionString = connection, Interceptor = interceptor, Clock = clock });
                 s.AddSingleton(nbg);
             });
         });
@@ -56,7 +56,7 @@ public sealed class FaultSite : IAsyncLifetime, IAsyncDisposable
     public async Task InitializeAsync()
     {
         await Db.InitializeAsync();
-        Factory = Build(Db.AppConnection, Faults, Nbg);
+        Factory = Build(Db.AppConnection, Faults, Nbg, Db.Clock);
     }
 
     public async Task DisposeAsync()

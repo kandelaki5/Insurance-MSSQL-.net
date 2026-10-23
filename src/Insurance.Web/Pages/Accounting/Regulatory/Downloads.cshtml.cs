@@ -14,7 +14,7 @@ public sealed class Form1XlsxModel(Rates rates) : AppPageModel
     {
         if (Me.RoleCode is not ("admin" or "accountant")) return Downloads.Text("Forbidden", 403);
         var requested = Query("month");
-        var month = Insurance.Application.Services.PremiumReport.ReportMonth(requested);
+        var month = Insurance.Application.Services.PremiumReport.ReportMonth(requested, Db.Today());
         if (requested != month) return Downloads.Text("Bad month", 400);
         var (report, impairment, settings) = await Db.ReadTxAsync(tx => RegulatoryForms.MonthAsync(tx, rates.LatestRateOnOrBeforeAsync, month));
         return Downloads.Form(Response, RegulatoryForms.Form1(report, impairment, settings), $"financial-annex-n1-{month}.xlsx");
@@ -43,7 +43,7 @@ public sealed class ReservesXlsxModel(Rates rates) : AppPageModel
     {
         if (Me.RoleCode is not ("admin" or "accountant")) return Downloads.Text("Forbidden", 403);
         var requested = Query("month");
-        var month = Insurance.Application.Services.PremiumReport.ReportMonth(requested);
+        var month = Insurance.Application.Services.PremiumReport.ReportMonth(requested, Db.Today());
         if (requested != month) return Downloads.Text("Bad month", 400);
         var (report, settings) = await Db.ReadTxAsync(async tx => (await Insurance.Application.Services.PremiumReport.BuildAsync(tx, rates, month), await Insurance.Application.Services.Settings.LoadSettingsAsync(tx)));
         return Downloads.Form(Response, RegulatoryForms.Reserves(report, settings).Workbook, $"reserves-placement-{month}.xlsx");

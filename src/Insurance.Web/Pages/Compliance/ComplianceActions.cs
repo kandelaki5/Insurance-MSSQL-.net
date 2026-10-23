@@ -8,7 +8,8 @@ namespace Insurance.Web.Pages.Compliance;
 
 /// <summary>The suspensions section on a client's card, an AML case and the register of suspensions in force.</summary>
 public sealed record SuspensionSectionView(
-    string Title, Guid? PartyId, Guid? CaseId, IReadOnlyList<Aml.SuspensionRow> Rows, bool Writable, string Back, bool ShowParty, bool TargetError);
+    string Title, Guid? PartyId, Guid? CaseId, IReadOnlyList<Aml.SuspensionRow> Rows, bool Writable, string Back, bool ShowParty, bool TargetError,
+    DateTimeOffset Now);
 
 /// <summary>Screening rows with their matches and, for open ones, the decision form (on the sanctions page and a client's card).</summary>
 public sealed record ScreeningTableView(IReadOnlyList<SanctionsScreening.ScreeningRow> Rows, bool Writable, string Back, bool ShowParty);
@@ -34,7 +35,7 @@ public static partial class ComplianceActions
         var caseId = PermissionPanel.Uuid(form("case_id"));
         var kind = form("kind") == "written" ? "written" : "oral";
         var scope = form("scope") == "transaction" ? "transaction" : "all";
-        var instructedAt = Aml.TbilisiInstant(form("instructed_at") ?? "") ?? DateTimeOffset.UtcNow;
+        var instructedAt = Aml.TbilisiInstant(form("instructed_at") ?? "") ?? db.Now();
         var back = SafeBack(form("back"), $"/parties/{partyText}");
         if (PermissionPanel.Uuid(partyText) is not { } partyId) return null;
         var endsAt = Suspension.SuspensionEnd(instructedAt);

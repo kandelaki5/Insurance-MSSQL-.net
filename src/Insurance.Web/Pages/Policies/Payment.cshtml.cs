@@ -39,7 +39,7 @@ public sealed class PaymentModel(Rates rates) : AppPageModel
         if (policy is not { } p) return NotFound();
         Number = p.Number;
         Currency = p.PremiumCurrency.Trim();
-        var today = Rates.TodayInTbilisi();
+        var today = Db.Today();
         await Db.ReadTxAsync(async tx =>
         {
             // As of today, like the card and the payment itself (H23).

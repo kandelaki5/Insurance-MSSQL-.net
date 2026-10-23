@@ -29,7 +29,7 @@ public sealed class LoadRatesActionTests : IAsyncLifetime
         {
             b.UseEnvironment("Development");
             b.UseSetting("ConnectionStrings:Insurance", _db.AppConnection);
-            b.ConfigureTestServices(s => s.AddSingleton<IHttpClientFactory>(_nbg));
+            b.ConfigureTestServices(s => s.AddSingleton<IHttpClientFactory>(_nbg).AddSingleton(_db.Options));
         });
     }
 

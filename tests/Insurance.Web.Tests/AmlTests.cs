@@ -143,7 +143,7 @@ public sealed class AmlTests(WebApp app) : IClassFixture<WebApp>
         Assert.Equal(claim.ClaimId, await c.ExecuteScalarAsync<Guid?>("select target_claim_id from core.fms_suspension where party_id = @party and kind = N'oral'", new { party }));
 
         // All of the client's operations, an oral instruction given now: in force, awaiting the letter.
-        Assert.Equal(card, Html.Location(await WebApp.PostFormAsync(client, $"{card}?handler=CreateSuspension", Form("oral", "all", instructed: Aml.TbilisiNowLocal()), card)));
+        Assert.Equal(card, Html.Location(await WebApp.PostFormAsync(client, $"{card}?handler=CreateSuspension", Form("oral", "all", instructed: Aml.TbilisiNowLocal(DateTimeOffset.UtcNow)), card)));
         var all = await c.ExecuteScalarAsync<Guid>("select id from core.fms_suspension where party_id = @party and scope = N'all'", new { party });
         var html = await Html.GetAsync(client, card);
         Assert.Contains(AmlTexts.Suspension.Active, html);

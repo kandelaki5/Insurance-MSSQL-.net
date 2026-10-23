@@ -21,7 +21,13 @@ public sealed class TestDatabase : IAsyncLifetime
     public string AppConnection { get; private set; } = "";
     public List<string> Log { get; } = [];
 
-    public Db App => new(new DbOptions { ConnectionString = AppConnection });
+    /// <summary>The clock of this database's application (TestDatabase.App and the web hosts over it): the system clock until a test sets it.</summary>
+    public TestClock Clock { get; } = new();
+
+    /// <summary>The application's options over this database: its connection and its clock.</summary>
+    public DbOptions Options => new() { ConnectionString = AppConnection, Clock = Clock };
+
+    public Db App => new(Options);
 
     public static string MasterFromEnvironment() =>
         Setting("INSURANCE_TEST_SQL_MASTER")

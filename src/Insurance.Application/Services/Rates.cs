@@ -77,9 +77,9 @@ public sealed class Rates(Db db, IHttpClientFactory http)
         return row is { } r ? (r.Rate, r.RateDate) : throw new InvalidOperationException($"No {currency} rate on or before {date:yyyy-MM-dd}");
     }
 
-    private static readonly TimeZoneInfo Tbilisi = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tbilisi");
-
-    /// <summary>Today's date in Tbilisi (legacy todayInTbilisi).</summary>
-    public static DateOnly TodayInTbilisi(DateTimeOffset? now = null) =>
-        DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now ?? DateTimeOffset.UtcNow, Tbilisi).DateTime);
+    /// <summary>
+    /// Today's date in Tbilisi by the system clock (or of <paramref name="now"/>). The application never calls it: its "today" is
+    /// <see cref="Db.Today"/> / <see cref="Tx.Today"/>, which a test can set (DbOptions.Clock). Kept for tests that compare with the real day.
+    /// </summary>
+    public static DateOnly TodayInTbilisi(DateTimeOffset? now = null) => TbilisiClock.Day(now ?? DateTimeOffset.UtcNow);
 }

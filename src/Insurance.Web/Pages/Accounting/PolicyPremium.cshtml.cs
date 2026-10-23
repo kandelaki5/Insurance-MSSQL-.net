@@ -12,7 +12,7 @@ public sealed class PolicyPremiumModel : AppPageModel
     public async Task<IActionResult> OnGetAsync()
     {
         if (Me.RoleCode is not ("admin" or "accountant")) return Redirect("/");
-        var (from, to) = PolicyPremiumReport.ReportPeriod(Query("from"), Query("to"), Rates.TodayInTbilisi());
+        var (from, to) = PolicyPremiumReport.ReportPeriod(Query("from"), Query("to"), Db.Today());
         Report = await Db.ReadTxAsync(tx => PolicyPremiumReport.BuildAsync(tx, from, to));
         return Page();
     }

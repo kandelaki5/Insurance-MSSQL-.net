@@ -23,7 +23,7 @@ public sealed class ImportModel(Rates rates) : AppPageModel
     public IActionResult OnGet()
     {
         if (!Me.CanWrite) return Redirect("/policies");
-        var today = Dates.ToIso(Rates.TodayInTbilisi());
+        var today = Dates.ToIso(Db.Today());
         Values["effective_from"] = today;
         // The same day next year as text, as the legacy page built it (a 29 February gives a date the form refuses).
         Values["effective_to"] = $"{int.Parse(today[..4], System.Globalization.CultureInfo.InvariantCulture) + 1}{today[4..]}";

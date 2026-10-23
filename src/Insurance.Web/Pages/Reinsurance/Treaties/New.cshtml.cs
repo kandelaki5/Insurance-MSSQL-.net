@@ -14,7 +14,7 @@ public sealed class NewModel : AppPageModel
     public async Task<IActionResult> OnGetAsync()
     {
         if (!Me.CanWrite) return Redirect("/reinsurance/treaties");
-        var year = DateTime.Now.Year;
+        var year = Db.Clock.GetLocalNow().Year; // legacy new Date().getFullYear(): the server's local year
         Values["kind"] = "quota_share";
         Values["currency"] = "GEL";
         Values["period_from"] = $"{year}-01-01";

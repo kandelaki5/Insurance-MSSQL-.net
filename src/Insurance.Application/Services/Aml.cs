@@ -43,9 +43,9 @@ public static partial class Aml
                {Ts("dateadd(hour, 24, s.instructed_at)")} as ConfirmBy,
                {Ts("s.ends_at")} as EndsAt, {Ts("s.lifted_at")} as LiftedAt, s.lift_reason as LiftReason,
                c.number as CaseNumber, s.case_id as CaseId, s.note as Note,
-               case when s.lifted_at is not null or s.ends_at <= sysdatetimeoffset() then N'lapsed'
+               case when s.lifted_at is not null or s.ends_at <= @now then N'lapsed'
                     when s.kind = N'written' or s.written_confirmed_at is not null then N'active'
-                    when sysdatetimeoffset() < dateadd(hour, 24, s.instructed_at) then N'awaiting'
+                    when @now < dateadd(hour, 24, s.instructed_at) then N'awaiting'
                     else N'unconfirmed' end as State
         from core.fms_suspension s
         join core.party pa on pa.id = s.party_id
@@ -53,7 +53,7 @@ public static partial class Aml
         """;
 
     private static async Task<List<SuspensionRow>> OfPartyAsync(Tx db, Guid partyId) =>
-        (await db.QueryAsync<SuspensionRow>($"{Select} where s.party_id = @partyId order by s.instructed_at desc", new { partyId })).ToList();
+        (await db.QueryAsync<SuspensionRow>($"{Select} where s.party_id = @partyId order by s.instructed_at desc", new { partyId, now = db.Now() })).ToList();
 
     /// <summary>
     /// The suspension in force for a client now, if any: not lifted, not expired, and — for an oral instruction —
@@ -116,7 +116,7 @@ public static partial class Aml
     {
         var rows = (await db.QueryAsync<SuspensionRow>(
             $"{Select} where (@partyId is null or s.party_id = @partyId) and (@caseId is null or s.case_id = @caseId) order by s.instructed_at desc offset 0 rows fetch next 200 rows only",
-            new { partyId, caseId })).ToList();
+            new { partyId, caseId, now = db.Now() })).ToList();
         return inForce ? rows.Where(r => r.State != "lapsed").ToList() : rows;
     }
 
@@ -130,7 +130,7 @@ public static partial class Aml
         return DateTimeOffset.TryParseExact(value[..16] + ":00+04:00", "yyyy-MM-dd'T'HH:mm:sszzz", CultureInfo.InvariantCulture, DateTimeStyles.None, out var at) ? at : null;
     }
 
-    /// <summary>The current Tbilisi time as a datetime-local value.</summary>
-    public static string TbilisiNowLocal(DateTimeOffset? now = null) =>
-        (now ?? DateTimeOffset.UtcNow).ToOffset(TimeSpan.FromHours(4)).ToString("yyyy-MM-dd'T'HH:mm", CultureInfo.InvariantCulture);
+    /// <summary>An instant (the page's Db.Now()) as a datetime-local value in Tbilisi time.</summary>
+    public static string TbilisiNowLocal(DateTimeOffset now) =>
+        now.ToOffset(TimeSpan.FromHours(4)).ToString("yyyy-MM-dd'T'HH:mm", CultureInfo.InvariantCulture);
 }

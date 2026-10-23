@@ -12,7 +12,8 @@ namespace Insurance.Integration.Tests.Policies;
 /// report, what the panel page shows) after PayClaimAsync / ApproveClaimPaymentRequestAsync / ReverseClaimPaymentAsync,
 /// RefundOverpaymentAsync / ApprovePremiumRefundRequestAsync and ReversePaymentAsync / ApproveReceiptReversalRequestAsync.
 /// Each test on a database of its own (the report counts every row). The claim chain keeps the legacy days (the claim
-/// actions take today); the refund and reversal chains run in today's month (the payment actions read the real day).
+/// actions take today); the refund and reversal chains run in today's month, and once more on the legacy days (the receipt of
+/// 20.10, the request and the approval on 03.11, the database's clock standing on that day): October as it was.
 /// </summary>
 public sealed class GapsFdPanelChainTests
 {
@@ -324,5 +325,120 @@ public sealed class GapsFdPanelChainTests
             Assert.Equal($"/policies/{r.A.Id}?reversal=approved", await PaymentActions.ApproveReceiptReversalRequestAsync(w.App, r.Beka, r.A.Id.ToString(), request.ToString()));
             Assert.Equal(1, await w.ScalarAsync<int>("select count(*) from core.payment where reversal_request_id = @request", new { request }));
             Assert.Empty(await ListedAsync(w, "reversal"));
+        });
+
+    // ================================================================ the legacy days, on the database's clock (DbOptions.Clock)
+
+    /// <summary>
+    /// The legacy overpaid world on its days: premium 3 000.00 from 01.10.2026 in three instalments of 1 000.00 (01.10, 02.10, 15.12);
+    /// a receipt of 12 000.01 received 20.10.2026 (the legacy fixture, written directly), 6 000.00 and 6 000.01 on the first two
+    /// booked 20.10; USD at 2.70 on 31.10 and 2.75 on 30.11. The clock stands on 03.11.2026 (the legacy TODAY).
+    /// </summary>
+    private static async Task<(World.Policy P, CurrentUser Accountant, CurrentUser Beka, Guid[] Inst)> LegacyOverpaidAsync(World w)
+    {
+        var admin = await w.UserAsync();
+        var accountant = await w.UserAsync("accountant");
+        var beka = await w.UserAsync("underwriter");
+        await GroupAsync(w, Fd, beka.Id);
+        await w.RateAsync("USD", D(2026, 10, 31), 2.7m);
+        await w.RateAsync("USD", D(2026, 11, 30), 2.75m);
+        var holder = await w.ClientAsync();
+        var from = D(2026, 10, 1);
+        var p = await w.PendingPolicyAsync(holder, from, premium: 3000m, schedule: [(0, 1000m), (1, 1000m), (D(2026, 12, 15).DayNumber - from.DayNumber, 1000m)]);
+        Assert.Equal("done", (await PolicyActions.ApprovePolicyAsync(w.App, admin, p.Id.ToString())).Outcome);
+        var inst = (await w.QueryAsync<Guid>("select id from core.installment where policy_id = @id order by due_on", new { id = p.Id })).ToArray();
+        var receipt = await w.ReceiptAsync(holder, D(2026, 10, 20), 12000.01m, reference: "ჩარიცხვა");
+        await using var c = await w.Database.OpenAppAsync();
+        foreach (var (i, amount) in new[] { (inst[0], 6000.00m), (inst[1], 6000.01m) })
+            await c.ExecuteAsync("insert core.payment_allocation (payment_id, installment_id, amount, amount_gel, rate, booked_on) values (@receipt, @i, @amount, @amount, 1, '2026-10-20')",
+                new { receipt, i, amount });
+        On(w, D(2026, 11, 3));
+        return (p, accountant, beka, inst);
+    }
+
+    private static async Task<PremiumReport.ReceivableRow?> OwedInAsync(World w, DateOnly month, string currency) =>
+        (await MonthReportAsync(w, month)).Receivables.SingleOrDefault(r => r.Currency == currency);
+
+    [Fact]
+    public async Task Refund_on_the_legacy_days_asked_and_approved_on_03_11_the_two_line_plan_dated_03_11_November_owes_1000_due_15_12_not_overdue_October_as_it_was() =>
+        await OwnDatabaseAsync(async w =>
+        {
+            var (p, accountant, beka, inst) = await LegacyOverpaidAsync(w);
+            var october = Shape(await MonthReportAsync(w, D(2026, 10, 1)));
+            var nothing = await OwedInAsync(w, D(2026, 11, 1), "GEL");
+            Assert.True(nothing is null || (nothing.Outstanding, nothing.Overdue) == (BigInteger.Zero, BigInteger.Zero));
+            // Asked on 03.11: overpaid that day 5 000.01 + 5 000.00 = 10 000.01 — a request, the later instalment first.
+            Assert.Equal($"/policies/{p.Id}?refund=requested", await PaymentActions.RefundOverpaymentAsync(w.App, w.Rates, accountant, p.Id.ToString(), "bank", "დაბრუნება"));
+            var request = await w.ScalarAsync<Guid>("select id from core.premium_refund_request where policy_id = @id", new { id = p.Id });
+            Assert.Equal((D(2026, 11, 3), 10000.01m), await w.QueryAsync<(DateOnly, decimal)>("select refunded_on, amount_gel from core.premium_refund_request where id = @request", new { request }).ContinueWith(t => t.Result.Single()));
+            Assert.Equal([(1, inst[1], 5000.01m, 5000.01m), (2, inst[0], 5000.00m, 5000.00m)], await w.QueryAsync<(int, Guid, decimal, decimal)>(
+                "select position, installment_id, amount, amount_gel from core.premium_refund_request_line where request_id = @request order by position", new { request }));
+            Assert.Equal([(request, p.Number, "10,000.01")], await ListedAsync(w, "refund"));
+            Assert.Equal(nothing, await OwedInAsync(w, D(2026, 11, 1), "GEL"));
+            // Approved by the financial director (a group) on 03.11: the refund −10 000.01 dated 03.11, its two lines; off the list.
+            Assert.Equal($"/policies/{p.Id}?refund=approved", await PaymentActions.ApprovePremiumRefundRequestAsync(w.App, w.Rates, beka, p.Id.ToString(), request.ToString()));
+            var back = Assert.Single(await w.QueryAsync<(Guid Id, DateOnly On, decimal Gel, Guid Request, Guid By)>(
+                "select id, received_on, amount_gel, refund_request_id, created_by from core.payment where kind = N'refund'"));
+            Assert.Equal((D(2026, 11, 3), -10000.01m, request, beka.Id), (back.On, back.Gel, back.Request, back.By));
+            Assert.Equal([(inst[1], -5000.01m, -5000.01m, 1m, D(2026, 11, 3)), (inst[0], -5000.00m, -5000.00m, 1m, D(2026, 11, 3))],
+                await w.QueryAsync<(Guid, decimal, decimal, decimal, DateOnly)>(
+                    "select installment_id, amount, amount_gel, rate, booked_on from core.payment_allocation where payment_id = @id order by amount", new { id = back.Id }));
+            Assert.Empty(await ListedAsync(w, "refund"));
+            // November by hand: 2 000.00 of credit left on the first two, the 15.12 instalment owed — 1 000.00, not overdue; October as it was.
+            Assert.Equal(new PremiumReport.ReceivableRow("GEL", 100000, 0, 100000, 1m, D(2026, 11, 30)), await OwedInAsync(w, D(2026, 11, 1), "GEL"));
+            Assert.Equal(october, Shape(await MonthReportAsync(w, D(2026, 10, 1))));
+            var after = await LedgerAsync(w);
+            Assert.Equal($"/policies/{p.Id}?refund=already", await PaymentActions.ApprovePremiumRefundRequestAsync(w.App, w.Rates, beka, p.Id.ToString(), request.ToString()));
+            Assert.Equal(after, await LedgerAsync(w));
+        });
+
+    [Fact]
+    public async Task Reversal_USD_two_policies_on_the_legacy_days_received_20_10_reversed_03_11_the_exact_mirror_at_the_stored_2_7_November_8000_owed_and_overdue_at_2_75_is_22000_October_as_it_was() =>
+        await OwnDatabaseAsync(async w =>
+        {
+            // USD, two policies from 01.10.2026: 5 000.00 on A and 3 000.00 on B due 01.10; 21 600.00 GEL received 20.10 at 2.7, 13 500.00
+            // and 8 100.00 booked 20.10 (written directly, as the legacy fixture); USD 2.70 on 31.10 and 2.75 on 30.11; asked and approved 03.11.
+            var admin = await w.UserAsync();
+            var accountant = await w.UserAsync("accountant");
+            var beka = await w.UserAsync("underwriter");
+            await GroupAsync(w, Fd, beka.Id);
+            var holder = await w.ClientAsync();
+            await w.RateAsync("USD", D(2026, 10, 31), 2.7m);
+            await w.RateAsync("USD", D(2026, 11, 30), 2.75m);
+            var a = await w.PendingPolicyAsync(holder, D(2026, 10, 1), "USD", 2.7m, 5000m, [(0, 5000m)]);
+            var b = await w.PendingPolicyAsync(holder, D(2026, 10, 1), "USD", 2.7m, 3000m, [(0, 3000m)]);
+            foreach (var p in new[] { a, b }) Assert.Equal("done", (await PolicyActions.ApprovePolicyAsync(w.App, admin, p.Id.ToString())).Outcome);
+            var instA = await w.ScalarAsync<Guid>("select id from core.installment where policy_id = @id", new { id = a.Id });
+            var instB = await w.ScalarAsync<Guid>("select id from core.installment where policy_id = @id", new { id = b.Id });
+            var receipt = await w.ReceiptAsync(holder, D(2026, 10, 20), 21600m, reference: "ჩარიცხვა");
+            await using (var c = await w.Database.OpenAppAsync())
+                foreach (var (i, amount, gel) in new[] { (instA, 5000m, 13500m), (instB, 3000m, 8100m) })
+                    await c.ExecuteAsync("insert core.payment_allocation (payment_id, installment_id, amount, amount_gel, rate, booked_on) values (@receipt, @i, @amount, @gel, 2.7, '2026-10-20')",
+                        new { receipt, i, amount, gel });
+            On(w, D(2026, 11, 3));
+            var october = Shape(await MonthReportAsync(w, D(2026, 10, 1)));
+            var octoberOwed = await OwedInAsync(w, D(2026, 10, 1), "USD");
+            Assert.True(octoberOwed is null || (octoberOwed.Outstanding, octoberOwed.Overdue) == (BigInteger.Zero, BigInteger.Zero));
+            var novemberBefore = await OwedInAsync(w, D(2026, 11, 1), "USD");
+            Assert.True(novemberBefore is null || novemberBefore.Outstanding == 0);
+            Assert.Equal($"/policies/{a.Id}?reversal=requested", await PaymentActions.ReversePaymentAsync(w.App, accountant, receipt.ToString(), a.Id.ToString(), "შეცდომა"));
+            var request = await w.ScalarAsync<Guid>("select id from core.receipt_reversal_request where receipt_id = @receipt", new { receipt });
+            Assert.Equal(D(2026, 11, 3), await w.ScalarAsync<DateOnly>("select reversed_on from core.receipt_reversal_request where id = @request", new { request }));
+            var listed = Assert.Single((await QueueAsync(w, "reversal")).Rows);
+            Assert.Equal((request, a.Number, (Guid?)receipt, "21,600.00"), (listed.Id, listed.CardNumber, listed.ReceiptId, FdPanel.AmountText(listed.AmountGel)));
+            Assert.Equal(novemberBefore, await OwedInAsync(w, D(2026, 11, 1), "USD"));
+            Assert.Equal($"/policies/{a.Id}?reversal=approved", await PaymentActions.ApproveReceiptReversalRequestAsync(w.App, beka, a.Id.ToString(), request.ToString()));
+            var mirror = Assert.Single(await w.QueryAsync<(Guid Id, DateOnly On, decimal Gel, Guid Request, Guid By)>(
+                "select id, received_on, amount_gel, reversal_request_id, created_by from core.payment where reverses_payment_id = @receipt", new { receipt }));
+            Assert.Equal((D(2026, 11, 3), -21600m, request, beka.Id), (mirror.On, mirror.Gel, mirror.Request, mirror.By));
+            Assert.Equal([(instA, -5000m, -13500m, 2.7m, D(2026, 11, 3)), (instB, -3000m, -8100m, 2.7m, D(2026, 11, 3))], await w.QueryAsync<(Guid, decimal, decimal, decimal, DateOnly)>(
+                "select installment_id, amount, amount_gel, rate, booked_on from core.payment_allocation where payment_id = @id order by amount", new { id = mirror.Id }));
+            Assert.Empty(await ListedAsync(w, "reversal"));
+            // November by hand: 8 000.00 USD owed and overdue (both due 01.10) at 30.11's 2.75 = 22 000.00; October as it was.
+            Assert.Equal(new PremiumReport.ReceivableRow("USD", 800000, 800000, 2200000, 2.75m, D(2026, 11, 30)), await OwedInAsync(w, D(2026, 11, 1), "USD"));
+            Assert.Equal(october, Shape(await MonthReportAsync(w, D(2026, 10, 1))));
+            var after = await LedgerAsync(w);
+            Assert.Equal($"/policies/{a.Id}?reversal=already", await PaymentActions.ApproveReceiptReversalRequestAsync(w.App, beka, a.Id.ToString(), request.ToString()));
+            Assert.Equal(after, await LedgerAsync(w));
         });
 }

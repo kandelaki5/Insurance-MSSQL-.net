@@ -159,4 +159,40 @@ public sealed class PeriodsPageTests
         var response = await site.Client().GetAsync("/accounting/periods");
         Assert.Equal((HttpStatusCode.Redirect, "/login"), (response.StatusCode, response.Headers.Location?.ToString()));
     }
+
+    /// <summary>The months the page offers to close (its close forms' period_start values).</summary>
+    private static List<string> Offered(string html) =>
+        [.. System.Text.RegularExpressions.Regex.Matches(html, "name=\"period_start\" value=\"([^\"]+)\"").Select(m => m.Groups[1].Value)];
+
+    [Fact]
+    public async Task A_new_year_first_policy_31_12_2026_December_closed_by_the_real_close_today_03_03_2027_the_page_offers_only_January_February_asked_directly_is_earlier_open_then_January_then_February()
+    {
+        // Legacy period-close-permission.test.ts "a month's last day and a new year", its page part: the database's clock stands on
+        // 05.01.2027 for December's real close (from the page), then on 03.03.2027 (the legacy today).
+        await using var site = await ReportSite.CreateAsync();
+        await site.World.PolicyAsync("P-NEW-YEAR", "2026-12-31", "2027-12-31", [new LineSpec("5.1", 365m, 365m)]);
+        var (client, userId) = await site.SignedInAsync("accountant");
+        site.World.Database.Clock.SetToday(new DateOnly(2027, 1, 5));
+        Assert.Equal(["2026-12-01"], Offered(await ReportSite.PageAsync(client, "/accounting/periods")));
+        Assert.Contains(Answer("2026-12-01", "done"), ReportSite.Decode(await (await CloseAsync(client, "2026-12-01")).Content.ReadAsStringAsync()));
+        var december = await PeriodsAsync(site);
+        Assert.Equal([(D("2026-12-01"), "closed", (Guid?)userId)], december.Select(p => (p.Month, p.Status, p.By)));
+        // 03.03.2027: December closed, January open — only January is offered.
+        site.World.Database.Clock.SetToday(new DateOnly(2027, 3, 3));
+        Assert.Equal(["2027-01-01"], Offered(await ReportSite.PageAsync(client, "/accounting/periods")));
+        // February asked directly: "earlier open", nothing written.
+        var refused = ReportSite.Decode(await (await CloseAsync(client, "2027-02-01")).Content.ReadAsStringAsync());
+        Assert.Contains($"<div class=\"alert error\">{Answer("2027-02-01", "earlier-open")}</div>", refused);
+        Assert.Equal(december, await PeriodsAsync(site));
+        // January, then February; then March is the current month — nothing more is offered.
+        var january = ReportSite.Decode(await (await CloseAsync(client, "2027-01-01")).Content.ReadAsStringAsync());
+        Assert.Contains($"<div class=\"alert ok\">{Answer("2027-01-01", "done")}</div>", january);
+        Assert.Equal(["2027-02-01"], Offered(january));
+        var february = ReportSite.Decode(await (await CloseAsync(client, "2027-02-01")).Content.ReadAsStringAsync());
+        Assert.Contains($"<div class=\"alert ok\">{Answer("2027-02-01", "done")}</div>", february);
+        Assert.Empty(Offered(february));
+        Assert.Equal([(D("2026-12-01"), "closed", (Guid?)userId), (D("2027-01-01"), "closed", userId), (D("2027-02-01"), "closed", userId)],
+            (await PeriodsAsync(site)).Select(p => (p.Month, p.Status, p.By)));
+        Assert.Contains(Answer("2027-03-01", "not-ended"), ReportSite.Decode(await (await CloseAsync(client, "2027-03-01")).Content.ReadAsStringAsync()));
+    }
 }

@@ -112,4 +112,55 @@ public sealed class GapsReportPagesTests
         Assert.Equal("218.00", Tables(november, 1)[0][4]);
         Assert.Empty(site.Nbg.Requests);
     }
+
+    /// <summary>
+    /// The legacy scenario on its own days, the database's clock standing on each action's day: September closed by the real close and the
+    /// two USD policies imported and approved on 20.10.2026 (15.10's 2.80 stored here; its fetch from the bank: GapsImportPlanTests), then
+    /// 600.00 GEL received 31.10 registered on the first policy on 07.11.2026 (31.10's 3.00: 200.00 USD, booked 07.11). The page read on
+    /// 01.12.2026, as the legacy page was.
+    /// </summary>
+    [Fact]
+    public async Task The_premium_report_page_over_the_real_import_approval_and_late_receipt_on_the_legacy_days_November_1400_USD_200_overdue_3_5_4900_October_1600_300_3_0_4800()
+    {
+        await using var site = await ReportSite.CreateAsync();
+        var w = new World(site.World.Database);
+        foreach (var (day, rate) in new[] { ("2026-10-01", 2.7m), ("2026-10-15", 2.8m), ("2026-10-20", 2.9m), ("2026-10-31", 3m), ("2026-11-07", 3.2m), ("2026-11-30", 3.5m) })
+            await site.World.RateAsync("USD", day, rate);
+        var underwriter = await w.UserAsync("underwriter");
+        var head = await w.UserAsync("operations_head");
+        var accountant = await w.UserAsync("accountant");
+        await Gaps.DecideAsync(w, underwriter.Id, "premium.receipt.create", "allow");
+        Gaps.On(w, new DateOnly(2026, 10, 20));
+        Assert.Equal(new PeriodClose.Answer("done", "2026-09-01"), await PeriodClose.CloseAsync(w.App, accountant, "2026-09-01"));
+        var taxId = (300_000_000 + Random.Shared.Next(600_000_000)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var holder = await w.ClientAsync(taxId);
+        const string csv = "make,model,plate,value,currency,effective_from,effective_to,installments,premium_damage,limit_damage,deductible_damage,premium_theft,limit_theft,deductible_theft\n"
+            + "ტესტი,დოლარი,US-011-PT,30000,USD,2026-10-01,2027-10-01,11,900,30000,0,300,30000,0\n"
+            + "ტესტი,მეორე,US-004-PT,20000,USD,2026-10-15,2027-10-15,4,300,20000,0,100,20000,0\n";
+        var form = World.Form(("policyholder_id_number", taxId), ("effective_from", "2026-10-01"), ("effective_to", "2027-10-01"), ("currency", "GEL"), ("installments", "1"));
+        var preview = await Import.PreviewAsync(w.App, underwriter, form, Encoding.UTF8.GetBytes(csv));
+        Assert.NotNull((await Import.ConfirmAsync(w.App, w.Rates, underwriter, preview.Payload, preview)).Redirect);
+        var ids = await w.QueryAsync<Guid>("select p.id from core.policy p join core.contract c on c.id = p.contract_id where c.policyholder_id = @holder order by p.effective_from", new { holder });
+        foreach (var id in ids) Assert.Equal("done", (await PolicyActions.ApprovePolicyAsync(w.App, head, id.ToString())).Outcome);
+        Gaps.On(w, new DateOnly(2026, 11, 7));
+        Assert.Equal($"/policies/{ids[0]}?paid=0", (await w.PayAsync(underwriter, ids[0], "600.00", new DateOnly(2026, 10, 31), reference: "IMPORT-USD-600")).Redirect);
+        Assert.Equal([(200m, 600m, 3m, new DateOnly(2026, 11, 7))], await w.QueryAsync<(decimal, decimal, decimal, DateOnly)>("select amount, amount_gel, rate, booked_on from core.payment_allocation"));
+        Gaps.On(w, new DateOnly(2026, 12, 1));
+        var (client, _) = await site.SignedInAsync("accountant");
+        var november = await ReportSite.PageAsync(client, "/accounting/premium-report?month=2026-11");
+        // By hand (tetri / cents), November at 30.11: owed 160000 − 20000 = 140000 USD cents, overdue 20000 (the first's 01.11, the second's
+        // 15.10), at 3.50 490000; nothing written; earned 68569 − 32733 = 35836; UPR 436000 − 68569 = 367431; IBNR 5 % of 436000 = 21800.
+        Assert.Equal([["USD", "1,400.00", "200.00", "3.5000 (30.11.2026)", "4,900.00"]], Tables(november, 2));
+        Assert.Equal(["5.1", "0", "0.00", "0.00", "358.36", "3,674.31", "0.00", "0.00", "0.00"], Tables(november, 0)[0] is var nrow ? (string[])[nrow[0], .. nrow[2..]] : []);
+        Assert.Equal(["0.00", "0.00", "218.00", "0.00", "0.00", "0.00"], Tables(november, 1)[0][2..]);
+        Assert.Contains("01.11.2026 – 30.11.2026", november);
+        // October at 31.10 from the same rows: the receipt's allocation is booked 07.11 — owed 1 600.00 USD, 300.00 overdue, at 3.00 4 800.00.
+        var october = await ReportSite.PageAsync(client, "/accounting/premium-report?month=2026-10");
+        Assert.Equal([["USD", "1,600.00", "300.00", "3.0000 (31.10.2026)", "4,800.00"]], Tables(october, 2));
+        Assert.Equal(["5.1", "2", "4,360.00", "4,360.00", "327.33", "4,032.67", "0.00", "0.00", "0.00"], Tables(october, 0)[0] is var orow ? (string[])[orow[0], .. orow[2..]] : []);
+        Assert.Equal("218.00", Tables(october, 1)[0][4]);
+        Assert.Empty(site.Nbg.Requests);
+        // The page without a month opens on today's month by the clock: December (its 31.12 rate is not stored, so the bank is asked for it).
+        Assert.Contains("01.12.2026 – 31.12.2026", await ReportSite.PageAsync(client, "/accounting/premium-report"));
+    }
 }

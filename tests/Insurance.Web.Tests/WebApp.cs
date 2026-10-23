@@ -27,7 +27,8 @@ public sealed partial class WebApp : IAsyncLifetime
             b.UseEnvironment("Development");
             b.UseSetting("ConnectionStrings:Insurance", Db.AppConnection);
             // No test reaches the network: the National Bank and the UN list refuse every request.
-            b.ConfigureTestServices(s => s.AddSingleton<IHttpClientFactory>(new RefusingNbg()));
+            // The application's options with the test database's clock (the system clock until a test sets a day).
+            b.ConfigureTestServices(s => s.AddSingleton<IHttpClientFactory>(new RefusingNbg()).AddSingleton(Db.Options));
         });
     }
 

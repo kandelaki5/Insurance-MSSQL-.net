@@ -20,21 +20,21 @@ public sealed class BrowserApp : IAsyncLifetime
     private KestrelFactory? _server;
 
     /// <summary>The application on a real socket (Kestrel), on the test database.</summary>
-    private sealed class KestrelFactory(string connection) : WebApplicationFactory<Program>
+    private sealed class KestrelFactory(string connection, Insurance.Application.Data.DbOptions options) : WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Development");
             builder.UseSetting("ConnectionStrings:Insurance", connection);
             // No test reaches the network: the National Bank and the UN list refuse every request.
-            builder.ConfigureTestServices(s => s.AddSingleton<IHttpClientFactory>(new Insurance.Integration.Tests.RefusingNbg()));
+            builder.ConfigureTestServices(s => s.AddSingleton<IHttpClientFactory>(new Insurance.Integration.Tests.RefusingNbg()).AddSingleton(options));
         }
     }
 
     public async Task InitializeAsync()
     {
         await Web.InitializeAsync();
-        _server = new KestrelFactory(Web.Db.AppConnection);
+        _server = new KestrelFactory(Web.Db.AppConnection, Web.Db.Options);
         var port = FreePort();
         _server.UseKestrel(port);
         _server.StartServer();

@@ -11,14 +11,16 @@ namespace Insurance.Integration.Tests.Policies;
 /// refund cases, and precision-fd-panel-chain.test.ts): RecordPaymentAsync records it, AllocateReceiptAsync lets the
 /// client's second policy take what is left, ReversePaymentAsync asks for the reversal above the threshold (10 000.00),
 /// FdPanel lists the request, ApproveReceiptReversalRequestAsync writes the mirror. The legacy receipt day 20.10 and the
-/// request day 03.11 are both today here, and the approval "the next day" (04.11) is the same day: the mirror is dated on
-/// the request's day either way, but a later approval day itself is not reproduced (no settable clock).
+/// request day 03.11 are both today here, and the approval "the next day" (04.11) is the same day. The tests at the end run on
+/// the legacy days on a database of their own, the database's clock (DbOptions.Clock) standing on 20.10, 03.11 and 04.11: the
+/// approval a day later, on the request's own day and rate.
 /// </summary>
 public sealed class GapsReceiptChainTests(TestDatabase db) : IClassFixture<TestDatabase>, IAsyncLifetime
 {
     private readonly World w = new(db);
     private static DateOnly Today => World.Today;
     private static decimal D(string s) => decimal.Parse(s, CultureInfo.InvariantCulture);
+    private static DateOnly D(int year, int month, int day) => new(year, month, day);
 
     public async Task InitializeAsync()
     {
@@ -476,6 +478,104 @@ public sealed class GapsReceiptChainTests(TestDatabase db) : IClassFixture<TestD
         Assert.Equal($"/policies/{x.P.Id}?refund=already", await PaymentActions.ApprovePremiumRefundRequestAsync(w.App, w.Rates, x.Admin, x.P.Id.ToString(), request.ToString()));
         Assert.Single(await RefundsAsync(x.P));
     }
+
+    // ================================================================ the legacy days, on a database of its own with its clock set
+
+
+
+    [Fact]
+    public async Task GEL_90071992547408_01_on_the_legacy_days_recorded_and_asked_on_03_11_approved_the_next_day_04_11_the_exact_mirror_on_the_requests_day_03_11() =>
+        await OwnDatabaseAsync(async w =>
+        {
+            var (admin, accountant, p, inst) = await LegacyDays.ChainAsync(w, "GEL", "90071992547408.00", "0.01");
+            Assert.Equal($"/policies/{p.Id}?paid=0", (await w.PayAsync(accountant, p.Id, "90071992547408.01", D(2026, 11, 3), reference: "R-NEW")).Redirect);
+            var r = await w.ScalarAsync<Guid>("select id from core.payment where reference = N'R-NEW'");
+            Assert.Equal([(inst[0], 90071992547408.00m, 90071992547408.00m, 1m, D(2026, 11, 3)), (inst[1], 0.01m, 0.01m, 1m, D(2026, 11, 3))], await LegacyDays.LinesOfAsync(w, r));
+            var original = await LegacyDays.LinesOfAsync(w, r);
+            Assert.Equal($"/policies/{p.Id}?reversal=requested", await PaymentActions.ReversePaymentAsync(w.App, accountant, r.ToString(), p.Id.ToString(), "შეცდომით ჩაირიცხა"));
+            var request = await w.ScalarAsync<Guid>("select id from core.receipt_reversal_request where receipt_id = @r", new { r });
+            Assert.Equal(D(2026, 11, 3), await w.ScalarAsync<DateOnly>("select reversed_on from core.receipt_reversal_request where id = @request", new { request }));
+            Assert.Equal(0m, await w.OwedAsync(p.Id));
+            Assert.Equal($"/policies/{p.Id}?reversal=not-allowed", await PaymentActions.ApproveReceiptReversalRequestAsync(w.App, accountant, p.Id.ToString(), request.ToString()));
+            // The admin approves the next day, 04.11: the mirror on the request's day 03.11, both lines negative.
+            On(w, D(2026, 11, 4));
+            Assert.Equal($"/policies/{p.Id}?reversal=approved", await PaymentActions.ApproveReceiptReversalRequestAsync(w.App, admin, p.Id.ToString(), request.ToString()));
+            var m = Assert.Single(await w.QueryAsync<(Guid Id, DateOnly On, decimal Gel, string Kind, Guid By, Guid? Request)>(
+                "select id, received_on, amount_gel, kind, created_by, reversal_request_id from core.payment where reverses_payment_id = @r", new { r }));
+            Assert.Equal((D(2026, 11, 3), -90071992547408.01m, "reversal", admin.Id, (Guid?)request), (m.On, m.Gel, m.Kind, m.By, m.Request));
+            Assert.Equal([(inst[1], -0.01m, -0.01m, 1m, D(2026, 11, 3)), (inst[0], -90071992547408.00m, -90071992547408.00m, 1m, D(2026, 11, 3))], await LegacyDays.LinesOfAsync(w, m.Id));
+            Assert.Equal(original, await LegacyDays.LinesOfAsync(w, r));
+            Assert.Equal($"/policies/{p.Id}?reversal=already", await PaymentActions.ApproveReceiptReversalRequestAsync(w.App, admin, p.Id.ToString(), request.ToString()));
+            Assert.Equal(90071992547408.01m, await w.OwedAsync(p.Id));
+            // The card's debt on 04.11: back to the tetri, the 01.11 instalment overdue.
+            Assert.Equal(90071992547408.01m, await w.OwedOnAsync(p.Id, D(2026, 11, 4)));
+        });
+
+    [Fact]
+    public async Task USD_on_the_legacy_days_10000_01_at_03_11s_2_7_reversal_approved_04_11_when_USD_is_2_8_the_mirror_is_the_stored_GEL_at_2_7_dated_03_11() =>
+        await OwnDatabaseAsync(async w =>
+        {
+            var (admin, accountant, p, inst) = await LegacyDays.ChainAsync(w, "USD", "5000.00", "100.00");
+            Assert.Equal($"/policies/{p.Id}?paid=0", (await w.PayAsync(accountant, p.Id, "10000.01", D(2026, 11, 3), reference: "R-USD")).Redirect);
+            var r = await w.ScalarAsync<Guid>("select id from core.payment where reference = N'R-USD'");
+            Assert.Equal([(inst[0], 3703.71m, 10000.01m, 2.7m, D(2026, 11, 3))], await LegacyDays.LinesOfAsync(w, r));
+            Assert.Equal($"/policies/{p.Id}?reversal=requested", await PaymentActions.ReversePaymentAsync(w.App, accountant, r.ToString(), p.Id.ToString(), "შეცდომით ჩაირიცხა"));
+            var request = await w.ScalarAsync<Guid>("select id from core.receipt_reversal_request where receipt_id = @r", new { r });
+            On(w, D(2026, 11, 4));
+            Assert.Equal($"/policies/{p.Id}?reversal=approved", await PaymentActions.ApproveReceiptReversalRequestAsync(w.App, admin, p.Id.ToString(), request.ToString()));
+            var m = Assert.Single(await w.QueryAsync<(Guid Id, DateOnly On, decimal Gel)>("select id, received_on, amount_gel from core.payment where reverses_payment_id = @r", new { r }));
+            Assert.Equal((D(2026, 11, 3), -10000.01m), (m.On, m.Gel));
+            Assert.Equal([(inst[0], -3703.71m, -10000.01m, 2.7m, D(2026, 11, 3))], await LegacyDays.LinesOfAsync(w, m.Id));
+            Assert.Equal(5100m, await w.OwedAsync(p.Id));
+        });
+
+    [Fact]
+    public async Task Exact_refund_asked_on_03_11_at_2_7_approved_a_day_later_04_11_when_USD_is_2_8_on_the_requests_own_day_and_rate_minus_10000_80() =>
+        await OwnDatabaseAsync(async w =>
+        {
+            // USD: one instalment of 1 000.00 due 01.10.2026, held 4 704.00 (12 700.80 GEL at 2.7) by a receipt of 20.10.2026 (written directly,
+            // as the legacy fixture); USD 2.70 on 03.11, 2.80 on 04.11.
+            await w.SettingAsync("payment.fd_threshold_gel", "10000.00");
+            await w.RateAsync("USD", D(2026, 11, 3), 2.7m);
+            await w.RateAsync("USD", D(2026, 11, 4), 2.8m);
+            var admin = await w.UserAsync();
+            var accountant = await w.UserAsync("accountant");
+            var p = await w.PendingPolicyAsync(await w.ClientAsync(), D(2026, 10, 1), "USD", 2.7m, 1000m, [(0, 1000m)]);
+            Assert.Equal("done", (await PolicyActions.ApprovePolicyAsync(w.App, admin, p.Id.ToString())).Outcome);
+            var i = await w.ScalarAsync<Guid>("select id from core.installment where policy_id = @id", new { id = p.Id });
+            var receipt = await w.ReceiptAsync(p.Holder, D(2026, 10, 20), 9999999999999999.99m, reference: "ჩარიცხვა");
+            await using (var c = await w.Database.OpenAppAsync())
+                await c.ExecuteAsync("insert core.payment_allocation (payment_id, installment_id, amount, amount_gel, rate, booked_on) values (@receipt, @i, 4704.00, 12700.80, 2.7, '2026-10-20')", new { receipt, i });
+            // Asked on 03.11: 3 704.00 over × 2.7 = 10 000.80, above 10 000 — a request at 2.7.
+            On(w, D(2026, 11, 3));
+            Assert.Equal($"/policies/{p.Id}?refund=requested", await PaymentActions.RefundOverpaymentAsync(w.App, w.Rates, accountant, p.Id.ToString(), "bank", "დაბრუნება"));
+            var request = await w.ScalarAsync<Guid>("select id from core.premium_refund_request where policy_id = @id", new { id = p.Id });
+            Assert.Equal([(D(2026, 11, 3), 10000.80m, "USD", 2.7m)], await w.QueryAsync<(DateOnly, decimal, string, decimal)>(
+                "select refunded_on, amount_gel, currency, rate from core.premium_refund_request where id = @request", new { request }));
+            // Approved on 04.11 (USD 2.8 that day): on the request's own day and rate — −10 000.80 dated 03.11, one line −3 704.00 / −10 000.80 at 2.7.
+            On(w, D(2026, 11, 4));
+            Assert.Equal($"/policies/{p.Id}?refund=approved", await PaymentActions.ApprovePremiumRefundRequestAsync(w.App, w.Rates, admin, p.Id.ToString(), request.ToString()));
+            var back = Assert.Single(await w.QueryAsync<(Guid Id, DateOnly On, decimal Gel, Guid By, Guid? Request)>(
+                "select id, received_on, amount_gel, created_by, refund_request_id from core.payment where kind = N'refund'"));
+            Assert.Equal((D(2026, 11, 3), -10000.80m, admin.Id, (Guid?)request), (back.On, back.Gel, back.By, back.Request));
+            Assert.Equal([(i, -3704.00m, -10000.80m, 2.7m, D(2026, 11, 3))], await LegacyDays.LinesOfAsync(w, back.Id));
+        });
+
+
+    [Fact]
+    public async Task USD_cross_on_the_legacy_days_10270_GEL_for_A_on_20_10_October_closed_B_takes_270_at_20_10s_2_7_on_03_11_approved_04_11_at_the_stored_2_7_dated_03_11_B_owes_USD_100_again() =>
+        await OwnDatabaseAsync(async w =>
+        {
+            var (admin, a, b, ia, ib, r, request) = await LegacyDays.CrossUsdAsync(w);
+            On(w, D(2026, 11, 4));
+            Assert.Equal($"/policies/{a.Id}?reversal=approved", await PaymentActions.ApproveReceiptReversalRequestAsync(w.App, admin, a.Id.ToString(), request.ToString()));
+            var m = Assert.Single(await w.QueryAsync<(Guid Id, DateOnly On, decimal Gel)>("select id, received_on, amount_gel from core.payment where reverses_payment_id = @r", new { r }));
+            Assert.Equal((D(2026, 11, 3), -10270m), (m.On, m.Gel));
+            // The mirror at the stored GEL and rate, negated, booked on the request's day 03.11 (none in the closed October).
+            Assert.Equal([(ib, -100m, -270m, 2.7m, D(2026, 11, 3)), (ia, -10000m, -10000m, 1m, D(2026, 11, 3))], await LegacyDays.LinesOfAsync(w, m.Id));
+            Assert.Equal([(ia, 10000m, 10000m, 1m, D(2026, 10, 20)), (ib, 100m, 270m, 2.7m, D(2026, 11, 3))], await LegacyDays.LinesOfAsync(w, r));
+            Assert.Equal((10000m, 100m), (await w.OwedAsync(a.Id), await w.OwedAsync(b.Id)));
+        });
 }
 
 /// <summary>
@@ -483,7 +583,7 @@ public sealed class GapsReceiptChainTests(TestDatabase db) : IClassFixture<TestD
 /// precision-month-report.test.ts, its seventh case), through the real actions, on a database of its own. The legacy
 /// receipt was recorded in October and everything after it booked in November, so October stayed as reported; here all
 /// of it is booked today and the figures are read for today's month: owed nothing while the request waits (and after a
-/// failed approval), then both debts back. "October as it was" (the month boundary) is not reproduced.
+/// failed approval), then both debts back. The second test runs on the legacy days (the database's clock): October as it was.
 /// </summary>
 public sealed class GapsMonthReportReversalTests
 {
@@ -525,5 +625,55 @@ public sealed class GapsMonthReportReversalTests
             Assert.Equal(new PremiumReport.ReceivableRow("GEL", 1000001, 1000000, 1000001, 1m, MonthEnd(from)), after.Receivables.Single());
             Assert.Equal(month.Totals, after.Totals);
             Assert.Empty((await MonthReportAsync(w, from.AddMonths(-1))).Receivables);
+        });
+
+    [Fact]
+    public async Task On_the_legacy_days_received_20_10_the_advance_taken_and_the_reversal_asked_03_11_failed_once_approved_04_11_October_as_it_was_November_owes_nothing_while_it_waits_then_both_back() =>
+        await OwnDatabaseAsync(async w =>
+        {
+            // a: 10 000.00 due 15.10; b: 0.01 due 01.11; both from 01.10.2026. 10 000.01 received and recorded for a on 20.10.2026.
+            var admin = await w.UserAsync();
+            var accountant = await w.UserAsync("accountant");
+            var holder = await w.ClientAsync();
+            var from = D(2026, 10, 1);
+            var a = await w.PendingPolicyAsync(holder, from, premium: 10000m, schedule: [(14, 10000m)]);
+            var b = await w.PendingPolicyAsync(holder, from, premium: 0.01m, schedule: [(31, 0.01m)]);
+            foreach (var p in new[] { a, b }) Assert.Equal("done", (await PolicyActions.ApprovePolicyAsync(w.App, admin, p.Id.ToString())).Outcome);
+            On(w, D(2026, 10, 20));
+            Assert.Equal($"/policies/{a.Id}?paid=1", (await w.PayAsync(accountant, a.Id, "10000.01", D(2026, 10, 20), reference: "R-X")).Redirect);
+            var r = await w.ScalarAsync<Guid>("select id from core.payment where reference = N'R-X'");
+            var october = await MonthReportAsync(w, from);
+            // October: a settled, b's 0.01 owed (due 01.11, not overdue); written 10 000.01.
+            Assert.Equal((System.Numerics.BigInteger.Parse("1000001"), System.Numerics.BigInteger.One, System.Numerics.BigInteger.Zero),
+                (october.Totals.FinancialWrittenGel, october.Receivables.Single().Outstanding, october.Receivables.Single().Overdue));
+            // 03.11: b takes the advance; the reversal is asked from a.
+            On(w, D(2026, 11, 3));
+            Assert.Equal($"/policies/{b.Id}?advance=allocated&gel=1&left=0", await PaymentActions.AllocateReceiptAsync(w.App, w.Rates, accountant, b.Id.ToString(), r.ToString()));
+            Assert.Equal($"/policies/{a.Id}?reversal=requested", await PaymentActions.ReversePaymentAsync(w.App, accountant, r.ToString(), a.Id.ToString(), "შეცდომით"));
+            var q = await w.ScalarAsync<Guid>("select id from core.receipt_reversal_request where receipt_id = @r", new { r });
+            // Waiting: November owes nothing; October as it was.
+            var waiting = (await MonthReportAsync(w, D(2026, 11, 1))).Receivables.Single();
+            Assert.Equal((System.Numerics.BigInteger.Zero, System.Numerics.BigInteger.Zero), (waiting.Outstanding, waiting.Overdue));
+            Assert.Equal(Shape(october), Shape(await MonthReportAsync(w, from)));
+            // 04.11: a failure at the mirror's second line — nothing of it, November still owes nothing.
+            On(w, D(2026, 11, 4));
+            await ArmAsync(w.Database, "payment_allocation", 2);
+            try
+            {
+                await Assert.ThrowsAnyAsync<Exception>(() => PaymentActions.ApproveReceiptReversalRequestAsync(w.App, admin, a.Id.ToString(), q.ToString()));
+            }
+            finally
+            {
+                await DisarmAsync(w.Database);
+            }
+            Assert.Equal(waiting, (await MonthReportAsync(w, D(2026, 11, 1))).Receivables.Single());
+            // Approved on 04.11: the mirror on the request's day 03.11 — November owes a's 10 000.00 and b's 0.01 again, both overdue at its end.
+            Assert.Equal($"/policies/{a.Id}?reversal=approved", await PaymentActions.ApproveReceiptReversalRequestAsync(w.App, admin, a.Id.ToString(), q.ToString()));
+            Assert.Equal([D(2026, 11, 3)], await w.QueryAsync<DateOnly>("select received_on from core.payment where reverses_payment_id = @r", new { r }));
+            var november = await MonthReportAsync(w, D(2026, 11, 1));
+            Assert.Equal(System.Numerics.BigInteger.Zero, november.Totals.FinancialWrittenGel);
+            Assert.Equal(new PremiumReport.ReceivableRow("GEL", 1000001, 1000001, 1000001, 1m, D(2026, 11, 30)), november.Receivables.Single());
+            // October, read again: exactly as before the advance, the request and the mirror (all booked in November).
+            Assert.Equal(Shape(october), Shape(await MonthReportAsync(w, from)));
         });
 }

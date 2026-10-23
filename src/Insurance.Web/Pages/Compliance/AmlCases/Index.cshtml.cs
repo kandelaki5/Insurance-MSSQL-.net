@@ -15,7 +15,7 @@ public sealed class IndexModel : AppPageModel
     public IReadOnlyList<Row> Rows { get; private set; } = [];
     public IReadOnlyList<Aml.SuspensionRow> InForce { get; private set; } = [];
 
-    public SuspensionSectionView Section => new(AmlTexts.Suspension.InForceTitle, null, null, InForce, Aml.IsComplianceRole(Me), "/compliance/aml-cases", true, false);
+    public SuspensionSectionView Section => new(AmlTexts.Suspension.InForceTitle, null, null, InForce, Aml.IsComplianceRole(Me), "/compliance/aml-cases", true, false, Db.Now());
 
     private async Task LoadAsync()
     {

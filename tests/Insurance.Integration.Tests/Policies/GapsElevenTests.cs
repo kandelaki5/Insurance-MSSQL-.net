@@ -12,7 +12,8 @@ namespace Insurance.Integration.Tests.Policies;
 /// as the legacy store gave it), and the real monthly report reads it. The legacy scenario ran from 01.10.2026 with
 /// "today" 07.10.2026; here the policy starts on the first of today's month and the receipt is received and entered
 /// today, so the day counts are the month's own: on a 31-day month (October, as in the legacy test) the figures are the
-/// legacy literals, checked as such.
+/// legacy literals, checked as such. The late receipt (received 31.10, entered 07.11) and its reversal (10.11) run on the legacy
+/// days, the database's clock (DbOptions.Clock) standing on each action's day.
 /// </summary>
 public sealed class GapsElevenTests(TestDatabase db) : IClassFixture<TestDatabase>
 {
@@ -164,6 +165,118 @@ public sealed class GapsElevenTests(TestDatabase db) : IClassFixture<TestDatabas
             Assert.Empty(previous.Claims);
             Assert.Equal(new PremiumReport.Totals(0, 0, 0, 0, 0, 0, 0, 0), previous.Totals);
             // The report only reads.
+            Assert.Equal(before, await LedgerAsync(w));
+        });
+
+    // ================================================================ the legacy days, on the database's clock (DbOptions.Clock)
+
+    /// <summary>
+    /// The legacy chain on its own days: issued on 01.10.2026 from 01.10.2026, approved by the head and 200.00 received on
+    /// 07.10.2026 (ELEVEN-0001), the clock of the database standing on each action's day as the legacy holder.__today did.
+    /// </summary>
+    private static async Task<(Guid Policy, Guid Holder, CurrentUser Underwriter)> LegacyDaysChainAsync(World w)
+    {
+        var underwriter = await w.UserAsync("underwriter");
+        var head = await w.UserAsync("operations_head");
+        await DecideAsync(w, underwriter.Id, "premium.receipt.create", "allow");
+        var taxId = TaxId();
+        var holder = await w.ClientAsync(taxId);
+        On(w, D(2026, 10, 1));
+        var id = await IssueAsync(w, underwriter, holder, taxId, D(2026, 10, 1), "900", "300");
+        On(w, D(2026, 10, 7));
+        Assert.Equal("done", (await PolicyActions.ApprovePolicyAsync(w.App, head, id.ToString())).Outcome);
+        Assert.Equal($"/policies/{id}?paid=0", (await w.PayAsync(underwriter, id, "200.00", D(2026, 10, 7), reference: "ELEVEN-0001")).Redirect);
+        return (id, holder, underwriter);
+    }
+
+    private static PremiumReport.ClassRow Casco(PremiumReport.Report r, int issued, long written, long earned, long unearned)
+    {
+        var c = Assert.Single(r.Classes);
+        Assert.Equal(("5.1", issued, new BigInteger(written), new BigInteger(written), new BigInteger(earned), new BigInteger(unearned)),
+            (c.ClassCode, c.PoliciesIssued, c.StatisticalWrittenGel, c.FinancialWrittenGel, c.EarnedGel, c.UnearnedGel));
+        Assert.Equal((BigInteger.Zero, BigInteger.Zero, BigInteger.Zero), (c.CededWrittenGel, c.CededUnearnedGel, c.RiCommissionGel));
+        Assert.Equal(new PremiumReport.Totals(issued, written, written, earned, unearned, 0, 0, 0), r.Totals);
+        var claims = Assert.Single(r.Claims);
+        Assert.Equal(("5.1", BigInteger.Zero, BigInteger.Zero, new BigInteger(6000)), (claims.ClassCode, claims.PaidGel, claims.RbnsGel, claims.IbnrGel));
+        Assert.Equal(new PremiumReport.ClaimsTotals(0, 0, 6000, 0, 0, 0), r.ClaimsTotals);
+        Assert.Equal(BigInteger.Zero, r.TreatyPremiumGel);
+        return c;
+    }
+
+    private static Task<List<(Guid Payment, DateOnly DueOn, decimal Amount, decimal AmountGel, decimal Rate, DateOnly BookedOn)>> AllocationsAsync(World w, Guid id) =>
+        w.QueryAsync<(Guid, DateOnly, decimal, decimal, decimal, DateOnly)>("""
+            select a.payment_id, i.due_on, a.amount, a.amount_gel, a.rate, a.booked_on from core.payment_allocation a join core.installment i on i.id = a.installment_id
+            where i.policy_id = @id order by a.created_at, a.amount desc
+            """, new { id });
+
+    [Fact]
+    public async Task Eleven_a_later_receipt_received_31_10_entered_07_11_is_booked_in_November_October_as_reported_November_owes_900_earned_98_63_UPR_999_45() =>
+        await OwnDatabaseAsync(async w =>
+        {
+            var (id, holder, underwriter) = await LegacyDaysChainAsync(w);
+            var octoberBefore = Shape(await MonthReportAsync(w, D(2026, 10, 1)));
+            // The real recordPayment on 07.11.2026: 100.00 by bank, received 31.10.2026 (ELEVEN-0002).
+            On(w, D(2026, 11, 7));
+            Assert.Equal($"/policies/{id}?paid=0", (await w.PayAsync(underwriter, id, "100.00", D(2026, 10, 31), reference: "ELEVEN-0002")).Redirect);
+            var before = await LedgerAsync(w);
+            var october = await MonthReportAsync(w, D(2026, 10, 1));
+            var november = await MonthReportAsync(w, D(2026, 11, 1));
+            // First financial check, by hand (tetri). October as reported: written 120000, earned 7644 + 2548 = 10192, UPR 109808,
+            // owed 120000 − 20000 = 100000, the 01.10 instalment paid. November (61 days of the year by 30.11): earned
+            // round(90000 × 61 / 365) + round(30000 × 61 / 365) − 10192 = 15041 + 5014 − 10192 = 9863, UPR 120000 − 20055 = 99945;
+            // owed 120000 − 20000 − 10000 = 90000, the 01.10 and 01.11 instalments paid; IBNR 5 % of 1 200.00 = 6000.
+            Assert.Equal(octoberBefore, Shape(october));
+            Casco(october, 1, 120000, 10192, 109808);
+            Assert.Equal([new PremiumReport.ReceivableRow("GEL", 100000, 0, 100000, 1m, D(2026, 10, 31))], october.Receivables);
+            Assert.Equal(("2026-11", D(2026, 11, 1), D(2026, 11, 30)), (november.Month, november.From, november.To));
+            Casco(november, 0, 0, 9863, 99945);
+            Assert.Equal([new PremiumReport.ReceivableRow("GEL", 90000, 0, 90000, 1m, D(2026, 11, 30))], november.Receivables);
+            Assert.Equal(before, await LedgerAsync(w));
+            // Then the raw rows: two receipts on their own days, two allocations — 200.00 on the 01.10 instalment booked 07.10, 100.00
+            // on the 01.11 instalment booked 07.11 (the day it was made, owner 05.10.2026); the schedule and the premium as written.
+            var receipts = await w.QueryAsync<(Guid Id, DateOnly ReceivedOn, decimal AmountGel, string Method, string Reference, Guid CreatedBy)>(
+                "select id, received_on, amount_gel, method, reference, created_by from core.payment where payer_party_id = @holder order by received_on", new { holder });
+            Assert.Equal([(D(2026, 10, 7), 200m, "bank", "ELEVEN-0001", underwriter.Id), (D(2026, 10, 31), 100m, "bank", "ELEVEN-0002", underwriter.Id)],
+                receipts.Select(r => (r.ReceivedOn, r.AmountGel, r.Method, r.Reference, r.CreatedBy)));
+            Assert.Equal([(receipts[0].Id, D(2026, 10, 1), 200m, 200m, 1m, D(2026, 10, 7)), (receipts[1].Id, D(2026, 11, 1), 100m, 100m, 1m, D(2026, 11, 7))], await AllocationsAsync(w, id));
+            Assert.Equal([(D(2026, 10, 1), 200m), .. Monthly(D(2026, 10, 1), 10, 100m)], await InstalmentsAsync(w, id));
+            Assert.Equal([900m, 300m], (await w.PremiumRowsAsync(id)).Select(r => r.Amount).OrderDescending());
+        });
+
+    [Fact]
+    public async Task Eleven_the_late_receipt_reversed_on_10_11_a_mirror_booked_10_11_October_as_reported_November_owes_1000_with_100_overdue() =>
+        await OwnDatabaseAsync(async w =>
+        {
+            var (id, holder, underwriter) = await LegacyDaysChainAsync(w);
+            On(w, D(2026, 11, 7));
+            Assert.Equal($"/policies/{id}?paid=0", (await w.PayAsync(underwriter, id, "100.00", D(2026, 10, 31), reference: "ELEVEN-0002")).Redirect);
+            var late = await w.ScalarAsync<Guid>("select id from core.payment where payer_party_id = @holder and reference = N'ELEVEN-0002'", new { holder });
+            var octoberBefore = Shape(await MonthReportAsync(w, D(2026, 10, 1)));
+            var novemberBefore = await MonthReportAsync(w, D(2026, 11, 1));
+            Assert.Equal([new PremiumReport.ReceivableRow("GEL", 90000, 0, 90000, 1m, D(2026, 11, 30))], novemberBefore.Receivables);
+            // The real reversePayment on 10.11.2026.
+            On(w, D(2026, 11, 10));
+            Assert.Null(await PaymentActions.ReversePaymentAsync(w.App, underwriter, late.ToString(), id.ToString(), "შეცდომით შეტანილი ქვითარი"));
+            var before = await LedgerAsync(w);
+            var october = await MonthReportAsync(w, D(2026, 10, 1));
+            var november = await MonthReportAsync(w, D(2026, 11, 1));
+            // By hand (tetri): October unchanged; November written 0, earned 9863, UPR 99945 as before; owed at 30.11
+            // 120000 − (20000 + 10000 − 10000) = 100000, the 01.11 instalment (10000) unpaid again — overdue 10000; IBNR 6000.
+            Assert.Equal(octoberBefore, Shape(october));
+            Casco(november, 0, 0, 9863, 99945);
+            Assert.Equal([new PremiumReport.ReceivableRow("GEL", 100000, 10000, 100000, 1m, D(2026, 11, 30))], november.Receivables);
+            Assert.Equal(before, await LedgerAsync(w));
+            // The raw rows: the mirror −100.00 of kind reversal, reversing the late receipt, dated 10.11, the receipt's method and payer,
+            // the reason as its reference; its one allocation −100.00 on the 01.11 instalment at 1.000000, booked 10.11.
+            var mirror = Assert.Single(await w.QueryAsync<(Guid Id, DateOnly ReceivedOn, decimal AmountGel, string Method, string Kind, Guid? Reverses, Guid Payer, string Reference, Guid CreatedBy)>(
+                "select id, received_on, amount_gel, method, kind, reverses_payment_id, payer_party_id, reference, created_by from core.payment where kind = N'reversal' and payer_party_id = @holder", new { holder }));
+            Assert.Equal((D(2026, 11, 10), -100m, "bank", "reversal", (Guid?)late, holder, "შეცდომით შეტანილი ქვითარი", underwriter.Id),
+                (mirror.ReceivedOn, mirror.AmountGel, mirror.Method, mirror.Kind, mirror.Reverses, mirror.Payer, mirror.Reference, mirror.CreatedBy));
+            var lines = await AllocationsAsync(w, id);
+            Assert.Equal(3, lines.Count);
+            Assert.Equal((mirror.Id, D(2026, 11, 1), -100m, -100m, 1m, D(2026, 11, 10)), lines[2]);
+            // A second reversal of the same receipt adds nothing.
+            await PaymentActions.ReversePaymentAsync(w.App, underwriter, late.ToString(), id.ToString(), "შეცდომით შეტანილი ქვითარი");
             Assert.Equal(before, await LedgerAsync(w));
         });
 }

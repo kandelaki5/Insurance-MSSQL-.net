@@ -58,7 +58,7 @@ public static class PolicyActions
             return new IssueContext(p, coverages, holder?.Holder);
         });
         if (context is null) return FormAnswer.Refused(PolicyTexts.Errors.Coverages);
-        var today = Rates.TodayInTbilisi();
+        var today = db.Today();
         var (errors, input) = PolicyIssue.ValidateVehiclePolicy(values, included, context.Coverages, context.Holder, context.Product, today);
         if (context.Holder is { } holder && await db.ReadTxAsync(tx => Aml.BlockingSuspensionAsync(tx, holder.Id)) is not null)
             errors["policyholder_id_number"] = AmlTexts.Suspension.Blocked;
@@ -275,7 +275,7 @@ public static class PolicyActions
         }
         if (errors.Count > 0 || rate is not { } fixedRate) return FormAnswer.Invalid(errors);
         var currency = Billing.ParseCurrency(currencyText);
-        var today = Rates.TodayInTbilisi();
+        var today = db.Today();
         var totalDelta = lines.Sum(l => l.DeltaMinor);
 
         Guid newId;

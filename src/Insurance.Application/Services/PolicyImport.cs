@@ -109,7 +109,7 @@ public static class PolicyImport
         var inputs = new List<PolicyIssue.VehiclePolicyInput>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var firstOpen = await db.ReadTxAsync(FirstOpenDayAsync);
-        var today = Rates.TodayInTbilisi();
+        var today = db.Today();
         foreach (var r in parsed)
         {
             string V(string key) => r.Values.GetValueOrDefault(key) ?? "";
@@ -188,7 +188,7 @@ public static class PolicyImport
             fixedRates[key] = rate;
         }
 
-        var today = Rates.TodayInTbilisi();
+        var today = db.Today();
         string contractNumber;
         try
         {

@@ -12,7 +12,7 @@ public sealed class ImpairmentXlsxModel(Rates rates) : AppPageModel
     {
         if (Me.RoleCode is not ("admin" or "accountant")) return Downloads.Text("Forbidden", 403);
         var date = Query("date") ?? "";
-        if (!Dates.IsIsoDate(date) || date.StartsWith("0000", StringComparison.Ordinal) || Dates.ParseIsoDate(date) > Rates.TodayInTbilisi())
+        if (!Dates.IsIsoDate(date) || date.StartsWith("0000", StringComparison.Ordinal) || Dates.ParseIsoDate(date) > Db.Today())
             return Downloads.Text("Bad date", 400);
         var report = await Db.ReadTxAsync(tx => ImpairmentReport.BuildAsync(tx, rates, Dates.ParseIsoDate(date)));
         return Downloads.Xlsx(Response, ReportWorkbooks.Impairment(report), $"impairment-{date}.xlsx");

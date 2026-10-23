@@ -29,7 +29,7 @@ public sealed partial class ReportSite : IAsyncDisposable
         {
             b.UseEnvironment("Development");
             b.UseSetting("ConnectionStrings:Insurance", world.Database.AppConnection);
-            b.ConfigureTestServices(s => s.AddSingleton<IHttpClientFactory>(nbg));
+            b.ConfigureTestServices(s => s.AddSingleton<IHttpClientFactory>(nbg).AddSingleton(world.Database.Options));
         });
         return new ReportSite { World = world, Factory = factory, Nbg = nbg };
     }

@@ -101,4 +101,13 @@ public static class Gaps
         """);
 
     public static string Iso(DateOnly d) => Dates.ToIso(d);
+
+    /// <summary>The legacy day of an action: the database's clock (DbOptions.Clock) stands on <paramref name="day"/> in Tbilisi until set again.</summary>
+    public static void On(World w, DateOnly day) => w.Database.Clock.SetToday(day);
+
+    public static DateOnly D(int year, int month, int day) => new(year, month, day);
+
+    /// <summary>A whole monthly report as one comparable text (its records' values, in order): "October as reported" is this text unchanged.</summary>
+    public static string Shape(PremiumReport.Report r) => string.Join(" | ",
+        r.Month, r.From, r.To, string.Join("; ", r.Classes), r.Totals, string.Join("; ", r.Receivables), string.Join("; ", r.Claims), r.ClaimsTotals, r.TreatyPremiumGel);
 }

@@ -54,9 +54,9 @@ public static partial class PremiumReport
     [GeneratedRegex(@"^\d{4}-(0[1-9]|1[0-2])\z")]
     private static partial Regex MonthText();
 
-    /// <summary>The month a report is asked for (YYYY-MM); anything else — the current month in Tbilisi (legacy reportMonth).</summary>
-    public static string ReportMonth(string? requested, DateOnly? today = null) =>
-        requested is not null && MonthText().IsMatch(requested) ? requested : (today ?? Rates.TodayInTbilisi()).ToString("yyyy-MM", CultureInfo.InvariantCulture);
+    /// <summary>The month a report is asked for (YYYY-MM); anything else — the month of <paramref name="today"/> (the caller's Db.Today(), Tbilisi; legacy reportMonth).</summary>
+    public static string ReportMonth(string? requested, DateOnly today) =>
+        requested is not null && MonthText().IsMatch(requested) ? requested : today.ToString("yyyy-MM", CultureInfo.InvariantCulture);
 
     /// <summary>A report figure (tetri) as the report shows it: 1234567 → 12,345.67, exactly (legacy reportMoney).</summary>
     public static string ReportMoney(BigInteger value) => Grouped(value);

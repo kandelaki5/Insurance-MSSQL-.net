@@ -39,7 +39,7 @@ public sealed class CardModel : AppPageModel
             """, new { key }));
         if (c is null) return false;
         C = c;
-        Today = Rates.TodayInTbilisi();
+        Today = Db.Today();
         Deadline = c.ReceivedOn.AddDays(ComplaintTexts.ResponseDays);
         Overdue = c.Status == "open" && Deadline < Today;
         Registered = !string.IsNullOrEmpty(Query("registered"));

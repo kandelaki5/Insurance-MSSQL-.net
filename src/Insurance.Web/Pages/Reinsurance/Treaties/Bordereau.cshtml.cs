@@ -23,7 +23,7 @@ public sealed class BordereauModel(Rates rates) : AppPageModel
     public async Task<IActionResult> OnGetAsync(string id)
     {
         if (!Guid.TryParseExact(id, "D", out var treatyId)) return NotFound();
-        var (from, to) = Period(Query("from"), Query("to"), Rates.TodayInTbilisi());
+        var (from, to) = Period(Query("from"), Query("to"), Db.Today());
         var b = await Db.ReadTxAsync(tx => Insurance.Application.Services.Bordereau.BuildAsync(tx, rates, treatyId, from, to));
         if (b is null) return NotFound();
         B = b;
