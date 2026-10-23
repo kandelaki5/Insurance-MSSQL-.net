@@ -18,6 +18,7 @@ public sealed class Db(DbOptions options)
     public async Task<SqlConnection> OpenAsync(CancellationToken ct = default)
     {
         var connection = new SqlConnection(options.ConnectionString);
+        if (options.Interceptor is { } interceptor) CommandInterception.Attach(connection, interceptor);
         await connection.OpenAsync(ct);
         return connection;
     }

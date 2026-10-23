@@ -154,7 +154,17 @@ public static class PermissionPanel
     /// </summary>
     public static async Task<Answer> ChangeAsync(Db db, Guid adminId, Func<Tx, Task<PermissionStore.ChangeResult>> run)
     {
-        var result = await db.AsUserAsync(adminId, run);
+        PermissionStore.ChangeResult result;
+        try
+        {
+            result = await db.AsUserAsync(adminId, run);
+        }
+        catch (Exception e) when (DbError.From(e) is { Code: DbError.UniqueViolation, Constraint: "user_group_name_idx" })
+        {
+            // Legacy createGroup / renameGroup: the taken name is looked up first; the unique key's refusal is the fallback for
+            // two admins naming two groups alike at the same moment. The transaction is already rolled back: nothing is written.
+            result = PermissionStore.ChangeResult.Refused(PermissionStore.Refusal.DuplicateName);
+        }
         if (!result.Ok) return new Answer(false, PermissionTexts.Changes.Refusals[result.Reason!.Value.ToKebabCode()], false);
         return new Answer(true, result.Changed ? PermissionTexts.Changes.Saved : PermissionTexts.Changes.Unchanged, result.Changed);
     }

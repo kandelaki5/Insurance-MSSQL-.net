@@ -21,6 +21,8 @@
     <Compile Include="..\Insurance.Integration.Tests\ClaimWorld.cs" Link="ClaimWorld.cs" />
     <Compile Include="..\Insurance.Integration.Tests\Policies\World.cs" Link="Policies\World.cs" />
     <Compile Include="..\Insurance.Integration.Tests\ComplianceFixtures.cs" Link="ComplianceFixtures.cs" />
+    <!-- The command interceptor of the failure-injection tests (DbOptions.Interceptor). -->
+    <Compile Include="..\Insurance.Integration.Tests\FailureInjection\Faults.cs" Link="FailureInjection\Faults.cs" />
     <!-- The report worlds of the integration tests, for the report pages over the same rows. -->
     <Compile Include="..\Insurance.Integration.Tests\Worlds\*.cs" LinkBase="Worlds" />
     <!-- The month-report cases of the legacy precision check, read here also through the report page and the panel. -->

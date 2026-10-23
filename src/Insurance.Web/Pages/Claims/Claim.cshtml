@@ -213,6 +213,11 @@
     </form>
 }
 
+@if (!(Model.RecordsPayment && claim.Status is "approved" or "paid" && Model.RemainingTetri > 0) && Model.FormMessage("pay") is { } refusedPay)
+{
+    @* The pay form was sent but is no longer shown (the permission was taken away meanwhile): its answer is still given. *@
+    <div class="alert error">@refusedPay</div>
+}
 @if (Model.RecordsPayment && claim.Status is "approved" or "paid" && Model.RemainingTetri > 0)
 {
     var payeeKind = Model.FormValue("pay", "payee_kind", "policyholder");

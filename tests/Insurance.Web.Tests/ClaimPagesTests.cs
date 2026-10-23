@@ -346,12 +346,13 @@ public sealed partial class ClaimPagesTests(WebApp app) : IClassFixture<WebApp>
         var claim = await ApprovedClaimAsync(p);
         var (viewer, _) = await AsAsync("viewer");
         var response = await PostAsync(viewer, claim, "PayClaim", new() { ["claim_id"] = claim.ToString(), ["amount"] = "250", ["paid_on"] = D(Today), ["payee_kind"] = "policyholder" });
-        // As on the old page the refusal is the payment form's own message, and a viewer has no payment form, so the page comes back
-        // without it (the refusal text itself is asserted on the action in ClaimPaymentTests).
+        // The refusal is the payment form's own message (legacy pay-form.tsx kept it on the form it was sent from); the page comes
+        // back without a payment form for a viewer, and the refusal is still given above where the form would be
+        // (docs/legacy-tests-gaps-a.md, D2: a form sent after its permission was taken away).
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var shown = await response.Content.ReadAsStringAsync();
         Assert.DoesNotContain("handler=PayClaim", shown);
-        Assert.DoesNotContain(Html(ClaimTexts.PaymentNotAllowed), shown);
+        Assert.Contains(Html(ClaimTexts.PaymentNotAllowed), shown);
         Assert.EndsWith("?reserve=not-allowed", Location(await PostAsync(viewer, claim, "ChangeReserve", new()
         {
             ["claim_id"] = claim.ToString(), ["booked_on"] = D(Today), ["new_level"] = "1", ["reason"] = "x",
