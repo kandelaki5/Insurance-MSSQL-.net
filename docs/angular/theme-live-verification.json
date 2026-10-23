@@ -1,0 +1,16 @@
+{
+  "checkedAt": "2026-10-23T19:17:05.8923975+00:00",
+  "assets": [
+    {
+      "path": "ui/main.js",
+      "sha256": "C755C7C00AFB4AC10BE0A0132864406D2D7043A53A0FD20A2A1FFC14F7D989DA",
+      "matches": true
+    },
+    {
+      "path": "ui/styles.css",
+      "sha256": "07C5318F218AC04F01E50E510CEDA414A196FCD446FFDA1E30A932339DE1B65A",
+      "matches": true
+    }
+  ],
+  "loginStatus": 200
+}

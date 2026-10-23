@@ -18,3 +18,7 @@ appsettings.*.Local.json
 *.bak
 !src/Insurance.Domain/Regulatory/Templates/*.xlsx
 artifacts/
+
+# Angular's standalone index is not served; authenticated Razor pages bootstrap the workspace.
+/src/Insurance.Web/wwwroot/ui/index.html
+/src/Insurance.Web/wwwroot/ui/favicon.ico

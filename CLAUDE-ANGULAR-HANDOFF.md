@@ -44,3 +44,11 @@ SQL კავშირი გარემოდან/ჰოსტინგი�
 
 Codex-მა განახლება უკვე ატვირთა დემოზე და ჩართვის შემდეგ გადაამოწმა. განმეორებითი ატვირთვა საჭირო არ არის. დეტალები და მტკიცებულებები: docs/angular/DEPLOYMENT.md, verification-live.json და live-asset-checks.json.
 
+
+## კლოდის მიმდინარე სამუშაოსთან გაერთიანება
+
+კლოდი პარალელურად ასრულებს: open-PR scope port/coverage map, #362 RI commission settlement, #366 Income statement IS/IS-COM/P&C(NL), H46 GEL claim on FX policy და CLAUDE-RESPONSE 003/STATUS/MIGRATION-COVERAGE open-PR map დოკუმენტაციას. დიზაინის ტოტი ამ ფინანსურ ცვლილებებს არ მოიცავს და მათ ფაილებს არ ცვლის.
+
+**არ გადააწერო შენი მიმდინარე checkout სრული ZIP-ით და არ ჩაანაცვლო ახალი ფინანსური build ძველი UI build-ით.** დიზაინი შემოიტანე Git merge/cherry-pick-ით შენს ბოლო სამუშაოზე და გადაფარვები შეაჯერე. არსებული ფინანსური სერვისები/წესები შენარჩუნდეს. საერთო `_Layout.cshtml`-ში ორივე მხარის მენიუს პუნქტები შეინარჩუნე: Angular shell-ისთვის `server-navigation`, `app-root`, `server-content`, logout CSRF form და UI asset links საჭიროა. ახალ ანგარიშებსაც დაემატოს მენიუს ბმულები. Index/Policies/Details model-ებში დამატებული read-only JSON handler-ები არ უნდა დაიკარგოს.
+
+შემდეგ ააწყვე Angular და ახალი .NET ვერსია ერთად და მხოლოდ ამის შემდეგ განათავსე. სრული deploy-ით ძველი wwwroot/ui-ის დაბრუნება დიზაინს წაშლის. თემების მიმდინარე deploy მხოლოდ main.js/styles.css ფაილებს ცვლის; DLL/DB/config არ იცვლება.
