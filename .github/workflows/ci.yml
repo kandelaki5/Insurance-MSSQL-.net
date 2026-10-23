@@ -42,6 +42,18 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Angular workspace — clean install and production build
+        # Codex INS-DOTNET-MSSQL-004 A6: frontend/ builds from its lock file into src/Insurance.Web/wwwroot/ui, and the build must be the
+        # committed one, so what the web app serves (and what a deploy copies) is the source's own build.
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+      - name: The committed workspace build is the source's
+        run: git diff --exit-code -- src/Insurance.Web/wwwroot/ui/main.js src/Insurance.Web/wwwroot/ui/styles.css
       - run: dotnet build --configuration Release
       - name: The old program's world in PostgreSQL
         # tests/parity/legacy-world/world.sql: a dump of the world build-world.ts makes with the old program's own code
