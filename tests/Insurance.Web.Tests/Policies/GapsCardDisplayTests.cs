@@ -408,4 +408,71 @@ public sealed partial class GapsCardDisplayTests(PolicyWebApp app) : IClassFixtu
             }
         }
     }
+    // ---------------------------------------------------------------- the card's stored money
+
+    [Theory]
+    [InlineData("GEL")]
+    [InlineData("USD")]
+    [InlineData("EUR")]
+    public async Task The_cards_coverages_cessions_and_related_policy_to_the_tetri_the_largest_2_53s_neighbour_negative_zero_empty(string currency)
+    {
+        var admin = await AdminAsync();
+        await W.RateAsync("USD", Today, 2.7m);
+        await W.RateAsync("EUR", Today, 3.1234m);
+        var holder = await W.ClientAsync();
+        var t = await W.PendingPolicyAsync(holder, B, currency, currency == "GEL" ? 1m : 2.7m, premium: 1m, schedule: []);
+        var (_, damage) = await W.CascoAsync();
+        var treaty = await W.TreatyAsync();
+        await using (var c = await app.Db.OpenAppAsync())
+        {
+            await c.ExecuteAsync("delete from core.policy_line where policy_id = @id", new { id = t.Id });
+            var line = Guid.NewGuid();
+            await c.ExecuteAsync("""
+                insert core.policy_line (id, policy_id, class_code, sum_insured, deductible, premium, premium_gel, product_coverage_id)
+                values (@line, @id, N'5.1', 9999999999999999.99, 90071992547408.01, 90071992547408.01, 9999999999999999.99, @damage);
+                insert core.policy_line (policy_id, class_code, sum_insured, deductible, premium, premium_gel, product_coverage_id)
+                values (@id, N'5.1', null, 0.00, -0.01, -1234567.89, @damage);
+                """, new { line, id = t.Id, damage });
+            // S, the related policy of the same contract: its premium is the sum of its lines, as stored.
+            var s = Guid.NewGuid();
+            await c.ExecuteAsync("""
+                insert core.policy (id, contract_id, number, issued_on, effective_from, effective_to, status, premium_currency, premium_rate, segment, created_by)
+                values (@s, @contract, @number, @b, @b, @to, N'pending_approval', @currency, 1, N'corporate', @admin);
+                insert core.policy_line (policy_id, class_code, premium, premium_gel) values (@s, N'5.1', 90071992547408.01, 90071992547408.01);
+                insert core.policy_line (policy_id, class_code, sum_insured, premium, premium_gel) values (@s, N'5.1', 1.00, 0.01, 0.01);
+                """, new { s, contract = t.ContractId, number = "S-" + s.ToString("N")[..10], b = B, to = B.AddYears(1), currency, admin = admin.Id });
+            // One cession of T's issue and its cancellation.
+            var issue = Guid.NewGuid();
+            await c.ExecuteAsync("""
+                insert core.premium_transaction (id, policy_line_id, kind, amount, amount_gel, booked_on, cover_from, cover_to)
+                values (@issue, @line, N'issue', 90071992547408.01, 9999999999999999.99, @b, @b, @to)
+                """, new { issue, line, b = B, to = B.AddYears(1) });
+            // Its cancellation from the next day, and the cession mirrored on it (the database keeps a row's cessions within 100 %).
+            var cancel = Guid.NewGuid();
+            await c.ExecuteAsync("""
+                insert core.premium_transaction (id, policy_line_id, kind, amount, amount_gel, booked_on, cover_from, cover_to, cancels_transaction_id)
+                values (@cancel, @line, N'cancellation', -90071992547408.01, -9999999999999999.99, @b, @b, @to, @issue)
+                """, new { cancel, line, issue, b = B, to = B.AddYears(1) });
+            var first = Guid.NewGuid();
+            await c.ExecuteAsync("""
+                insert core.premium_cession (id, premium_transaction_id, treaty_id, share_percent, amount, amount_gel, commission, commission_gel, booked_on, cover_from, cover_to)
+                values (@first, @issue, @treaty, 50, 90071992547408.01, 9999999999999999.99, 0.01, 0.01, @b, @b, @to);
+                insert core.premium_cession (premium_transaction_id, treaty_id, share_percent, amount, amount_gel, commission, commission_gel, booked_on, cover_from, cover_to, cancels_cession_id)
+                values (@cancel, @treaty, 50, -90071992547408.01, -9999999999999999.99, -0.01, -0.01, @b, @b, @to, @first);
+                """, new { first, issue, cancel, treaty, b = B, to = B.AddYears(1) });
+        }
+        var (acc, _) = await app.SignedInAsync("accountant");
+        var ledger = await Gaps.LedgerAsync(W);
+        var html = await RawAsync(acc, $"/policies/{t.Id}");
+        Assert.Equal(new[] { "9,999,999,999,999,999.99|90,071,992,547,408.01|90,071,992,547,408.01|9,999,999,999,999,999.99", "|0.00|-0.01|-1,234,567.89" }.Order(StringComparer.Ordinal),
+            TableWith(html, PolicyTexts.Fields.SumInsured).Select(r => string.Join("|", r[2..])).Order(StringComparer.Ordinal));
+        Assert.Equal(["90,071,992,547,408.01|9,999,999,999,999,999.99|0.01", "-90,071,992,547,408.01|-9,999,999,999,999,999.99|-0.01"],
+            TableWith(html, ReinsuranceTexts.Cessions.CededPremiumGel).Select(r => string.Join("|", r[^3..])));
+        var related = Regex.Matches(Regex.Match(html, @"<ul class=""changes"">([\s\S]*?)</ul>").Groups[1].Value, @"<li>([\s\S]*?)</li>").Select(m => Html.Text(m.Groups[1].Value)).ToList();
+        Assert.Contains($"· 90,071,992,547,408.02 {currency} ·", Assert.Single(related));
+        Assert.Equal(ledger, await Gaps.LedgerAsync(W));
+        // A viewer sees the same stored cells.
+        var (viewer, _) = await app.SignedInAsync("viewer");
+        Assert.Equal(TableWith(html, PolicyTexts.Fields.SumInsured).Select(r => string.Join("|", r)), TableWith(await RawAsync(viewer, $"/policies/{t.Id}"), PolicyTexts.Fields.SumInsured).Select(r => string.Join("|", r)));
+    }
 }
