@@ -107,7 +107,7 @@ public static partial class PartyForm
                     // A malformed id is an error, as PostgreSQL refused it (22P02).
                     var key = Guid.Parse(id, CultureInfo.InvariantCulture);
                     p.Add("__id", key);
-                    await tx.ExecuteAsync($"update core.party set {string.Join(", ", columns.Select(c => $"{c} = @{c}"))}, updated_at = core.tx_now() where id = @__id", p);
+                    await tx.ExecuteAsync($"update core.party set {string.Join(", ", columns.Select(c => $"{c} = @{c}"))}, updated_at = sysdatetimeoffset() where id = @__id", p);
                     return key;
                 }
                 var created = Guid.NewGuid();

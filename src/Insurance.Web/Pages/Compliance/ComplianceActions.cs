@@ -97,13 +97,13 @@ public static partial class ComplianceActions
                 // p. 3; the owner's decision, 04.10.2026), so the written confirmation only records the letter. It still
                 // takes the same locks as registering (review H13).
                 await Aml.LockForSuspensionChangeAsync(tx, party);
-                await tx.ExecuteAsync("update core.fms_suspension set written_confirmed_at = core.tx_now() where id = @id and written_confirmed_at is null and lifted_at is null", new { id });
+                await tx.ExecuteAsync("update core.fms_suspension set written_confirmed_at = sysdatetimeoffset() where id = @id and written_confirmed_at is null and lifted_at is null", new { id });
             }
             else if (action == "lift")
             {
                 var reason = JsText.Trim(form("lift_reason") ?? "");
                 if (reason == "") return true;
-                await tx.ExecuteAsync("update core.fms_suspension set lifted_at = core.tx_now(), lift_reason = @reason where id = @id and lifted_at is null", new { reason, id });
+                await tx.ExecuteAsync("update core.fms_suspension set lifted_at = sysdatetimeoffset(), lift_reason = @reason where id = @id and lifted_at is null", new { reason, id });
             }
             return true;
         });

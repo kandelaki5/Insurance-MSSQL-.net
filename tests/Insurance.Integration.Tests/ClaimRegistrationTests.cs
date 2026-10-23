@@ -59,7 +59,7 @@ public sealed class ClaimRegistrationTests(TestDatabase db) : IClassFixture<Test
         Assert.All(rows, r => Assert.Equal(("GEL", "თბილისი", "ავარია"), (r.Currency.Trim(), r.Place, r.Description)));
         Assert.Equal(first, (await w.ClaimsOfEventAsync(first))[0]);
         Assert.Equal([(new DateOnly(y, 3, 5), 3000m, ClaimTexts.Fields.InitialReserve), (new DateOnly(y, 3, 5), 500m, ClaimTexts.Fields.InitialReserve), (new DateOnly(y, 3, 5), 150m, ClaimTexts.Fields.InitialReserve)],
-            await w.RowsAsync<(DateOnly, decimal, string)>("select r.booked_on, r.change, r.reason from core.claim_reserve r join core.claim c on c.id = r.claim_id where c.policy_id = @policy order by c.created_at",
+            await w.RowsAsync<(DateOnly, decimal, string)>("select r.booked_on, r.change, r.reason from core.claim_reserve r join core.claim c on c.id = r.claim_id where c.policy_id = @policy order by c.created_at, c.number",
                 new { policy = p.Id }));
         Assert.Equal(1, await w.ScalarAsync<int>("select count(*) from core.loss_event where policy_id = @policy", new { policy = p.Id }));
     }

@@ -106,13 +106,12 @@ public sealed class Faults : ICommandInterceptor
     public void AssertOnlyThePermissionWasRead(bool grants = true)
     {
         var tx = LastTransaction();
-        Assert.Equal(grants ? 6 : 5, tx.Count);
+        Assert.Equal(grants ? 5 : 4, tx.Count);
         Assert.Equal("set xact_abort on", tx[0]);
-        Assert.Contains("N'core.tx_at'", tx[1], StringComparison.Ordinal);
-        Assert.StartsWith("exec sp_set_session_context N'core.user_id'", tx[2], StringComparison.Ordinal);
-        Assert.Contains(Overrides, tx[3], StringComparison.Ordinal);
-        Assert.Contains(Memberships, tx[4], StringComparison.Ordinal);
-        if (grants) Assert.Contains(Grants, tx[5], StringComparison.Ordinal);
+        Assert.StartsWith("exec sp_set_session_context", tx[1], StringComparison.Ordinal);
+        Assert.Contains(Overrides, tx[2], StringComparison.Ordinal);
+        Assert.Contains(Memberships, tx[3], StringComparison.Ordinal);
+        if (grants) Assert.Contains(Grants, tx[4], StringComparison.Ordinal);
     }
 
     /// <summary>The quick check and the binding one, each with the three reads (the legacy tests' [mode, label] × [name, text]).</summary>

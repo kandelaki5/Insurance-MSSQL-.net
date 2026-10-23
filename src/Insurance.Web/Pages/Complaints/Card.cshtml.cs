@@ -59,7 +59,7 @@ public sealed class CardModel : AppPageModel
         if (Me.CanWrite && PermissionPanel.Uuid(Form("id")) is { } complaintId)
         {
             await Db.AsUserAsync(Me.Id, tx => tx.ExecuteAsync(
-                "update core.complaint set acknowledged_at = core.tx_now() where id = @complaintId and acknowledged_at is null", new { complaintId }));
+                "update core.complaint set acknowledged_at = sysdatetimeoffset() where id = @complaintId and acknowledged_at is null", new { complaintId }));
             return Redirect($"/complaints/{complaintId}");
         }
         return await LoadAsync(id) ? Page() : NotFound();
