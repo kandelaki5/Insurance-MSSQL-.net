@@ -354,7 +354,7 @@ public sealed class ClaimPaymentTests(TestDatabase db) : IClassFixture<TestDatab
     {
         var (x, c, a) = await EventAsync(200m, 200m);
         Assert.Equal(3, c.Count);
-        var numbers = await w.RowsAsync<string>("select number from core.claim where id in @c order by created_at", new { c });
+        var numbers = await w.RowsAsync<string>("select number from core.claim where id in @c order by created_at, number", new { c });
         var ev = numbers[0];
         Assert.Equal([ev, $"{ev}-2", $"{ev}-3"], numbers);
         foreach (var (claim, amount) in c.Zip(new[] { "2000", "500", "150" })) await w.ApproveAsync(x.Claims, claim, amount, x.Today);
