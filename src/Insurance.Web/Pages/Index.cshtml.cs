@@ -14,9 +14,18 @@ public sealed class IndexModel : AppPageModel
     {
         await OnGetAsync();
         var today=Db.Today();
+        // A change approved in its original's open month is no policy of its own (the policies list leaves its record out,
+        // Policies/IndexModel): it is not counted, and its premium (negative or positive) stays in the active premium, so the
+        // original counts once at its premium as corrected.
         var portfolio=await Db.ReadAsync(c=>c.QuerySingleAsync<Portfolio>("""
-            select (select count(*) from core.policy where status=N'active') as Active,
-                   (select count(*) from core.policy) as AllPolicies,
+            with counted as (
+              select p.id, p.status from core.policy p
+              where not (p.replaces_policy_id is not null and p.status = N'active'
+                         and exists (select 1 from core.policy_line l where l.policy_id = p.id)
+                         and not exists (select 1 from core.premium_transaction t join core.policy_line l on l.id = t.policy_line_id
+                                         where l.policy_id = p.id)))
+            select (select count(*) from counted where status=N'active') as Active,
+                   (select count(*) from counted) as AllPolicies,
                    (select coalesce(sum(l.premium_gel),0) from core.policy_line l join core.policy p on p.id=l.policy_id where p.status=N'active') as ActivePremiumGel,
                    (select coalesce(sum(amount_gel),0) from core.premium_cession where booked_on<=@today) as CededGel
             """,new {today}));

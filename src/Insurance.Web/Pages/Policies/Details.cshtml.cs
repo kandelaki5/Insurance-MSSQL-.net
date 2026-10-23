@@ -225,7 +225,9 @@ public sealed class DetailsModel(Rates rates) : AppPageModel
         return new JsonResult(new {
             Policy.Id, Policy.Number, Client=Policy.Policyholder, Policy.Product, Vehicle=Objects,
             From=Policy.EffectiveFrom, To=Policy.EffectiveTo, Policy.Status, Policy.Currency,
-            Premium=Lines.Sum(l=>l.Premium), Outstanding=(decimal)Receivable.Outstanding/100m,
+            // The premium as it stands on the card's day (a correction in the open month included, PR #211), and as issued.
+            Premium=(decimal)CurrentByLine.Values.Aggregate(BigInteger.Zero, (a, b) => a + b)/100m, IssuedPremium=Lines.Sum(l=>l.Premium),
+            Outstanding=(decimal)Receivable.Outstanding/100m,
             OutstandingGel=(decimal)Receivable.OutstandingGel/100m,
             Overdue=(decimal)Receivable.Overdue/100m,
             Overpaid=(decimal)Receivable.Overpaid/100m,
