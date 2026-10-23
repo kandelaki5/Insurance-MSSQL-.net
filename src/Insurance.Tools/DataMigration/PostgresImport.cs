@@ -28,7 +28,7 @@ public sealed class PostgresImport(string postgresConnection, string sqlServerAd
     public static readonly IReadOnlySet<string> NotCopied = new HashSet<string>(StringComparer.Ordinal) { "session", "schema_migration" };
 
     /// <summary>Target tables that have no source counterpart.</summary>
-    public static readonly IReadOnlySet<string> TargetOnly = new HashSet<string>(StringComparer.Ordinal) { "audit_config", "data_import", "schema_migration" };
+    public static readonly IReadOnlySet<string> TargetOnly = new HashSet<string>(StringComparer.Ordinal) { "audit_config", "data_import", "schema_migration", "case_money_pass" };
 
     /// <summary>Tables the migrations fill with reference rows, replaced by the source's on the first run (children first).</summary>
     public static readonly IReadOnlyList<string> Seeded =

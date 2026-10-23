@@ -501,25 +501,107 @@ public sealed class SubrogationCaseTests(TestDatabase db) : IClassFixture<TestDa
         Assert.Equal(0, await w.ScalarAsync<int>("select count(*) from core.case_recovery_without_movement where subrogation_case_id = @caseId", new { caseId }));
     }
 
+    private const string ForgedInsert = """
+        insert core.claim_recovery (id, claim_id, kind, subrogation_case_id, received_on, amount_gel) values (@id, @claim, N'subrogation', @caseId, @on, 10)
+        """;
+
+    private Task<int> OrphansAsync(Guid caseId) =>
+        w.ScalarAsync<int>("select count(*) from core.case_recovery_without_movement where subrogation_case_id = @caseId", new { caseId });
+
+    private async Task<int> PassesAsync()
+    {
+        await using var admin = await db.OpenAdminAsync();
+        return await admin.ExecuteScalarAsync<int>("select count(*) from core.case_money_pass");
+    }
+
+    /// <summary>
+    /// Codex R02, on a connection of the application's own login (a member of core_app only): money of a regress case written
+    /// past core.record_case_money is refused however it is written — plainly, or with the session key that 0003's guard trusted
+    /// set by hand (the way round it that the earlier version of this test proved, now refused) — and the application can
+    /// neither read nor write the passes the procedure uses. The procedure's own receipt and reversal still work, and nothing
+    /// is left behind: no orphan in the check view, no pass in its table.
+    /// </summary>
     [Fact]
-    public async Task Negative_control_a_money_row_written_past_the_procedure_is_refused_and_one_forced_in_shows_in_the_check_view()
+    public async Task R02_the_application_role_cannot_write_case_money_past_the_procedure_even_with_the_old_session_key()
     {
         var c = await CompanyAsync();
-        var (caseId, _) = await ConfirmedCaseAsync(c, "A", 1000m);
-        var e = await Assert.ThrowsAnyAsync<Exception>(() => w.ExecAsync("""
-            insert core.claim_recovery (claim_id, kind, subrogation_case_id, received_on, amount_gel) values (@claim, N'subrogation', @caseId, @on, 10)
-            """, new { claim = c.Claims["A"], caseId, on = c.D(10, 15) }));
-        Assert.Equal("SG034", DbError.From(e)?.Code);
-        Assert.Equal(0, await w.ScalarAsync<int>("select count(*) from core.case_recovery_without_movement where subrogation_case_id = @caseId", new { caseId }));
-        // Without the procedure's guarantee (the session key set by hand, no movement): the row stays behind, and the view that must
-        // always be empty shows it — the check the reconciliation runs (database/README.md, difference 1).
-        var forced = Guid.NewGuid();
-        await w.ExecAsync("""
-            exec sp_set_session_context N'core.case_recovery', @key;
-            insert core.claim_recovery (id, claim_id, kind, subrogation_case_id, received_on, amount_gel) values (@forced, @claim, N'subrogation', @caseId, @on, 10);
-            exec sp_set_session_context N'core.case_recovery', null;
-            """, new { key = forced.ToString(), forced, claim = c.Claims["A"], caseId, on = c.D(10, 15) });
-        Assert.Equal(1, await w.ScalarAsync<int>("select count(*) from core.case_recovery_without_movement where subrogation_case_id = @caseId", new { caseId }));
+        var (caseId, payer) = await ConfirmedCaseAsync(c, "A", 1000m);
+        var before = await SnapshotAsync(c);
+        var args = new { id = Guid.NewGuid(), claim = c.Claims["A"], caseId, on = c.D(10, 15) };
+
+        var plain = await Assert.ThrowsAnyAsync<Exception>(() => w.ExecAsync(ForgedInsert, args));
+        Assert.Equal("SG034", DbError.From(plain)?.Code);
+        var keyed = await Assert.ThrowsAnyAsync<Exception>(() => w.ExecAsync("exec sp_set_session_context N'core.case_recovery', @key;\n" + ForgedInsert,
+            new { key = args.id.ToString(), args.id, args.claim, args.caseId, args.on }));
+        Assert.Equal("SG034", DbError.From(keyed)?.Code);
+        // Even read-only for life, the key names nothing the guard reads.
+        var readOnlyKey = await Assert.ThrowsAnyAsync<Exception>(() => w.ExecAsync("exec sp_set_session_context N'core.case_recovery', @key, @read_only = 1;\n" + ForgedInsert,
+            new { key = args.id.ToString(), args.id, args.claim, args.caseId, args.on }));
+        Assert.Equal("SG034", DbError.From(readOnlyKey)?.Code);
+        // The passes are out of the application's reach: no read, no write (229: permission denied).
+        foreach (var sql in new[] { "select count(*) from core.case_money_pass", "insert core.case_money_pass (recovery_id) values (newid())", "delete core.case_money_pass" })
+        {
+            var denied = await Assert.ThrowsAsync<Microsoft.Data.SqlClient.SqlException>(() => w.ExecAsync(sql));
+            Assert.Equal(229, denied.Number);
+        }
+        // A pass and the money in one batch of the application's: the pass is refused, and the batch with it.
+        var both = await Assert.ThrowsAsync<Microsoft.Data.SqlClient.SqlException>(() => w.ExecAsync("insert core.case_money_pass (recovery_id) values (@id);\n" + ForgedInsert, args));
+        Assert.Equal(229, both.Number);
+        Assert.Equal(before, await SnapshotAsync(c));
+        Assert.Equal((0, 0), (await OrphansAsync(caseId), await PassesAsync()));
+
+        // Positive control: the procedure's way, as the same role, writes the receipt and its reversal with their movements.
+        var r = await ReceiveAsync(c, caseId, payer, 600m, c.D(10, 15));
+        Assert.True(r.Ok, r.Error);
+        Assert.True((await ReverseAsync(c, caseId, r.Id!.Value, c.D(10, 16))).Ok);
+        Assert.Equal(["receipt|600.00", "reversal|-600.00"], (await MoneyAsync(caseId)).Select(m => $"{m.RowKind}|{m.Amount:0.00}"));
+        Assert.Equal((0, 0), (await OrphansAsync(caseId), await PassesAsync()));
+    }
+
+    /// <summary>
+    /// Codex R02 across sessions: a pass belongs to the session that wrote it. One written and committed by another session (an
+    /// administrator's here: the application cannot write one at all) does not let the application's session write that row; and
+    /// receipts made through the procedure while other sessions keep trying to write case money directly all land with their
+    /// movements, every forged row refused.
+    /// </summary>
+    [Fact]
+    public async Task R02_a_pass_of_another_session_does_not_count_and_concurrent_forgery_leaves_no_orphan()
+    {
+        var c = await CompanyAsync();
+        var (caseId, payer) = await ConfirmedCaseAsync(c, "A", 1000m);
+        var id = Guid.NewGuid();
+        await using (var admin = await db.OpenAdminAsync())
+        {
+            await admin.ExecuteAsync("insert core.case_money_pass (recovery_id) values (@id)", new { id });
+            // The administrator's connection stays open, so its session id is not the application's.
+            var e = await Assert.ThrowsAnyAsync<Exception>(() => w.ExecAsync(ForgedInsert, new { id, claim = c.Claims["A"], caseId, on = c.D(10, 15) }));
+            Assert.Equal("SG034", DbError.From(e)?.Code);
+            Assert.Equal(1, await admin.ExecuteScalarAsync<int>("select count(*) from core.case_money_pass where recovery_id = @id", new { id }));
+            await admin.ExecuteAsync("delete core.case_money_pass where recovery_id = @id", new { id });
+        }
+        Assert.Equal(0, await OrphansAsync(caseId));
+
+        var forged = 0;
+        async Task Forge()
+        {
+            for (var i = 0; i < 10; i++)
+            {
+                var fid = Guid.NewGuid();
+                var e = await Assert.ThrowsAnyAsync<Exception>(() => w.ExecAsync("exec sp_set_session_context N'core.case_recovery', @key;\n" + ForgedInsert,
+                    new { key = fid.ToString(), id = fid, claim = c.Claims["A"], caseId, on = c.D(10, 15) }));
+                Assert.Equal("SG034", DbError.From(e)?.Code);
+                Interlocked.Increment(ref forged);
+            }
+        }
+        async Task Receive(int day)
+        {
+            var r = await ReceiveAsync(c, caseId, payer, 100m, c.D(10, day));
+            Assert.True(r.Ok, r.Error);
+        }
+        await Task.WhenAll(Forge(), Forge(), Receive(15), Receive(16), Receive(17));
+        Assert.Equal(20, forged);
+        Assert.Equal(3, (await MoneyAsync(caseId)).Count);
+        Assert.Equal((0, 0), (await OrphansAsync(caseId), await PassesAsync()));
     }
 
     [Fact]

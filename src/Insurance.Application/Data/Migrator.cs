@@ -26,6 +26,9 @@ public static partial class Migrator
     /// <summary>Tables the application may only read: the migration journal is written by this runner alone (legacy M1, 0031).</summary>
     public static readonly IReadOnlyList<string> ReadOnly = ["schema_migration", "audit_config", "data_import"];
 
+    /// <summary>Tables the application may not touch at all: reached only through the modules that own them (0009, Codex R02).</summary>
+    public static readonly IReadOnlyList<string> Closed = ["case_money_pass"];
+
     /// <summary>Tables the application may change but never remove rows from.</summary>
     public static readonly IReadOnlyList<string> NoDelete = ["accounting_period", "subrogation_case", "subrogation_party"];
 
@@ -132,6 +135,8 @@ public static partial class Migrator
             await db.ExecuteAsync($"revoke update, delete on core.{Quote(table)} from core_app");
         foreach (var table in NoDelete.Where(present.Contains))
             await db.ExecuteAsync($"revoke delete on core.{Quote(table)} from core_app");
+        foreach (var table in Closed.Where(present.Contains))
+            await db.ExecuteAsync($"deny select, insert, update, delete on core.{Quote(table)} to core_app");
         foreach (var table in ReadOnly.Where(present.Contains))
         {
             await db.ExecuteAsync($"revoke insert, update, delete on core.{Quote(table)} from core_app");
@@ -165,6 +170,7 @@ public static partial class Migrator
             .Concat(ReadOnly.Where(present.Contains).SelectMany(t => new[] { $"{t}:INSERT", $"{t}:UPDATE", $"{t}:DELETE" }))
             .Concat(NoDelete.Where(present.Contains).Select(t => $"{t}:DELETE"))
             .Where(leaks.Contains).ToList();
+        changeable.AddRange(Closed.Where(present.Contains).SelectMany(t => new[] { "SELECT", "INSERT", "UPDATE", "DELETE" }.Select(p => $"{t}:{p}")).Where(leaks.Contains));
         if (changeable.Count > 0)
             throw new InvalidOperationException($"core_app can still change: {string.Join(", ", changeable)}");
         var unreadable = ReadOnly.Where(present.Contains).Where(t => !leaks.Contains($"{t}:SELECT")).ToList();
