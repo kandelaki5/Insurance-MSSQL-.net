@@ -20,9 +20,10 @@ public sealed partial class ReportSite : IAsyncDisposable
     public required WebApplicationFactory<Program> Factory { get; init; }
     public required RefusingNbg Nbg { get; init; }
 
-    public static async Task<ReportSite> CreateAsync()
+    public static async Task<ReportSite> CreateAsync(Func<Task<ReportWorld>>? world = null) => Over(await (world ?? (() => ReportWorld.CreateAsync()))());
+
+    private static ReportSite Over(ReportWorld world)
     {
-        var world = await ReportWorld.CreateAsync();
         var nbg = new RefusingNbg();
         var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
         {

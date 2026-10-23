@@ -164,6 +164,24 @@ public sealed class PremiumReportPageTests
         Assert.Equal(july, await PageAsync("2026-07"), new TableComparer());
     }
 
+    [Fact]
+    public async Task The_page_over_a_thousand_policies_for_a_signed_in_user_of_any_role()
+    {
+        // legacy report-1000-page-session.test.ts: the page requires a signed-in user and grants nothing more; the figures are the report's.
+        await using var site = await ReportSite.CreateAsync(() => ThousandWorld.CreateAsync());
+        var (client, _) = await site.SignedInAsync("sales");
+        var tables = Tables(await ReportSite.PageAsync(client, "/accounting/premium-report?month=2026-11"));
+        Assert.Equal([["5.1", Casco, "1000", "400,000.00", "400,000.00", "32,889.86", "367,219.95", "0.00", "0.00", "0.00"], ["სულ", "1000", "400,000.00", "400,000.00", "32,889.86", "367,219.95", "0.00", "0.00", "0.00"]], tables[0].Rows);
+        Assert.Equal([["GEL", "300,000.00", "0.00", "", "300,000.00"]], tables[2].Rows);
+        var october = Tables(await ReportSite.PageAsync(client, "/accounting/premium-report?month=2026-10"));
+        Assert.Equal(["5.1", Casco, "1", "120.00", "120.00", "10.19", "109.81", "0.00", "0.00", "0.00"], october[0].Rows[0]);
+        var forged = site.Client();
+        forged.DefaultRequestHeaders.Add("Cookie", $"{Insurance.Application.Services.Auth.Cookie}={new string('x', 43)}");
+        var refused = await forged.GetAsync("/accounting/premium-report?month=2026-11");
+        Assert.Equal(HttpStatusCode.Redirect, refused.StatusCode);
+        Assert.StartsWith("/login", refused.Headers.Location!.ToString());
+    }
+
     private sealed class TableComparer : IEqualityComparer<Table>
     {
         public bool Equals(Table? x, Table? y) => x is not null && y is not null && x.Header.SequenceEqual(y.Header)
