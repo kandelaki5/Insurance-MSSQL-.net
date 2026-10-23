@@ -215,11 +215,13 @@ public sealed class AmlTests(WebApp app) : IClassFixture<WebApp>
         await transaction.CommitAsync();
         Assert.Equal(card, Html.Location(await registering));
 
+        // The registration waited for the receipt (above: not done before the receipt committed) and both are written. Their
+        // created_at no longer tells the order of the commits: a row carries its transaction's start (0009, as PostgreSQL's
+        // now()), and the registration began before it waited.
         await using var c = await app.Db.OpenAdminAsync();
-        var (paymentAt, suspensionAt) = await c.QuerySingleAsync<(DateTimeOffset, DateTimeOffset)>("""
-            select (select max(created_at) from core.payment where payer_party_id = @party), (select created_at from core.fms_suspension where party_id = @party)
-            """, new { party });
-        Assert.True(paymentAt < suspensionAt);
+        Assert.Equal((1, 1), await c.QuerySingleAsync<(int, int)>("""
+            select (select count(*) from core.payment where payer_party_id = @party and received_on = '2026-10-02'), (select count(*) from core.fms_suspension where party_id = @party)
+            """, new { party }));
         var later = await app.Db.App.AsUserAsync(userId, tx => Aml.SuspensionInTransactionAsync(tx, party));
         Assert.NotNull(later);
         Assert.Equal("active", later.State);

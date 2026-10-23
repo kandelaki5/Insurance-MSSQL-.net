@@ -50,7 +50,7 @@ public sealed class ClaimRegistrationTests(TestDatabase db) : IClassFixture<Test
         var rows = await w.RowsAsync<(string Number, string Event, string Class, decimal? Claimed, string Currency, string? Place, string Description)>("""
             select c.number, v.number, l.class_code, c.claimed_amount, c.currency, c.occurred_place, c.description
             from core.claim c join core.loss_event v on v.id = c.loss_event_id join core.policy_line l on l.id = c.policy_line_id
-            where c.policy_id = @policy order by c.created_at
+            where c.policy_id = @policy order by c.created_at, c.number
             """, new { policy = p.Id });
         var ev = rows[0].Event;
         Assert.Equal([ev, $"{ev}-2", $"{ev}-3"], rows.Select(r => r.Number));

@@ -320,7 +320,7 @@ public sealed partial class MonthReportCase
     private Task<List<string>> LinesOfAsync(Guid payment) => RowsAsync("""
         select concat(lower(convert(nchar(36), installment_id)), ' ', convert(nvarchar(40), amount), ' ', convert(nvarchar(40), amount_gel), ' ', convert(nvarchar(40), rate), ' ',
                       convert(char(10), booked_on, 23), ' ', lower(convert(nchar(36), created_by)))
-        from core.payment_allocation where payment_id = @payment order by created_at, id
+        from core.payment_allocation where payment_id = @payment order by created_at, amount_gel, id
         """, new { payment });
 
     private static string Line(Guid installment, string amount, string gel, string rate, DateOnly on, Guid by) => $"{installment} {amount} {gel} {rate} {Iso(on)} {by}";

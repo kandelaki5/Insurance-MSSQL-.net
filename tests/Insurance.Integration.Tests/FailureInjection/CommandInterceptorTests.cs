@@ -37,9 +37,11 @@ public sealed class CommandInterceptorTests(TestDatabase db) : IClassFixture<Tes
         Assert.Contains(("select 3 /*snapshot*/", (IsolationLevel?)IsolationLevel.Snapshot), log.Select(c => (c.Sql, (IsolationLevel?)c.Isolation)));
         Assert.Contains(("select 4 /*asuser*/", (IsolationLevel?)IsolationLevel.ReadCommitted), log.Select(c => (c.Sql, (IsolationLevel?)c.Isolation)));
         Assert.Contains(("select 5 /*raw*/", (IsolationLevel?)IsolationLevel.ReadCommitted), log.Select(c => (c.Sql, (IsolationLevel?)c.Isolation)));
-        // The transaction's own set-up is a command like any other: the user's transaction starts with these two.
+        // The transaction's own set-up is a command like any other: the user's transaction starts with these three (the
+        // transaction's time for core.tx_now(), 0009, then the actor).
         var four = log.ToList().FindIndex(c => c.Sql == "select 4 /*asuser*/");
-        Assert.Equal(["set xact_abort on", "exec sp_set_session_context N'core.user_id', @id"], log.Skip(four - 2).Take(2).Select(c => c.Sql));
+        Assert.Equal(["set xact_abort on", "declare @at datetimeoffset(6) = sysdatetimeoffset(); exec sp_set_session_context N'core.tx_at', @at",
+            "exec sp_set_session_context N'core.user_id', @id"], log.Skip(four - 3).Take(3).Select(c => c.Sql));
     }
 
     [Fact]

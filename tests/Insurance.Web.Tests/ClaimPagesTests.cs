@@ -92,7 +92,8 @@ public sealed partial class ClaimPagesTests(WebApp app) : IClassFixture<WebApp>
         var to = Location(response);
         Assert.Matches("^/claims/[0-9a-f-]{36}\\?registered=1$", to);
         var first = Guid.Parse(to[8..44]);
-        var claims = await w.RowsAsync<(Guid Id, string Class, decimal? Claimed, Guid? By)>("select id, (select class_code from core.policy_line where id = policy_line_id), claimed_amount, created_by from core.claim where policy_id = @p order by created_at", new { p = p.Id });
+        var claims = await w.RowsAsync<(Guid Id, string Class, decimal? Claimed, Guid? By)>("select id, (select class_code from core.policy_line where id = policy_line_id), claimed_amount, created_by from core.claim where policy_id = @p order by created_at, number", new { p = p.Id });
+        // The claims of one registration share their transaction's time (0009), so they are ordered by number: N, N-2.
         Assert.Equal([(first, "5.1", (decimal?)3500m, (Guid?)user.Id), (claims[1].Id, "14", null, user.Id)], claims);
         Assert.Equal([(treaty, 25m)], await w.RowsAsync<(Guid, decimal)>("select treaty_id, share_percent from core.claim_cession where claim_id = @first", new { first }));
         var page = await (await client.GetAsync(to)).Content.ReadAsStringAsync();
