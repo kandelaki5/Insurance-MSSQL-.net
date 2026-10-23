@@ -20,6 +20,8 @@
     <Compile Include="..\Insurance.Integration.Tests\Fixtures.cs" Link="Fixtures.cs" />
     <Compile Include="..\Insurance.Integration.Tests\ClaimWorld.cs" Link="ClaimWorld.cs" />
     <Compile Include="..\Insurance.Integration.Tests\Policies\World.cs" Link="Policies\World.cs" />
+    <!-- The gap tests' helpers: a database of its own, an armed fault, permission decisions (docs/legacy-tests-gaps-b.md). -->
+    <Compile Include="..\Insurance.Integration.Tests\Policies\GapsSupport.cs" Link="Policies\GapsSupport.cs" />
     <Compile Include="..\Insurance.Integration.Tests\ComplianceFixtures.cs" Link="ComplianceFixtures.cs" />
     <!-- The report worlds of the integration tests, for the report pages over the same rows. -->
     <Compile Include="..\Insurance.Integration.Tests\Worlds\*.cs" LinkBase="Worlds" />
