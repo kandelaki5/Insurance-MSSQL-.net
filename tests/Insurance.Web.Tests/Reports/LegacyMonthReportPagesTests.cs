@@ -3,7 +3,7 @@ using Insurance.Integration.Tests.Accounting;
 namespace Insurance.Web.Tests.Reports;
 
 /// <summary>
-/// Legacy scripts/month-report-precision-db-check.ts over HTTP ("PREPARED, NOT RUN" in the old program): every step of the cases R1–R9
+/// Legacy scripts/month-report-precision-db-check.ts over HTTP ("PREPARED, NOT RUN" in the old program): every step of the cases R1–R10
 /// (tests/Insurance.Integration.Tests/Accounting/MonthReportCases*.cs) reads the month three ways, as the legacy child did — the report,
 /// the monthly report page as an accountant and the financial director's panel as an admin — and every figure the page and the panel
 /// show is parsed back from its text and compared exactly: the class row and the totals, the ceded premium, the claims row and total,

@@ -116,6 +116,44 @@ public static class ImpairmentReport
 
     public static Task<Report> BuildAsync(Tx db, Rates rates, DateOnly asOf) => BuildAsync(db, rates.LatestRateOnOrBeforeAsync, asOf);
 
+    /// <summary>Excel keeps 15 significant digits: a money figure of more tetri cannot be stored in a cell to the tetri (legacy PR #361).</summary>
+    public const long ExcelDigitsTetri = 999_999_999_999_999;
+
+    /// <param name="Report">Null when a figure overflowed (a sum beyond a long): nothing exact to show.</param>
+    /// <param name="Exact">Every figure is to the tetri.</param>
+    /// <param name="Exportable">Exact, and every money figure fits Excel's 15 digits: only then is the workbook given.</param>
+    public sealed record Checked(Report? Report, bool Exact, bool Exportable);
+
+    /// <summary>
+    /// The report with whether it can be shown and given as Excel (legacy PR #361 buildImpairmentReportChecked). The old code
+    /// computed in JavaScript numbers and could lose a tetri on reading, adding or formatting; here every figure is exact
+    /// (long tetri from decimal, checked arithmetic), so the only failure of that kind left is an overflow, which is reported
+    /// as inexact rather than an error page. The one real limit is Excel's: a money figure beyond 15 digits is refused as a
+    /// file (the page still shows it exactly).
+    /// </summary>
+    public static Task<Checked> BuildCheckedAsync(Tx db, Rates rates, DateOnly asOf) => BuildCheckedAsync(db, rates.LatestRateOnOrBeforeAsync, asOf);
+
+    public static async Task<Checked> BuildCheckedAsync(Tx db, Valuation valuation, DateOnly asOf)
+    {
+        Report report;
+        try { report = await BuildAsync(db, valuation, asOf); }
+        catch (OverflowException) { return new Checked(null, false, false); }
+        return new Checked(report, true, MoneyFigures(report).All(n => n >= -ExcelDigitsTetri && n <= ExcelDigitsTetri));
+    }
+
+    /// <summary>Every money figure of the report (legacy moneyFigures): the rate is not money.</summary>
+    public static IEnumerable<long> MoneyFigures(Report report)
+    {
+        foreach (var r in report.Rows)
+        {
+            foreach (var n in new[] { r.Premium, r.UnpaidPremium, r.UnpaidPremiumGel, r.ReserveGel, r.Impairment.TotalEarned, r.Impairment.Paid, r.Impairment.UnpaidEarned, r.Impairment.TotalReserve }) yield return n;
+            foreach (var band in new[] { r.Impairment.Earned, r.Impairment.Unpaid, r.Impairment.Reserve })
+                foreach (var n in new[] { band.Over12, band.M9to12, band.M6to9, band.M3to6, band.M0to3 }) yield return n;
+        }
+        foreach (var t in report.Totals)
+            foreach (var n in new[] { t.UnpaidPremiumGel, t.UnpaidEarnedGel, t.ReserveGel }) yield return n;
+    }
+
     /// <summary>
     /// Every policy that is a receivable on the date: it has a payment schedule and its premium was booked by then (the same recognition
     /// rule as the monthly receivable, review H03). Approved reductions issued as separate change policies without a schedule of their
@@ -154,7 +192,7 @@ public static class ImpairmentReport
             var impairment = KindOf(debtorKinds) == "broker" ? Impairment.WithoutReserve(aged) : aged;
             var rate = inputs.RateOf.First(r => r.Currency == p.Currency).Rate;
             return new Row(p.Id, p.Number, p.EffectiveFrom, p.EffectiveTo, p.CancelledOn, debtorKinds, p.Intermediaries, p.Policyholder, p.Segment,
-                p.Classes, p.Insured, p.Beneficiary, p.Currency, premium, premium - paid, rate, InGel(premium - paid, rate), impairment, InGel(impairment.TotalReserve, rate));
+                p.Classes, p.Insured, p.Beneficiary, p.Currency, premium, checked(premium - paid), rate, InGel(checked(premium - paid), rate), impairment, InGel(impairment.TotalReserve, rate));
         }).ToList();
 
         return new Report(asOf, rows, TotalsOf(rows),

@@ -219,14 +219,14 @@ public sealed partial class MonthReportCase
     // ---------------------------------------------------------------- shared reinsurance and claim rows (R7, R9)
 
     private async Task TreatyAsync(string k, string n, string kind, string currency, string? ceded = null, string? priority = null, string? limit = null, string? premium = null,
-        string commission = "0.0000", DateOnly? to = null) =>
+        string commission = "0.0000", DateOnly? to = null, DateOnly? from = null) =>
         await Exec("""
             insert core.ri_treaty (id, number, name, reinsurer_party_id, kind, period_from, period_to, currency, ceded_percent, priority, treaty_limit, treaty_premium,
                                    commission_percent, broker_percent, status, created_at, created_by)
             values (@id, @number, @name, @re, @kind, @from, @to, @currency, @ceded, @priority, @limit, @premium, @commission, 0, N'active', @at, @admin)
             """, new
         {
-            id = Id($"{k}:{n}"), number = $"{Tag}-RI-{k}-{n}", name = $"{Tag} {k} {n} (გამოგონილი)", re = Id($"{k}:re"), kind, from = First0, to = to ?? First0.AddDays(364), currency,
+            id = Id($"{k}:{n}"), number = $"{Tag}-RI-{k}-{n}", name = $"{Tag} {k} {n} (გამოგონილი)", re = Id($"{k}:re"), kind, from = from ?? First0, to = to ?? First0.AddDays(364), currency,
             ceded = ceded is null ? (decimal?)null : D(ceded), priority = priority is null ? (decimal?)null : D(priority), limit = limit is null ? (decimal?)null : D(limit),
             premium = premium is null ? (decimal?)null : D(premium), commission = D(commission), at = At(First0, 8), admin = W.Admin,
         });
@@ -483,5 +483,50 @@ public sealed partial class MonthReportCase
         await ReportAsync($"R9 {M1}", M1, new(IssuesIn([Egel, Bgel], 1), Owe("EUR", OwedAt(1)), MoneyIn(1)));
         await SnapshotAsync($"R9 {M0} after the reversal", M0, "R9:m0", compare: true);
         await CountsAsync("R9", new() { ["party"] = 2, ["contract"] = 1, ["policy"] = 2, ["policy_line"] = 2, ["premium_transaction"] = 2, ["installment"] = 2, ["payment"] = 1, ["payment_allocation"] = 1, ["ri_treaty"] = 3, ["loss_event"] = 1, ["claim"] = 1, ["claim_reserve"] = 1, ["claim_payment"] = 2, ["claim_cession"] = 1 });
+    }
+
+    /// <summary>
+    /// R10 (legacy PR #350): three EUR XL treaties of m0-16 to m1-15, so each treaty's premium falls in two months — earned over
+    /// the treaty's days, both ends included, half away from zero; each month's share valued at that month end's own rate,
+    /// treaty by treaty, then summed. The earlier cases all ended in m0, so a report that skipped every share after a treaty's
+    /// first month passed them. The 16.50 treaty makes "sum first, then value" differ by a tetri in both months.
+    /// </summary>
+    private async Task R10()
+    {
+        const string k = "R10";
+        string end0Rate = "2.987600", end1Rate = "3.345600";
+        var (from, to) = (Day($"{M0}-16"), Day($"{M1}-15"));
+        var total = to.DayNumber - from.DayNumber + 1;
+        var inFirst = End0.DayNumber - from.DayNumber + 1;
+        BigInteger[] premiums = [36500, T("90071992547408.01"), 1650];
+        var shares = premiums.Select(p =>
+        {
+            var first = EarnedTo(p, inFirst, total);
+            var second = p - first;
+            if (first + second != p || first <= 0 || second <= 0) throw new Xunit.Sdk.XunitException($"R10: {p} does not split into two months");
+            return (First: first, Second: second);
+        }).ToList();
+        BigInteger Treaty(int month) => shares.Aggregate(BigInteger.Zero, (sum, s) => sum + (month == 0 ? AtRateUp(s.First, end0Rate) : AtRateUp(s.Second, end1Rate)));
+
+        await W.RateAsync("EUR", Iso(Day($"{M0}-20")), 3.1m);
+        await W.RateAsync("EUR", Iso(End0), 2.9876m);
+        await W.RateAsync("EUR", Iso(End1), 3.3456m);
+        await PartyAsync(Id($"{k}:re"), $"{Tag} {k} გადამზღვევი (გამოგონილი)", $"{Tag}-{k}-re");
+        await TreatyAsync(k, "T1", "excess_of_loss", "EUR", priority: "100.00", limit: "1000.00", premium: "365.00", from: from, to: to);
+        await TreatyAsync(k, "T2", "excess_of_loss", "EUR", priority: "100.00", limit: "1000.00", premium: "90071992547408.01", from: from, to: to);
+        await TreatyAsync(k, "T3", "excess_of_loss", "EUR", priority: "100.00", limit: "1000.00", premium: "16.50", from: from, to: to);
+
+        await ReportAsync($"R10 {M0}: the treaties' first {inFirst} days of {total}", M0, new(Fig.Zero, Nothing, new([0, 0, 0], [0, 0, 0, 0, 0, 0], Treaty(0))));
+        await SnapshotAsync("R10", M0, "R10:m0");
+        await ReportAsync($"R10 {M1}: the rest, to the 15th", M1, new(Fig.Zero, Nothing, new([0, 0, 0], [0, 0, 0, 0, 0, 0], Treaty(1))));
+        await SnapshotAsync($"R10 {M0} after the next month was read", M0, "R10:m0", compare: true);
+        await CountsAsync("R10", new() { ["party"] = 1, ["ri_treaty"] = 3 });
+        if (October)
+        {
+            // By hand (legacy PR #350, re-checked with Python integers): 188.39 + 176.61, 46 488 770 347 049.30 + 43 583 222 200 358.71,
+            // 8.52 + 7.98; summing the shares before valuing would give …432.78 and …137.66.
+            Pinned("R10 October", "138889850289432.77", Treaty(0));
+            Pinned("R10 November", "145812028194137.67", Treaty(1));
+        }
     }
 }

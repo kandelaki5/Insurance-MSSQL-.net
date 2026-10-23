@@ -14,6 +14,8 @@ public static class ImpairmentTexts
     public const string TotalsTitle = "ჯამი ფორმა N1-4-ის მიხედვით";
     public const string RowsTitle = "პოლისების მიხედვით";
     public const string RatesUsed = "კურსი საანგარიშო თარიღისთვის";
+    public const string Inexact = "ამ თარიღის ზოგიერთი თანხა ძალიან დიდია: ამ გვერდზე და Excel-ში ის თეთრამდე ზუსტად ვერ ჩანს, ამიტომ ციფრები მხოლოდ საორიენტაციოა და Excel-ის ფაილი არ გაიცემა. ფორმა 1-ის N1-4 ამ თანხებს ზუსტად ითვლის (საზედამხედველო ფორმები).";
+    public const string NotForExcel = "ამ თარიღის ზოგიერთ თანხას 15-ზე მეტი ციფრი აქვს: Excel მას თეთრამდე ზუსტად ვერ შეინახავს, ამიტომ Excel-ის ფაილი არ გაიცემა. გვერდზე ციფრები ზუსტია.";
 
     public static class Bands
     {

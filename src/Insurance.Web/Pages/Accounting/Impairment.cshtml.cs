@@ -8,7 +8,11 @@ namespace Insurance.Web.Pages.Accounting;
 /// <summary>The impairment reserve on insurance receivables (legacy accounting/impairment/page.tsx): the admin and the accountant only.</summary>
 public sealed class ImpairmentModel(Rates rates) : AppPageModel
 {
-    public ImpairmentReport.Report Report { get; private set; } = null!;
+    /// <summary>Null when a figure overflowed: nothing exact to show (Exact is false).</summary>
+    public ImpairmentReport.Report? Report { get; private set; }
+    public DateOnly AsOfDate { get; private set; }
+    public bool Exact { get; private set; }
+    public bool Exportable { get; private set; }
 
     /// <summary>The last day of the previous month: the usual reporting date.</summary>
     public static DateOnly DefaultDate(DateOnly today) => new DateOnly(today.Year, today.Month, 1).AddDays(-1);
@@ -22,7 +26,9 @@ public sealed class ImpairmentModel(Rates rates) : AppPageModel
     {
         if (Me.RoleCode is not ("admin" or "accountant")) return Redirect("/");
         var asOf = AsOf(Query("date"), Db.Today());
-        Report = await Db.ReadTxAsync(tx => ImpairmentReport.BuildAsync(tx, rates, asOf));
+        AsOfDate = asOf;
+        var c = await Db.ReadTxAsync(tx => ImpairmentReport.BuildCheckedAsync(tx, rates, asOf));
+        (Report, Exact, Exportable) = (c.Report, c.Exact, c.Exportable);
         return Page();
     }
 }

@@ -13,16 +13,28 @@
 <form class="toolbar">
     <div>
         <label for="date">@ImpairmentTexts.Date</label>
-        <date-input id="date" name="date" value="@Fmt.Iso(r.AsOf)" style="width: 170px" />
+        <date-input id="date" name="date" value="@Fmt.Iso(Model.AsOfDate)" style="width: 170px" />
     </div>
     <button class="btn secondary" style="align-self: flex-end">@ImpairmentTexts.Show</button>
-    <a class="btn" style="align-self: flex-end" href="/accounting/impairment/xlsx?date=@Fmt.Iso(r.AsOf)">@ImpairmentTexts.Download</a>
-    @if (r.Rates.Count > 0)
+    @if (Model.Exportable)
+    {
+        <a class="btn" style="align-self: flex-end" href="/accounting/impairment/xlsx?date=@Fmt.Iso(Model.AsOfDate)">@ImpairmentTexts.Download</a>
+    }
+    @if (r is not null && r.Rates.Count > 0)
     {
         <span class="hint" style="align-self: flex-end">@ImpairmentTexts.RatesUsed: @string.Join(", ", r.Rates.Select(x => $"{x.Currency} {Fmt.Plain(x.Rate)} ({Fmt.Date(x.Date)})"))</span>
     }
 </form>
-
+@if (!Model.Exact)
+{
+    <p class="note"><strong>@ImpairmentTexts.Inexact</strong></p>
+}
+else if (!Model.Exportable)
+{
+    <p class="note"><strong>@ImpairmentTexts.NotForExcel</strong></p>
+}
+@if (r is not null)
+{
 <h2 class="section">@ImpairmentTexts.TotalsTitle</h2>
 <table style="max-width: 820px">
     <thead>
@@ -88,4 +100,5 @@ else
         }
         </tbody>
     </table>
+}
 }

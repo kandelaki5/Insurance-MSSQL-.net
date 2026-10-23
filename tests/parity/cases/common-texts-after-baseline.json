@@ -228,6 +228,20 @@
     ]
    ],
    "origin": "Insurance-Software PR #207/#212/#211/#218/#225, policy-texts state at #225 head f9b5a9a (owner 13.10.2026 and 14.10.2026, docs/05 a15/a16, PR #213/#226)"
+  },
+  {
+   "kind": "text",
+   "ts": "impairmentTexts.inexact",
+   "cs": "ImpairmentTexts.Inexact",
+   "value": "ამ თარიღის ზოგიერთი თანხა ძალიან დიდია: ამ გვერდზე და Excel-ში ის თეთრამდე ზუსტად ვერ ჩანს, ამიტომ ციფრები მხოლოდ საორიენტაციოა და Excel-ის ფაილი არ გაიცემა. ფორმა 1-ის N1-4 ამ თანხებს ზუსტად ითვლის (საზედამხედველო ფორმები).",
+   "origin": "Insurance-Software PR #361 head 61de62c (impairment precision guard; Codex INS-PR361-GUARD-FIX-61DE62C-20261020, a technical invariant, no new business rule)"
+  },
+  {
+   "kind": "text",
+   "ts": "impairmentTexts.notForExcel",
+   "cs": "ImpairmentTexts.NotForExcel",
+   "value": "ამ თარიღის ზოგიერთ თანხას 15-ზე მეტი ციფრი აქვს: Excel მას თეთრამდე ზუსტად ვერ შეინახავს, ამიტომ Excel-ის ფაილი არ გაიცემა. გვერდზე ციფრები ზუსტია.",
+   "origin": "Insurance-Software PR #361 head 61de62c (impairment precision guard; Codex INS-PR361-GUARD-FIX-61DE62C-20261020, a technical invariant, no new business rule)"
   }
  ]
 }

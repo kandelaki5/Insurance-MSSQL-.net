@@ -1,7 +1,7 @@
 namespace Insurance.Integration.Tests.Accounting;
 
 /// <summary>
-/// Legacy scripts/month-report-precision-db-check.ts (cases R1–R9 of scripts/integration/month-report-cases.ts; "PREPARED, NOT RUN" in the
+/// Legacy scripts/month-report-precision-db-check.ts (cases R1–R10 of scripts/integration/month-report-cases.ts; "PREPARED, NOT RUN" in the
 /// old program — real evidence here for the first time): the monthly report's money exactly to the tetri on a real SQL Server, each
 /// case in a database of its own, through the report the page and the panel are built from (PremiumReport.BuildAsync, the stored
 /// rates only — the National Bank is not asked). The page and the panel over the same cases: Insurance.Web.Tests LegacyMonthReportPagesTests.

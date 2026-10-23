@@ -33,7 +33,7 @@ public sealed record Want(Fig Cls, IReadOnlyDictionary<string, Owed> Owed, Money
 public sealed record MonthView(PremiumReport.Report Report, string? Page, string? Panel);
 
 /// <summary>
-/// The cases R1–R9 of legacy scripts/month-report-precision-db-check.ts (scripts/integration/month-report-cases.ts, Codex
+/// The cases R1–R10 of legacy scripts/month-report-precision-db-check.ts (scripts/integration/month-report-cases.ts, Codex
 /// INS-MONTHLY-REPORT-PRECISION-CHECKER-OFFLINE-PREP-20261019 — "PREPARED, NOT RUN" in the old program), with their amounts, days and
 /// steps. Each case runs in a database of its own, so what it adds to a month is the month itself (the legacy "before its fixtures"
 /// read of a shared copy is empty here). Every step reads the month through <see cref="Read"/>: the report (PremiumReport.BuildAsync,
@@ -82,6 +82,7 @@ public sealed partial class MonthReportCase
     {
         ["R1"] = (false, c => c.R1()), ["R2"] = (false, c => c.R2()), ["R3"] = (false, c => c.R3()), ["R4"] = (true, c => c.R4()), ["R5"] = (true, c => c.R5()),
         ["R6"] = (false, c => c.R6()), ["R7"] = (false, c => c.R7()), ["R8"] = (false, c => c.R8()), ["R9"] = (true, c => c.R9()),
+        ["R10"] = (false, c => c.R10()),
     };
 
     public static string MonthOf(string name) => Cases[name].Current ? Today.ToString("yyyy-MM", CultureInfo.InvariantCulture) : "2026-10";

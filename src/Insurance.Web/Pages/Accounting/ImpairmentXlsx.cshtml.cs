@@ -1,4 +1,5 @@
 using Insurance.Application.Services;
+using Insurance.Application.Texts;
 using Insurance.Domain.Finance;
 using Insurance.Web.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
@@ -14,7 +15,9 @@ public sealed class ImpairmentXlsxModel(Rates rates) : AppPageModel
         var date = Query("date") ?? "";
         if (!Dates.IsIsoDate(date) || date.StartsWith("0000", StringComparison.Ordinal) || Dates.ParseIsoDate(date) > Db.Today())
             return Downloads.Text("Bad date", 400);
-        var report = await Db.ReadTxAsync(tx => ImpairmentReport.BuildAsync(tx, rates, Dates.ParseIsoDate(date)));
-        return Downloads.Xlsx(Response, ReportWorkbooks.Impairment(report), $"impairment-{date}.xlsx");
+        var c = await Db.ReadTxAsync(tx => ImpairmentReport.BuildCheckedAsync(tx, rates, Dates.ParseIsoDate(date)));
+        // A figure Excel cannot keep to the tetri (or none exact to give) is not handed out as a file (legacy PR #361).
+        if (!c.Exportable) return Downloads.Text(c.Exact ? ImpairmentTexts.NotForExcel : ImpairmentTexts.Inexact, 422);
+        return Downloads.Xlsx(Response, ReportWorkbooks.Impairment(c.Report!), $"impairment-{date}.xlsx");
     }
 }
