@@ -12,7 +12,10 @@ namespace Insurance.Application.Services;
 /// checks for a suspension inside its transaction; registering, confirming or attaching a suspension holds the client's
 /// lock exclusively. Legacy used the party row (for share / for update); here a transaction-owned application lock on
 /// the client, 'core.party:&lt;id&gt;', with the same modes — so a suspension waits for operations already in flight, an
-/// operation that starts after it sees it, and operations do not block each other.
+/// operation that starts after it sees it, and operations do not block each other. The operation also keeps the party
+/// row itself locked shared, as legacy "for share" did, because a sanctions decision changes that row (it sets
+/// sanctions_blocked): without it, under row versioning, an operation would read the flag as it was before an
+/// uncommitted decision and pay a sanctioned person (legacy scripts/claim-payee-race.ts R2, R5, R7, R8).
 /// </summary>
 public static partial class Aml
 {
@@ -76,19 +79,22 @@ public static partial class Aml
     public static async Task<SuspensionRow?> SuspensionInTransactionAsync(Tx tx, Guid partyId, OperationTargets? targets = null)
     {
         await tx.LockAsync("core.party", PartyLock(partyId), shared: true);
+        await tx.ExecuteAsync("select id from core.party with (holdlock, rowlock) where id = @partyId", new { partyId });
         return await BlockingSuspensionAsync(tx, partyId, targets);
     }
 
     /// <summary>
     /// Locks for any change that can make a suspension take effect: registering, confirming in writing, attaching to a
-    /// target (review H13). The targeted policy or claim row is read under a shared lock first (legacy "for key share",
-    /// the lock its foreign key takes), then the client's lock is taken exclusively. Operations lock their policy or claim
-    /// first and the client after, so both sides take the locks in the same order.
+    /// target (review H13). The targeted policy or claim row is locked first (legacy "for key share", which waits for an
+    /// operation's "for update" of that row; a shared lock here would not wait for the operations' update locks, so it is
+    /// an update lock), then the client's lock is taken exclusively. Operations lock their policy or claim first and the
+    /// client after, so both sides take the locks in the same order: a suspension waits for an operation in flight on its
+    /// target (legacy scripts/db-acceptance.ts, claim target).
     /// </summary>
     public static async Task LockForSuspensionChangeAsync(Tx tx, Guid partyId, Guid? policyId = null, Guid? claimId = null)
     {
-        if (policyId is { } p) await tx.ExecuteAsync("select id from core.policy with (holdlock, rowlock) where id = @p", new { p });
-        if (claimId is { } c) await tx.ExecuteAsync("select id from core.claim with (holdlock, rowlock) where id = @c", new { c });
+        if (policyId is { } p) await tx.ExecuteAsync("select id from core.policy with (updlock, rowlock, holdlock) where id = @p", new { p });
+        if (claimId is { } c) await tx.ExecuteAsync("select id from core.claim with (updlock, rowlock, holdlock) where id = @c", new { c });
         await tx.LockAsync("core.party", PartyLock(partyId));
     }
 
