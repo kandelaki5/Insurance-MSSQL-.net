@@ -1,0 +1,60 @@
+@page "/claims"
+@model Insurance.Web.Pages.Claims.IndexModel
+@{
+    ViewData["Title"] = ClaimTexts.Title;
+}
+<h1>@ClaimTexts.Title</h1>
+<div class="toolbar">
+    <form style="display: flex; gap: 8px; flex: 1; max-width: 640px">
+        <input type="search" name="q" value="@Model.Q" placeholder="@($"{ClaimTexts.Fields.Number}, {ClaimTexts.Fields.PolicyNumber}, {ClaimTexts.Fields.Policyholder}")" />
+        <select name="status" style="width: auto">
+            <option value="" selected="@(Model.Status == "")">@ClaimTexts.Fields.Status: —</option>
+            @foreach (var (value, title) in ClaimTexts.Status)
+            {
+                <option value="@value" selected="@(Model.Status == value)">@title</option>
+            }
+        </select>
+        <button class="btn secondary">@Ka.Common.Search</button>
+    </form>
+    <div class="spacer"></div>
+    @if (Model.Me.CanWrite)
+    {
+        <a class="btn" href="/claims/new">@ClaimTexts.New</a>
+    }
+</div>
+@if (Model.Rows.Count == 0)
+{
+    <div class="card empty">@Ka.Common.NoData</div>
+}
+else
+{
+    <table>
+        <thead>
+        <tr>
+            <th>@ClaimTexts.Fields.Number</th>
+            <th>@ClaimTexts.Fields.Policy</th>
+            <th>@ClaimTexts.Fields.Policyholder</th>
+            <th>@ClaimTexts.Fields.Object</th>
+            <th>@ClaimTexts.Fields.OccurredOn</th>
+            <th>@ClaimTexts.Fields.Status</th>
+            <th class="num">@ClaimTexts.Fields.CurrentReserve</th>
+            <th class="num">@ClaimTexts.Fields.PaidTotal</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var r in Model.Rows)
+        {
+            <tr>
+                <td><a href="/claims/@r.Id">@r.Number</a></td>
+                <td>@r.PolicyNumber</td>
+                <td>@r.Policyholder</td>
+                <td>@r.Object</td>
+                <td>@Fmt.Date(r.OccurredOn)</td>
+                <td><span class="badge @IndexModel.Badge(r.Status)">@ClaimTexts.Status.GetValueOrDefault(r.Status)</span></td>
+                <td class="num">@Fmt.Fixed(r.Reserve, 2) @r.Currency.Trim()</td>
+                <td class="num">@Fmt.Fixed(r.Paid, 2) @r.Currency.Trim()</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
