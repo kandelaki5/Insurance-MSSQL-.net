@@ -70,6 +70,24 @@ public sealed class ApiFoundationTests(WebApp app) : IClassFixture<WebApp>
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/v1/health")).StatusCode);
     }
 
+    [Fact]
+    public async Task Outside_Development_an_unexpected_error_of_the_api_is_500_problem_details_with_nothing_of_the_error()
+    {
+        // A USD policy with no USD rate stored at all: the card's revaluation cannot be made (the Razor card fails the same way).
+        var w = new Insurance.Integration.Tests.Policies.World(app.Db);
+        var usd = await w.PendingPolicyAsync(await w.ClientAsync(), w.App.Today(), "EUR", 2.9m);
+        var (_, username, password) = await app.UserAsync("viewer");
+        await using var production = app.Factory.WithWebHostBuilder(b => b.UseEnvironment("Production"));
+        var client = production.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, BaseAddress = new Uri("https://localhost"), HandleCookies = true });
+        Assert.Equal(HttpStatusCode.Redirect, (await WebApp.PostFormAsync(client, "/login", new() { ["username"] = username, ["password"] = password })).StatusCode);
+        var r = await client.GetAsync($"/api/v1/policies/{usd.Id}");
+        Assert.Equal(HttpStatusCode.InternalServerError, r.StatusCode);
+        Assert.Equal("application/problem+json", r.Content.Headers.ContentType?.MediaType);
+        var text = await r.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("EUR", text);
+        Assert.DoesNotContain("InvalidOperationException", text);
+    }
+
     private static string Root()
     {
         var d = new DirectoryInfo(AppContext.BaseDirectory);

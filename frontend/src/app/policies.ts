@@ -4,11 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DemoStore, Policy, statusLabel } from './demo-store';
 import { Icon } from './icon';
+import { MoneyPipe, formatMoney, isPositive, isZero } from './money';
 import { PolicyDetail } from './policy-detail';
 
 @Component({
   selector: 'app-policies',
-  imports: [DatePipe, DecimalPipe, FormsModule, Icon, PolicyDetail],
+  imports: [DatePipe, DecimalPipe, FormsModule, Icon, MoneyPipe, PolicyDetail],
   template: `
     @if (store.error()) {
       <div class="workspace-error" role="alert">
@@ -145,17 +146,17 @@ import { PolicyDetail } from './policy-detail';
                   }}<small class="cell-sub">{{ p.to | date: 'dd.MM.yyyy' }}</small>
                 </td>
                 <td class="number-cell">
-                  <strong>{{ p.premium | number: '1.2-2' }} {{ p.currency }}</strong
+                  <strong>{{ p.premium | money }} {{ p.currency }}</strong
                   ><small
                     class="cell-sub"
-                    [class.green-text]="p.status === 'active' && p.outstanding === 0"
+                    [class.green-text]="p.status === 'active' && zero(p.outstanding)"
                   >
                     @if (p.outstanding === null) {
                       დამტკიცების შემდეგ
-                    } @else if (p.outstanding === 0) {
+                    } @else if (zero(p.outstanding)) {
                       სრულად გადახდილი
                     } @else {
-                      ნაშთი: {{ p.outstanding ?? 0 | number: '1.2-2' }} {{ p.currency }}
+                      ნაშთი: {{ p.outstanding | money }} {{ p.currency }}
                     }
                   </small>
                 </td>
@@ -252,12 +253,13 @@ export class Policies {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   readonly label = statusLabel;
+  readonly zero = isZero;
   readonly search = signal('');
   readonly status = signal('all');
   readonly payment = signal('all');
   readonly ascending = signal(false);
   readonly page = signal(1);
-  readonly selected = signal<Policy | null>(null);
+  readonly selected = signal<Pick<Policy, 'id' | 'number'> | null>(null);
   readonly toast = signal('');
   readonly pageSize = 7;
   private returnFocus: HTMLElement | null = null;
@@ -281,7 +283,7 @@ export class Policies {
             )) &&
           (this.payment() === 'all' ||
             (p.status === 'active' &&
-              (this.payment() === 'paid' ? p.outstanding === 0 : (p.outstanding ?? 0) > 0))),
+              (this.payment() === 'paid' ? isZero(p.outstanding) : isPositive(p.outstanding)))),
       )
       .sort((a, b) =>
         this.ascending() ? a.number.localeCompare(b.number) : b.number.localeCompare(a.number),
@@ -301,12 +303,10 @@ export class Policies {
     const q = this.route.snapshot.queryParamMap;
     if (q.get('status')) this.status.set(q.get('status')!);
     if (q.get('policy'))
-      this.store
-        .detail(q.get('policy')!)
-        .subscribe({
-          next: (p) => this.selected.set(p),
-          error: () => this.toast.set('პოლისი ვერ ჩაიტვირთა.'),
-        });
+      this.store.detail(q.get('policy')!).subscribe({
+        next: (p) => this.selected.set(p),
+        error: () => this.toast.set('პოლისი ვერ ჩაიტვირთა.'),
+      });
     if (q.has('new')) location.assign('/policies/new');
   }
   count(key: string) {
@@ -347,8 +347,8 @@ export class Policies {
         p.client,
         p.vehicle,
         p.plate,
-        p.premium,
-        p.paid,
+        formatMoney(p.premium, false),
+        formatMoney(p.paid, false),
         this.label(p.status),
       ]),
     ];

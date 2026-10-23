@@ -48,7 +48,9 @@ app.UseForwardedHeaders();
 app.RequireHttpsOutsideDevelopment();
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Error");
+    // An unexpected error: the API answers it as problem details with no detail of the error, the pages with the error page.
+    app.UseWhen(c => c.Request.Path.StartsWithSegments(ApiServices.Prefix), api => api.UseExceptionHandler());
+    app.UseWhen(c => !c.Request.Path.StartsWithSegments(ApiServices.Prefix), pages => pages.UseExceptionHandler("/Error"));
     app.UseHsts();
 }
 app.Use(async (context, next) =>

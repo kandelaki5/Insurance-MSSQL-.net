@@ -3,9 +3,10 @@ import { DecimalPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { DemoStore, statusLabel } from './demo-store';
 import { Icon } from './icon';
+import { MoneyPipe } from './money';
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink, DecimalPipe, Icon],
+  imports: [RouterLink, DecimalPipe, Icon, MoneyPipe],
   template: `
     @if (store.error()) {
       <div class="workspace-error" role="alert">
@@ -217,7 +218,7 @@ import { Icon } from './icon';
                   {{ p.vehicle }}<small class="cell-sub">{{ p.plate }}</small>
                 </td>
                 <td class="number-cell">
-                  <strong>{{ p.premium | number: '1.2-2' }} {{ p.currency }}</strong>
+                  <strong>{{ p.premium | money }} {{ p.currency }}</strong>
                 </td>
                 <td>
                   <span class="status" [class.pending]="p.status === 'pending_approval'"
