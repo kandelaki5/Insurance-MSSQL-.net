@@ -1,0 +1,146 @@
+{
+  "Summary": {
+    "DemoClients": 10,
+    "DemoPolicies": 12,
+    "DemoReceipts": 7,
+    "DemoClaims": 4,
+    "DemoClaimPayments": 2,
+    "DemoReceiptsGel": 27275.00,
+    "DemoClaimNetPaidGel": 4300.00
+  },
+  "Financial": {
+    "ActivePremiumGel": 42900.00,
+    "AllocatedReceiptsGel": 27075.00,
+    "OutstandingClaimReserveGel": 4500.00
+  },
+  "Reconciliation": {
+    "ScheduleErrors": 0,
+    "PremiumErrors": 0,
+    "ReceiptErrors": 0,
+    "ClaimPaymentErrors": 0
+  },
+  "Policies": [
+    {
+      "id": "53033d0c-bad2-44dd-97fa-754f0f2635cd",
+      "number": "CAS000001",
+      "status": "active",
+      "effective_from": "2026-10-01T00:00:00",
+      "effective_to": "2027-10-01T00:00:00",
+      "PremiumGel": 3600.00
+    },
+    {
+      "id": "d6428500-543b-4b7a-a7bc-39be3e8ea7f9",
+      "number": "CAS000002",
+      "status": "active",
+      "effective_from": "2026-09-02T00:00:00",
+      "effective_to": "2027-09-02T00:00:00",
+      "PremiumGel": 1500.00
+    },
+    {
+      "id": "34077d64-b4d6-4503-9580-c4ec262a809e",
+      "number": "CAS000003",
+      "status": "active",
+      "effective_from": "2026-08-03T00:00:00",
+      "effective_to": "2027-08-03T00:00:00",
+      "PremiumGel": 1800.00
+    },
+    {
+      "id": "fb41a950-7223-45db-a3f8-197faa6ddc02",
+      "number": "CAS000004",
+      "status": "active",
+      "effective_from": "2026-10-04T00:00:00",
+      "effective_to": "2027-10-04T00:00:00",
+      "PremiumGel": 4200.00
+    },
+    {
+      "id": "41f1070e-a705-4596-903b-25f87a460706",
+      "number": "CAS000005",
+      "status": "active",
+      "effective_from": "2026-09-05T00:00:00",
+      "effective_to": "2027-09-05T00:00:00",
+      "PremiumGel": 4800.00
+    },
+    {
+      "id": "20c25b70-9cee-48b9-8015-d4ea78f92862",
+      "number": "CAS000006",
+      "status": "active",
+      "effective_from": "2026-08-06T00:00:00",
+      "effective_to": "2027-08-06T00:00:00",
+      "PremiumGel": 2700.00
+    },
+    {
+      "id": "283285e1-573b-44e3-a282-5a7b1e754975",
+      "number": "CAS000007",
+      "status": "active",
+      "effective_from": "2026-10-07T00:00:00",
+      "effective_to": "2027-10-07T00:00:00",
+      "PremiumGel": 6000.00
+    },
+    {
+      "id": "cdd1fc8b-36da-4236-b2b9-8190e957dc7a",
+      "number": "CAS000008",
+      "status": "active",
+      "effective_from": "2026-09-08T00:00:00",
+      "effective_to": "2027-09-08T00:00:00",
+      "PremiumGel": 3300.00
+    },
+    {
+      "id": "5e3ccd3d-b2c9-42b8-8d50-61a58f093535",
+      "number": "CAS000009",
+      "status": "active",
+      "effective_from": "2026-08-01T00:00:00",
+      "effective_to": "2027-08-01T00:00:00",
+      "PremiumGel": 7200.00
+    },
+    {
+      "id": "46301329-472f-44d2-b453-4cf6797125fe",
+      "number": "CAS000010",
+      "status": "active",
+      "effective_from": "2026-10-02T00:00:00",
+      "effective_to": "2027-10-02T00:00:00",
+      "PremiumGel": 7800.00
+    },
+    {
+      "id": "5e53faf7-cac1-45fe-9f25-37b5450a78f5",
+      "number": "CAS000011",
+      "status": "pending_approval",
+      "effective_from": "2026-10-23T00:00:00",
+      "effective_to": "2027-10-23T00:00:00",
+      "PremiumGel": 4200.00
+    },
+    {
+      "id": "0bd796b1-ae6c-4490-ac63-0574e34cb961",
+      "number": "CAS000012",
+      "status": "pending_approval",
+      "effective_from": "2026-10-23T00:00:00",
+      "effective_to": "2027-10-23T00:00:00",
+      "PremiumGel": 4500.00
+    }
+  ],
+  "Claims": [
+    {
+      "id": "ce34e5d9-31e1-4ab8-bf83-0463dc729d37",
+      "number": "CLM000001",
+      "status": "registered",
+      "approved_amount": null
+    },
+    {
+      "id": "b4022340-84f5-405e-9a68-899684fb9328",
+      "number": "CLM000002",
+      "status": "in_review",
+      "approved_amount": null
+    },
+    {
+      "id": "4a5e20a4-9724-4cad-b892-9b1abde42d57",
+      "number": "CLM000003",
+      "status": "approved",
+      "approved_amount": 2500.00
+    },
+    {
+      "id": "5960f126-eb9f-4fd5-886a-dcdc103ab05e",
+      "number": "CLM000004",
+      "status": "paid",
+      "approved_amount": 3500.00
+    }
+  ]
+}
