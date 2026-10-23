@@ -29,9 +29,10 @@ public sealed class PostgresImport(string postgresConnection, string sqlServerAd
 
     /// <summary>
     /// Target tables that have no source counterpart. ri_commission_settlement (0011) is the old program's 0039 of PR #362, which the
-    /// baseline database the import reads does not have: an import leaves that ledger empty.
+    /// baseline database the import reads does not have: an import leaves that ledger empty. oidc_code_use (0014) belongs to the new
+    /// program's own OpenID Connect provider (ADR 0003): nothing to bring over.
     /// </summary>
-    public static readonly IReadOnlySet<string> TargetOnly = new HashSet<string>(StringComparer.Ordinal) { "audit_config", "data_import", "schema_migration", "case_money_pass", "ri_commission_settlement" };
+    public static readonly IReadOnlySet<string> TargetOnly = new HashSet<string>(StringComparer.Ordinal) { "audit_config", "data_import", "schema_migration", "case_money_pass", "ri_commission_settlement", "oidc_code_use" };
 
     /// <summary>
     /// Nullable target columns the old database never had: left null on imported rows (sanctions fingerprints and the reuse

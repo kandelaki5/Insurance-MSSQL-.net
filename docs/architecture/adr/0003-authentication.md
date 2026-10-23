@@ -1,6 +1,6 @@
 # ADR 0003 — OpenID Connect sign-in through a same-origin BFF; OAuth 2.0 for the API
 
-Status: proposed (INS-DOTNET-MSSQL-004 B3), 24.10.2026. ქართულად: შესვლა OIDC-ით; ბრაუზერი ტოკენს არ ინახავს — სერვერი ინახავს, ბრაუზერს მხოლოდ დაცული cookie აქვს.
+Status: accepted for the embedded provider and the API (INS-DOTNET-MSSQL-004 B3), 24.10.2026; the external provider's BFF client is still open. ქართულად: შესვლა OIDC-ით; ბრაუზერი ტოკენს არ ინახავს — სერვერი ინახავს, ბრაუზერს მხოლოდ დაცული cookie აქვს.
 
 ## Context
 Today: the program's own sign-in (scrypt hashes in `core.app_user`, a server session row, a Secure/HttpOnly cookie, antiforgery, throttling, disable/logout/expiry checked on every request). Hosting: one IIS site on SmarterASP.NET (one domain, HTTPS, no extra paid service assumed). The browser runs the Angular shell on the same origin.
@@ -20,3 +20,10 @@ Today: the program's own sign-in (scrypt hashes in `core.app_user`, a server ses
 ## Consequences
 - The first slice (B5) delivers: OpenIddict in Development with a real login page, the BFF's login/logout/callback, revocation (disabling a user or signing out ends the BFF session at once — the session row is still checked per request), and Swagger Authorize with PKCE.
 - SmarterASP.NET: one site keeps the IdP, the BFF and the API; Data Protection keys must be persisted (the database or `App_Data`) so cookies survive an app-pool recycle — to be configured before the first deploy of this stage.
+
+## As built (24.10.2026, branch `claude/architecture-api`)
+- OpenIddict 7.7.1 in **degraded mode** (no token store, no EF Core): the clients are fixed in code (`insurance-swagger` only), the authorization code is self-contained and lives 2 minutes. Because degraded mode cannot mark a code as used, migration 0014 adds `core.oidc_code_use` (the SHA-256 of each exchanged code, insert/select for `core_app`): a second exchange is `invalid_grant`.
+- PKCE is required and S256 only (OpenIddict allows "plain" by default; removed). No refresh tokens. Access tokens: audience `insurance-api`, 30 minutes, with the claim `sid` = SHA-256 of the session row's key; the API accepts a token only while that session is open and the user active (`Auth.UserForSessionAsync`) — sign-out and disabling revoke at once.
+- With an `Authorization` header only the bearer counts (a bad token beside a valid cookie is 401). The login page returns only to `/connect/authorize?…`.
+- Development: ephemeral keys, HTTP allowed. Elsewhere the provider is off unless `Insurance:Oidc:Enabled=true` with `Insurance:Oidc:SigningCertificate` / `EncryptionCertificate` (PFX files outside Git, passwords from the host's secrets); off means no discovery, no authorize/token endpoints, no Swagger security scheme, and any bearer is 401.
+- Not yet: the BFF as an OIDC client of an external provider (`core.app_user_login`, issuer + subject); while the provider is embedded the browser's session stays the program's own cookie, which is already same-origin, HttpOnly, Secure and revocable. Data Protection keys must be persisted before the first deploy of this stage (ADR 0005).

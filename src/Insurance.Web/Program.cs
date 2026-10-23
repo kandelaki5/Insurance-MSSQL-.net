@@ -3,6 +3,7 @@ using Insurance.Application;
 using Insurance.Application.Data;
 using Insurance.Application.Ports;
 using Insurance.Infrastructure;
+using Insurance.Web.Identity;
 using Insurance.Application.Services;
 using Insurance.Web.Infrastructure;
 
@@ -23,6 +24,9 @@ builder.Services.AddInsuranceInfrastructure();
 builder.Services.AddInsuranceApi();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserSource, HttpCurrentUserSource>();
+// ADR 0003: the embedded OpenID Connect provider and the API's bearer tokens (Development; elsewhere when configured).
+builder.Services.AddInsuranceIdentity(builder.Environment, builder.Configuration);
+builder.Services.AddSwaggerSecurity(builder.Environment, builder.Configuration);
 builder.Services.Configure<SanctionsOptions>(builder.Configuration.GetSection("Insurance:Sanctions"));
 
 // Georgian (and every other) text is written as it is, not as &#x...; entities.
@@ -64,7 +68,11 @@ app.Use(async (context, next) =>
 });
 app.UseStaticFiles();
 app.UseRouting();
+// The OpenID Connect provider's endpoints are authentication request handlers.
+app.UseAuthentication();
+app.UseInsuranceSwaggerUi(app.Environment, app.Configuration);
 app.MapRazorPages();
+app.MapInsuranceIdentity(app.Environment, app.Configuration);
 app.MapInsuranceApi(app.Environment, app.Configuration);
 app.Run();
 

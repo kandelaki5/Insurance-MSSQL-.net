@@ -15,8 +15,9 @@ public sealed class SchemaTests(TestDatabase db) : IClassFixture<TestDatabase>
         Assert.Equal(Migrator.Embedded().Select(m => m.Name).ToList(), applied);
         // The 59 legacy tables (schema_migration included), core.audit_config (drives the generated audit triggers),
         // core.data_import (the record of imports from the old database), core.case_money_pass (SG034's pass, 0009) and
-        // core.ri_commission_settlement (0011: the old program's 0039 of PR #362, after the baseline).
-        Assert.Equal(63, await c.ExecuteScalarAsync<int>("select count(*) from sys.tables where schema_id = schema_id(N'core')"));
+        // core.ri_commission_settlement (0011: the old program's 0039 of PR #362, after the baseline) and core.oidc_code_use (0014: the
+        // embedded OpenID Connect provider's used codes, ADR 0003).
+        Assert.Equal(64, await c.ExecuteScalarAsync<int>("select count(*) from sys.tables where schema_id = schema_id(N'core')"));
         Assert.Equal("Latin1_General_100_CS_AS_SC", await c.ExecuteScalarAsync<string>("select convert(nvarchar(128), databasepropertyex(db_name(), 'Collation'))"));
         Assert.True(await c.ExecuteScalarAsync<bool>("select is_read_committed_snapshot_on from sys.databases where name = db_name()"));
         // Reference data of the legacy migrations.

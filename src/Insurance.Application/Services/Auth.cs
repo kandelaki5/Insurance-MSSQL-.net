@@ -3,6 +3,7 @@ using System.Text;
 using Dapper;
 using Insurance.Application.Data;
 using Insurance.Domain.Common;
+using Microsoft.Data.SqlClient;
 
 namespace Insurance.Application.Services;
 
@@ -56,6 +57,45 @@ public sealed class Auth(Db db)
             join core.role r on r.code = u.role_code
             where s.token_hash = @hash and s.expires_at > sysdatetimeoffset() and u.is_active = 1
             """, new { hash = HashToken(token) }));
+    }
+
+    /// <summary>
+    /// The id a token issued in a session carries for it (ADR 0003): the SHA-256 of the session row's key, which is itself the
+    /// SHA-256 of the cookie's token — so neither the cookie nor the row's key is ever written into a token.
+    /// </summary>
+    public static string SessionId(string token) => HashToken(HashToken(token));
+
+    /// <summary>
+    /// The user of an access token: its subject, while the session it was issued in is still open and the user still active —
+    /// signing out or disabling the user ends the token at once, whatever its lifetime.
+    /// </summary>
+    public async Task<CurrentUser?> UserForSessionAsync(Guid userId, string? sessionId)
+    {
+        if (string.IsNullOrEmpty(sessionId)) return null;
+        return await db.ReadAsync(c => c.QuerySingleOrDefaultAsync<CurrentUser>("""
+            select u.id as Id, u.username as Username, u.full_name as FullName, u.role_code as RoleCode, r.name_ka as RoleName
+            from core.session s
+            join core.app_user u on u.id = s.user_id
+            join core.role r on r.code = u.role_code
+            where s.user_id = @userId and s.expires_at > sysdatetimeoffset() and u.is_active = 1
+              and lower(convert(char(64), hashbytes('SHA2_256', convert(varchar(128), s.token_hash)), 2)) = @sessionId
+            """, new { userId, sessionId }));
+    }
+
+    /// <summary>
+    /// True the first time an authorization code is exchanged, false every time after (0014: a code is used once); the code itself
+    /// is never stored, only its SHA-256.
+    /// </summary>
+    public async Task<bool> FirstUseOfCodeAsync(string code)
+    {
+        try
+        {
+            return await db.ReadAsync(c => c.ExecuteAsync("insert into core.oidc_code_use (code_hash) values (@hash)", new { hash = HashToken(code) })) == 1;
+        }
+        catch (SqlException e) when (e.Number is 2627 or 2601)
+        {
+            return false;
+        }
     }
 
     /// <summary>
