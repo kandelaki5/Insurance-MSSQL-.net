@@ -1,4 +1,5 @@
 using Insurance.Application.Ports;
+using Insurance.Infrastructure.Policies;
 using Insurance.Infrastructure.Queries;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -10,6 +11,7 @@ public static class InfrastructureServices
     public static IServiceCollection AddInsuranceInfrastructure(this IServiceCollection services)
     {
         services.AddSingleton<ISystemStatusQuery, SystemStatusQuery>();
+        services.AddSingleton<IPolicyListQuery, PolicyListQuery>();
         return services;
     }
 }

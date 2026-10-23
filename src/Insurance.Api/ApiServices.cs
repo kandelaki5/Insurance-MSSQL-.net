@@ -55,6 +55,7 @@ public static class ApiServices
             .WithSummary("The signed-in user: name, role and whether the role may write (finer rights are checked per action).")
             .Produces<MeResponse>()
             .ProducesProblem(StatusCodes.Status401Unauthorized);
+        PolicyEndpoints.Map(signedIn);
         return app;
     }
 }
@@ -67,7 +68,12 @@ public sealed record MeResponse(string Username, string FullName, string Role, s
 public static class Problems
 {
     public const string NotSignedInCode = "not-signed-in";
+    public const string InvalidPagingCode = "invalid-paging";
 
     public static IResult NotSignedIn() => Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "სისტემაში შესვლა საჭიროა",
         extensions: new Dictionary<string, object?> { ["code"] = NotSignedInCode });
+
+    public static IResult InvalidPaging(int maxLimit) => Results.Problem(statusCode: StatusCodes.Status400BadRequest,
+        title: $"გვერდის პარამეტრები არასწორია: offset ≥ 0, limit 1-დან {maxLimit}-მდე",
+        extensions: new Dictionary<string, object?> { ["code"] = InvalidPagingCode });
 }

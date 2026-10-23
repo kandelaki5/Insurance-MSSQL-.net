@@ -41,9 +41,9 @@ else
                 <td><a href="/policies/@row.Id">@row.Number</a></td>
                 <td>@row.Policyholder</td>
                 <td>@row.Product</td>
-                <td>@row.Object</td>
+                <td>@row.Objects</td>
                 <td>@Fmt.Date(row.EffectiveFrom) – @Fmt.Date(row.EffectiveTo)</td>
-                <td class="num">@Fmt.Fixed(row.Premium, 2) @row.PremiumCurrency</td>
+                <td class="num">@Fmt.Fixed(Insurance.Application.Services.PaymentActions.Decimal(row.Premium), 2) @row.Currency</td>
                 <td><span class="badge @(row.Status == "active" ? "low" : "")">@PolicyTexts.Status.GetValueOrDefault(row.Status)</span></td>
             </tr>
         }
