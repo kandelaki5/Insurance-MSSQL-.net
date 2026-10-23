@@ -493,10 +493,14 @@ public sealed class GapsFdRefundReversalTests(TestDatabase db) : IClassFixture<T
         var r = await ReceivedAsync("12000.00", [('A', "7000.00", "7000.00", 1m), ('B', "5000.00", "5000.00", 1m)]);
         Assert.Equal(Reversed(r, "requested"), await ReverseAsync(r.Accountant, r));
         var request = await ReversalRequestAsync(r);
-        Assert.Equal([(1, r.InstA, 7000m, 7000m, 1m), (2, r.InstB, 5000m, 5000m, 1m)], await w.QueryAsync<(int, Guid, decimal, decimal, decimal)>(
-            "select position, installment_id, amount, amount_gel, rate from core.receipt_reversal_request_line where request_id = @request order by position", new { request }));
+        // The two allocations were written by two transactions; their order (created_at, then amount_gel, as legacy) is not
+        // the subject here — both lines are planned, numbered 1 and 2, and both are reversed.
+        var planned = await w.QueryAsync<(int, Guid, decimal, decimal, decimal)>(
+            "select position, installment_id, amount, amount_gel, rate from core.receipt_reversal_request_line where request_id = @request order by position", new { request });
+        Assert.Equal([1, 2], planned.Select(p => p.Item1));
+        Assert.Equal([(r.InstA, 7000m, 7000m, 1m), (r.InstB, 5000m, 5000m, 1m)], planned.Select(p => (p.Item2, p.Item3, p.Item4, p.Item5)).OrderByDescending(p => p.Item2));
         Assert.Equal(Reversed(r, "approved"), await ApproveReversalAsync(r.Admin, r.A.Id, request));
-        Assert.Equal([(r.InstA, -7000m, -7000m, 1m), (r.InstB, -5000m, -5000m, 1m)], await MirrorLinesAsync(r));
+        Assert.Equal([(r.InstA, -7000m, -7000m, 1m), (r.InstB, -5000m, -5000m, 1m)], (await MirrorLinesAsync(r)).OrderBy(l => l.Item2));
     }
 
     [Fact]

@@ -73,6 +73,8 @@ public sealed class Db(DbOptions options)
         {
             // XACT_ABORT: any error rolls the whole transaction back, as in PostgreSQL where an error aborts it.
             await tx.ExecuteAsync("set xact_abort on");
+            // The transaction's own time, for every row it stamps (core.tx_now(), 0009): PostgreSQL's now().
+            await tx.ExecuteAsync("declare @at datetimeoffset(6) = sysdatetimeoffset(); exec sp_set_session_context N'core.tx_at', @at");
             if (userId is { } id)
                 await tx.ExecuteAsync("exec sp_set_session_context N'core.user_id', @id", new { id = id.ToString() });
             var result = await work(tx);
@@ -89,11 +91,11 @@ public sealed class Db(DbOptions options)
         }
         finally
         {
-            if (userId is not null && connection.State == ConnectionState.Open)
+            if (connection.State == ConnectionState.Open)
             {
                 try
                 {
-                    await using var clear = new SqlCommand("exec sp_set_session_context N'core.user_id', null", connection);
+                    await using var clear = new SqlCommand("exec sp_set_session_context N'core.user_id', null; exec sp_set_session_context N'core.tx_at', null", connection);
                     await clear.ExecuteNonQueryAsync(CancellationToken.None);
                 }
                 catch (SqlException) { }

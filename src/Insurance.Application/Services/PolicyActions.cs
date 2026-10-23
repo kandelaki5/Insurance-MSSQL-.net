@@ -161,7 +161,7 @@ public static class PolicyActions
                         """, new { booked, lineId = line.Id, premium = line.Premium, premiumGel = line.PremiumGel, bookedOn, from = policy.EffectiveFrom, to = policy.EffectiveTo, userId = user.Id });
                     await ReinsuranceStore.CedeIssuedPremiumAsync(tx, booked, user.Id);
                 }
-                await tx.ExecuteAsync("update core.policy set status = N'active', approved_at = sysdatetimeoffset(), approved_by = @userId where id = @id",
+                await tx.ExecuteAsync("update core.policy set status = N'active', approved_at = core.tx_now(), approved_by = @userId where id = @id",
                     new { userId = user.Id, id });
                 return "approved";
             });

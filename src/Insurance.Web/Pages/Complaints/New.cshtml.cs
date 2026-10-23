@@ -73,7 +73,7 @@ public sealed class NewModel : AppPageModel
                     insert into core.complaint (id, number, received_on, channel, party_id, customer_name, customer_contact, policy_id, claim_id,
                                                 category, description, acknowledged_at, created_by)
                     values (@id, @complaintNumber, @receivedOn, @channel, @partyId, @customerName, @contact, @policyId, @claimId,
-                            @category, @description, case when @acknowledged = 1 then sysdatetimeoffset() end, @userId)
+                            @category, @description, case when @acknowledged = 1 then core.tx_now() end, @userId)
                     """, new
                 {
                     id, complaintNumber, receivedOn = Dates.ParseIsoDate(receivedOn), channel, partyId = party?.Id, customerName, contact, policyId, claimId,

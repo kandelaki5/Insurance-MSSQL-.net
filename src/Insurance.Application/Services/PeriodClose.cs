@@ -49,12 +49,12 @@ public static class PeriodClose
             var changed = await tx.ExecuteScalarAsync<int>("""
                 if not exists (select 1 from core.accounting_period with (updlock, holdlock) where period_start = @start)
                 begin
-                  insert into core.accounting_period (period_start, status, closed_at, closed_by) values (@start, N'closed', sysdatetimeoffset(), @userId);
+                  insert into core.accounting_period (period_start, status, closed_at, closed_by) values (@start, N'closed', core.tx_now(), @userId);
                   select 1;
                 end
                 else
                 begin
-                  update core.accounting_period set status = N'closed', closed_at = sysdatetimeoffset(), closed_by = @userId
+                  update core.accounting_period set status = N'closed', closed_at = core.tx_now(), closed_by = @userId
                   where period_start = @start and status = N'open';
                   select @@rowcount;
                 end

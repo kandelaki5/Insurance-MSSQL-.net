@@ -92,7 +92,7 @@ public static class PartyRisk
             factors = FactorsJson(computed.Factors), isOverride = manual is not null, reason = manual?.Reason, reviewDueOn, userId,
         });
         await tx.ExecuteAsync("""
-            update core.party set risk_level = @level, risk_assessed_on = @asOf, risk_review_on = @reviewDueOn, updated_at = sysdatetimeoffset()
+            update core.party set risk_level = @level, risk_assessed_on = @asOf, risk_review_on = @reviewDueOn, updated_at = core.tx_now()
             where id = @partyId
             """, new { level = level.ToSnakeCode(), asOf, reviewDueOn, partyId });
     }

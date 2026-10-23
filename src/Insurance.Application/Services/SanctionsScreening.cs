@@ -90,8 +90,8 @@ public static class SanctionsScreening
             await tx.ExecuteAsync("""
                 merge core.sanction_list_version with (holdlock) as v
                 using (select N'un' as source) as s on v.source = s.source
-                when matched then update set generated_at = @generatedAt, loaded_at = sysdatetimeoffset(), entries = @entries
-                when not matched then insert (source, generated_at, loaded_at, entries) values (N'un', @generatedAt, sysdatetimeoffset(), @entries);
+                when matched then update set generated_at = @generatedAt, loaded_at = core.tx_now(), entries = @entries
+                when not matched then insert (source, generated_at, loaded_at, entries) values (N'un', @generatedAt, core.tx_now(), @entries);
                 """, new { generatedAt, entries = list.Entries.Count });
             return 0;
         });
@@ -257,17 +257,17 @@ public static class SanctionsScreening
         var today = tx.Today();
         if (decision == "dismiss" && r.Outcome == "possible")
         {
-            await tx.ExecuteAsync("update core.sanctions_screening set outcome = N'false_positive', decided_by = @userId, decided_at = sysdatetimeoffset(), note = @note where id = @id", new { userId, note, id });
+            await tx.ExecuteAsync("update core.sanctions_screening set outcome = N'false_positive', decided_by = @userId, decided_at = core.tx_now(), note = @note where id = @id", new { userId, note, id });
             await tx.ExecuteAsync("update core.party set sanctions_checked_at = @today where id = @partyId", new { today, partyId = r.PartyId });
         }
         else if (decision == "confirm" && r.Outcome == "possible")
         {
-            await tx.ExecuteAsync("update core.sanctions_screening set outcome = N'confirmed', decided_by = @userId, decided_at = sysdatetimeoffset(), note = @note where id = @id", new { userId, note, id });
+            await tx.ExecuteAsync("update core.sanctions_screening set outcome = N'confirmed', decided_by = @userId, decided_at = core.tx_now(), note = @note where id = @id", new { userId, note, id });
             await tx.ExecuteAsync("update core.party set sanctions_blocked = 1 where id = @partyId", new { partyId = r.PartyId });
         }
         else if (decision == "lift" && r.Outcome == "confirmed")
         {
-            await tx.ExecuteAsync("update core.sanctions_screening set outcome = N'false_positive', decided_by = @userId, decided_at = sysdatetimeoffset(), note = @note where id = @id", new { userId, note, id });
+            await tx.ExecuteAsync("update core.sanctions_screening set outcome = N'false_positive', decided_by = @userId, decided_at = core.tx_now(), note = @note where id = @id", new { userId, note, id });
             await tx.ExecuteAsync("update core.party set sanctions_blocked = 0, sanctions_checked_at = @today where id = @partyId", new { today, partyId = r.PartyId });
         }
     }
