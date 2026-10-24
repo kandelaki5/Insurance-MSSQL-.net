@@ -508,6 +508,7 @@ Cases = `test(`/`it(` calls in the file (v1 count). Rows changed since v1 are ma
 | H46 (ძველი docs/07 §4.5) | ლარის ზარალი სავალუტო პოლისზე: კურსის ფიქსაცია, ჩათვლის კურსი | 0012_claim_gel_currency | ClaimGelOnForeignPolicyTests, ClaimGelCardTests, CrossCurrencySetOffTests | DONE |
 | — (Codex R005-03) | ზარალის snapshot-ის NULL-უსაფრთხო დაცვა (0012-ის ტრიგერის ჩანაცვლება) | 0013_claim_snapshot_null_safe | ClaimGelOnForeignPolicyTests.The_snapshot_is_neither_wiped_nor_given_… (core_app) | DONE |
 | — (INS-DOTNET-MSSQL-004 B3, ADR 0003) | ჩაშენებული OpenID Connect provider-ის გამოყენებული ავტორიზაციის კოდები (თითო კოდი ერთხელ; ინახება მხოლოდ SHA-256) — ძველ პროგრამაში ეს ცხრილი არ იყო, იმპორტი მას არ ეხება | 0014_oidc_code_use | OidcTests.A_signed_in_user_gets_a_code_with_PKCE_… (მეორე გაცვლა — invalid_grant), SchemaTests (64 ცხრილი) | DONE (ბრანჩი `claude/architecture-api`) |
+| — (Codex R006-01) | ზარალის გადახდის სტორნოს NULL-უსაფრთხო შედარება (CP002: ჩათვლის კურსი, ვალუტა, მიმღები) და H46-ის CHECK-ები UNKNOWN-ის უარყოფით; ნომერი 0014 არქიტექტურის ბრანჩის OIDC ცხრილს ეკუთვნის | 0015_claim_payment_reversal_null_safe | ClaimGelOnForeignPolicyTests.R006_01_a_reversal_cannot_drop_… და R006_01_a_partial_set_off_or_snapshot_… (core_app; 0015-ის გარეშე ორივე ვარდება) | DONE |
 
 ## 6. ძველი სკრიპტები (scripts/)
 
