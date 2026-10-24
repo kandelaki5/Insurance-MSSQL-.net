@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Dapper;
 using Insurance.Api;
 using Insurance.Application.Services;
 using Insurance.Integration.Tests.Policies;
@@ -162,5 +163,60 @@ public sealed partial class PolicyApiTests(PolicyWebApp app) : IClassFixture<Pol
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
         Assert.Equal(Problems.NoSuchPolicyCode, JsonDocument.Parse(await missing.Content.ReadAsStringAsync()).RootElement.GetProperty("code").GetString());
         Assert.Equal(HttpStatusCode.Unauthorized, (await app.Client().GetAsync($"/api/v1/policies/{usd.Id}")).StatusCode);
+    }
+
+    /// <summary>
+    /// The list's filters on the server, over the whole search (Codex 006, item 2 of the first slice): counts by status for the search
+    /// alone; status, paid and unpaid (active policies by what they still owe) and the order before the page is cut; the insured object
+    /// searched too; a bad filter refused as problem details.
+    /// </summary>
+    [Fact]
+    public async Task Status_payment_and_order_are_applied_by_the_server_before_the_page_and_the_counts_are_the_searchs()
+    {
+        var (taxId, pending, gel, usd) = await ClientWithThreeAsync();
+        // A fourth policy of the client, 100.00 GEL, paid in full by a 100.00 receipt.
+        var paidUp = await app.W.ActivePolicyAsync(await app.W.UserAsync("operations_head"), gel.Holder, app.W.App.Today().AddDays(-10), premium: 100m);
+        var full = await app.W.ReceiptAsync(gel.Holder, app.W.App.Today().AddDays(-9), 100m);
+        Assert.NotNull(await PaymentActions.AllocateReceiptAsync(app.W.App, app.W.Rates, await app.W.UserAsync("admin"), paidUp.Id.ToString(), full.ToString()));
+        var (viewer, _) = await app.SignedInAsync("viewer");
+        async Task<string[]> NumbersAsync(string query)
+        {
+            var r = await JsonAsync(viewer, $"/api/v1/policies?search={taxId}&{query}");
+            var numbers = r.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("number").GetString()!).ToArray();
+            Assert.Equal(("1", "3"), (r.GetProperty("counts").GetProperty("pending_approval").GetInt32().ToString(CultureInfo.InvariantCulture),
+                r.GetProperty("counts").GetProperty("active").GetInt32().ToString(CultureInfo.InvariantCulture)));
+            return numbers;
+        }
+        Assert.Equal([paidUp.Number, pending.Number, usd.Number, gel.Number], await NumbersAsync("limit=10"));
+        Assert.Equal([gel.Number, usd.Number, pending.Number, paidUp.Number], await NumbersAsync("sort=oldest"));
+        Assert.Equal([pending.Number], await NumbersAsync("status=pending_approval"));
+        Assert.Equal([paidUp.Number, usd.Number, gel.Number], await NumbersAsync("status=active"));
+        // Paid: the 100.00 policy paid in full; unpaid: the GEL (265.00 still asked) and the USD ones; never the pending policy.
+        Assert.Equal([paidUp.Number], await NumbersAsync("payment=paid"));
+        Assert.Equal([usd.Number, gel.Number], await NumbersAsync("payment=unpaid"));
+        Assert.Equal([gel.Number], await NumbersAsync("payment=unpaid&offset=1&limit=1"));
+        Assert.Empty(await NumbersAsync("payment=paid&status=pending_approval"));
+        var unpaid = await JsonAsync(viewer, $"/api/v1/policies?search={taxId}&payment=unpaid&limit=1");
+        Assert.Equal(2, unpaid.GetProperty("total").GetInt32());
+        foreach (var bad in new[] { "status=gone", "payment=some", "sort=up" })
+        {
+            var r = await viewer.GetAsync($"/api/v1/policies?{bad}");
+            Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
+            Assert.Equal(Problems.InvalidFilterCode, JsonDocument.Parse(await r.Content.ReadAsStringAsync()).RootElement.GetProperty("code").GetString());
+        }
+    }
+
+    [Fact]
+    public async Task The_api_finds_a_policy_by_its_insured_object_and_the_razor_list_as_the_old_one_does_not()
+    {
+        var holder = await app.W.ClientAsync();
+        var p = await app.W.ActivePolicyAsync(await app.W.UserAsync("operations_head"), holder, app.W.App.Today().AddDays(-10));
+        var plate = "ZZ-" + Random.Shared.Next(100_000, 999_999).ToString(CultureInfo.InvariantCulture);
+        await using (var c = await app.Db.OpenAdminAsync())
+            await c.ExecuteAsync("insert core.insured_object (policy_id, object_type, description) values (@id, N'vehicle', @plate)", new { id = p.Id, plate });
+        var (viewer, _) = await app.SignedInAsync("viewer");
+        var api = await JsonAsync(viewer, $"/api/v1/policies?search={plate.ToLowerInvariant()}");
+        Assert.Equal(p.Number, Assert.Single(api.GetProperty("items").EnumerateArray()).GetProperty("number").GetString());
+        Assert.Empty((await JsonAsync(viewer, $"/policies?handler=Data&q={plate}")).GetProperty("rows").EnumerateArray());
     }
 }

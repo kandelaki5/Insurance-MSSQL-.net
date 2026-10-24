@@ -2,9 +2,9 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { DemoStore, Policy, statusLabel } from './demo-store';
+import { DemoStore, Policy, PolicyQuery, statusLabel } from './demo-store';
 import { Icon } from './icon';
-import { MoneyPipe, formatMoney, isPositive, isZero } from './money';
+import { MoneyPipe, formatMoney, isZero } from './money';
 import { PolicyDetail } from './policy-detail';
 
 @Component({
@@ -23,7 +23,7 @@ import { PolicyDetail } from './policy-detail';
       <div>
         <p class="eyebrow">სადაზღვევო პორტფელი</p>
         <h1>
-          პოლისები <span class="heading-count">{{ store.policies().length }}</span>
+          პოლისები <span class="heading-count">{{ store.allCount() }}</span>
         </h1>
         <p>იპოვე საჭირო პოლისი და მართე ყველა დეტალი ერთ ადგილას.</p>
       </div>
@@ -39,13 +39,13 @@ import { PolicyDetail } from './policy-detail';
       <div>
         <span class="icon-tile lavender"><ui-icon name="shield" /></span>
         <div>
-          <span>მოქმედი პოლისები</span><strong>{{ store.active().length }}</strong>
+          <span>მოქმედი პოლისები</span><strong>{{ store.activeCount() }}</strong>
         </div>
       </div>
       <div>
         <span class="icon-tile peach"><ui-icon name="clock" /></span>
         <div>
-          <span>დასამტკიცებელი</span><strong>{{ store.pending().length }}</strong>
+          <span>დასამტკიცებელი</span><strong>{{ store.pendingCount() }}</strong>
         </div>
       </div>
       <div>
@@ -75,14 +75,14 @@ import { PolicyDetail } from './policy-detail';
             aria-label="პოლისის ძიება"
             placeholder="პოლისის ნომერი, კლიენტი ან ავტომობილი..."
             [ngModel]="search()"
-            (ngModelChange)="search.set($event); page.set(1)"
+            (ngModelChange)="onSearch($event)"
         /></label>
         <div class="filter-right">
           <label class="select-field"
             ><ui-icon name="wallet" /><select
               aria-label="გადახდის ფილტრი"
               [ngModel]="payment()"
-              (ngModelChange)="payment.set($event); page.set(1)"
+              (ngModelChange)="payment.set($event); go(1)"
             >
               <option value="all">ყველა გადახდა</option>
               <option value="unpaid">გადაუხდელი ნაშთით</option>
@@ -90,7 +90,7 @@ import { PolicyDetail } from './policy-detail';
             </select></label
           ><button
             class="button sort-button"
-            (click)="ascending.set(!ascending()); page.set(1)"
+            (click)="ascending.set(!ascending()); go(1)"
             [attr.aria-label]="ascending() ? 'ჯერ ახალი პოლისები' : 'ჯერ ძველი პოლისები'"
           >
             <ui-icon name="sort" />{{ ascending() ? 'ჯერ ძველი' : 'ჯერ ახალი' }}
@@ -99,8 +99,7 @@ import { PolicyDetail } from './policy-detail';
       </div>
       @if (search() || payment() !== 'all' || status() !== 'all') {
         <div class="filter-result">
-          <button class="text-link" (click)="store.load(search()); page.set(1)">ბაზაში ძიება</button
-          ><span>მოიძებნა {{ filtered().length }} პოლისი</span
+          <span>მოიძებნა {{ store.total() }} პოლისი</span
           ><button class="text-link" (click)="reset()">
             ფილტრების გასუფთავება<ui-icon name="close" />
           </button>
@@ -197,15 +196,15 @@ import { PolicyDetail } from './policy-detail';
       </div>
       <div class="pagination">
         <span
-          >ნაჩვენებია {{ filtered().length ? (page() - 1) * pageSize + 1 : 0 }}–{{ end() }} /
-          {{ filtered().length }} პოლისი</span
+          >ნაჩვენებია {{ store.total() ? (page() - 1) * pageSize + 1 : 0 }}–{{ end() }} /
+          {{ store.total() }} პოლისი</span
         >
         <div>
           <button
             class="page-button"
             [disabled]="page() === 1"
             aria-label="წინა გვერდი"
-            (click)="page.set(page() - 1)"
+            (click)="go(page() - 1)"
           >
             ←
           </button>
@@ -215,16 +214,16 @@ import { PolicyDetail } from './policy-detail';
               [class.current]="page() === n"
               [attr.aria-current]="page() === n ? 'page' : null"
               [attr.aria-label]="'გვერდი ' + n"
-              (click)="page.set(n)"
+              (click)="go(n)"
             >
               {{ n }}
             </button>
           }
           <button
             class="page-button"
-            [disabled]="page() >= pages().length"
+            [disabled]="page() >= pageCount()"
             aria-label="შემდეგი გვერდი"
-            (click)="page.set(page() + 1)"
+            (click)="go(page() + 1)"
           >
             →
           </button>
@@ -232,7 +231,7 @@ import { PolicyDetail } from './policy-detail';
       </div>
     </section>
     <p class="page-hint">
-      <ui-icon name="info" />ბოლო 200 პოლისი. სხვა ჩანაწერის მოსაძებნად გამოიყენე ბაზაში ძიება.
+      <ui-icon name="info" />ძიება, სტატუსი, გადახდის ფილტრი და დალაგება მთელ ბაზაზე სრულდება.
     </p>
     @if (selected(); as p) {
       <policy-detail [policy]="p" (close)="closeDetail()" />
@@ -270,59 +269,60 @@ export class Policies {
     { key: 'draft', title: 'მონახაზი' },
     { key: 'cancelled', title: 'გაუქმებული' },
   ];
-  readonly filtered = computed(() => {
-    const q = this.search().trim().toLocaleLowerCase();
-    return this.store
-      .policies()
-      .filter(
-        (p) =>
-          (this.status() === 'all' || p.status === this.status()) &&
-          (!q ||
-            [p.number, p.client, p.vehicle, p.plate].some((v) =>
-              v.toLocaleLowerCase().includes(q),
-            )) &&
-          (this.payment() === 'all' ||
-            (p.status === 'active' &&
-              (this.payment() === 'paid' ? isZero(p.outstanding) : isPositive(p.outstanding)))),
-      )
-      .sort((a, b) =>
-        this.ascending() ? a.number.localeCompare(b.number) : b.number.localeCompare(a.number),
-      );
+  /** The page the server gave for the search, the tab, the payment filter and the order (GET /api/v1/policies). */
+  readonly visible = computed(() => this.store.policies());
+  readonly pageCount = computed(() => Math.max(1, Math.ceil(this.store.total() / this.pageSize)));
+  /** At most seven page numbers, around the current one. */
+  readonly pages = computed(() => {
+    const n = this.pageCount();
+    const from = Math.max(1, Math.min(this.page() - 3, n - 6));
+    return Array.from({ length: Math.min(n, 7) }, (_, i) => from + i);
   });
-  readonly visible = computed(() =>
-    this.filtered().slice((this.page() - 1) * this.pageSize, this.page() * this.pageSize),
-  );
-  readonly pages = computed(() =>
-    Array.from(
-      { length: Math.max(1, Math.ceil(this.filtered().length / this.pageSize)) },
-      (_, i) => i + 1,
-    ),
-  );
-  readonly end = computed(() => Math.min(this.page() * this.pageSize, this.filtered().length));
+  readonly end = computed(() => Math.min(this.page() * this.pageSize, this.store.total()));
+  private searchTimer: ReturnType<typeof setTimeout> | undefined;
   constructor() {
     const q = this.route.snapshot.queryParamMap;
     if (q.get('status')) this.status.set(q.get('status')!);
+    if (q.get('q')) this.search.set(q.get('q')!);
     if (q.get('policy'))
       this.store.detail(q.get('policy')!).subscribe({
         next: (p) => this.selected.set(p),
         error: () => this.toast.set('პოლისი ვერ ჩაიტვირთა.'),
       });
     if (q.has('new')) location.assign('/policies/new');
+    this.go(1);
+  }
+  private query(page: number): PolicyQuery {
+    return {
+      search: this.search().trim(),
+      status: this.status(),
+      payment: this.payment(),
+      oldest: this.ascending(),
+      offset: (page - 1) * this.pageSize,
+      limit: this.pageSize,
+    };
+  }
+  go(page: number) {
+    this.page.set(page);
+    this.store.load(this.query(page));
+  }
+  onSearch(value: string) {
+    this.search.set(value);
+    clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => this.go(1), 300);
   }
   count(key: string) {
-    return key === 'all'
-      ? this.store.policies().length
-      : this.store.policies().filter((p) => p.status === key).length;
+    return key === 'all' ? this.store.allCount() : (this.store.counts()[key] ?? 0);
   }
   setStatus(value: string) {
     this.status.set(value);
-    this.page.set(1);
+    this.go(1);
   }
   reset() {
     this.search.set('');
     this.payment.set('all');
     this.status.set('all');
-    this.page.set(1);
+    this.go(1);
   }
   open(p: Policy) {
     this.returnFocus = document.activeElement as HTMLElement;
@@ -340,9 +340,15 @@ export class Policies {
     void this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
   }
   exportCsv() {
+    this.store.all(this.query(1)).subscribe({
+      next: (policies) => this.download(policies),
+      error: () => this.toast.set('ფაილი ვერ მომზადდა. სცადე ხელახლა.'),
+    });
+  }
+  private download(policies: Policy[]) {
     const rows = [
       ['პოლისი', 'კლიენტი', 'ავტომობილი', 'ნომერი', 'პრემია', 'გადახდილი', 'სტატუსი'],
-      ...this.filtered().map((p) => [
+      ...policies.map((p) => [
         p.number,
         p.client,
         p.vehicle,

@@ -35,7 +35,8 @@ public sealed class PolicyListQuery(Db db) : IPolicyListQuery
                    and not exists (select 1 from core.premium_transaction t join core.policy_line l on l.id = t.policy_line_id
                                    where l.policy_id = p.id))
           and (@all = 1 or lower(p.number) like @pattern or lower(c.number) like @pattern
-               or lower(h.display_name) like @pattern or h.tax_id like @pattern)
+               or lower(h.display_name) like @pattern or h.tax_id like @pattern
+               or (@objects = 1 and exists (select 1 from core.insured_object o where o.policy_id = p.id and lower(o.description) like @pattern)))
         """;
 
     public async Task<PolicyList> ListAsync(PolicyListRequest request, CancellationToken ct = default)
@@ -43,49 +44,102 @@ public sealed class PolicyListQuery(Db db) : IPolicyListQuery
         ArgumentOutOfRangeException.ThrowIfNegative(request.Offset);
         ArgumentOutOfRangeException.ThrowIfLessThan(request.Limit, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(request.Limit, PolicyListRequest.MaxLimit);
+        if (request.Status is { } st && !PolicyListRequest.Statuses.Contains(st)) throw new ArgumentOutOfRangeException(nameof(request), st, "unknown policy status");
         var q = JsText.Trim(request.Search);
-        var filter = new { all = q == "", pattern = Pattern(q) };
+        // Paid and unpaid are said of an active policy only (what its schedule still asks), so either narrows the list to active ones.
+        var status = request.Payment == PolicyPayment.All ? request.Status : request.Status is null or "active" ? "active" : null;
+        var none = request.Payment != PolicyPayment.All && status is null;
+        var filter = new { all = q == "", pattern = Pattern(q), status, objects = request.SearchObjects };
+        var order = request.Oldest ? "order by p.created_at, p.id" : "order by p.created_at desc, p.id desc";
         var today = db.Today();
         return await db.SnapshotAsync(async tx =>
         {
-            var total = (await tx.QueryAsync<int>("select count(*) " + Where, filter)).Single();
-            var rows = (await tx.QueryAsync<Row>($"""
-                select p.id as Id, p.number as Number, h.display_name as Policyholder, pr.name_ka as Product,
-                       (select string_agg(o.description, '; ') from core.insured_object o where o.policy_id = p.id) as Objects,
-                       p.effective_from as EffectiveFrom, p.effective_to as EffectiveTo,
-                       (select coalesce(sum(l.premium), 0) from core.policy_line l where l.policy_id = p.id)
-                       + (select coalesce(sum(l.premium), 0) from core.policy_line l join core.policy r on r.id = l.policy_id
-                          where r.replaces_policy_id = p.id and r.status = N'active'
-                            and not exists (select 1 from core.premium_transaction t join core.policy_line rl on rl.id = t.policy_line_id
-                                            where rl.policy_id = r.id)) as Premium,
-                       p.premium_currency as Currency, p.status as Status
-                {Where}
-                order by p.created_at desc, p.id desc
-                offset @offset rows fetch next @limit rows only
-                """, new { filter.all, filter.pattern, offset = request.Offset, limit = request.Limit })).ToList();
-            var ids = rows.Select(r => r.Id).ToArray();
-            var schedules = await Billing.LoadSchedulesAsync(tx, ids, today);
-            var credits = (ids.Length == 0 ? [] : await tx.QueryAsync<Credit>("""
-                select i.policy_id as PolicyId, a.amount as Amount, p.received_on as ReceivedOn, p.method as Method
-                from core.payment_allocation a join core.payment p on p.id = a.payment_id
-                join core.installment i on i.id = a.installment_id where i.policy_id in @ids
-                """, new { ids })).ToLookup(c => c.PolicyId);
-            var reinsured = ids.Length == 0 ? [] : (await tx.QueryAsync<Guid>("""
-                select distinct l.policy_id from core.premium_cession c
-                join core.premium_transaction t on t.id = c.premium_transaction_id
-                join core.policy_line l on l.id = t.policy_line_id
-                where l.policy_id in @ids and c.booked_on <= @today
-                """, new { ids, today })).ToHashSet();
-            var items = rows.Select(r =>
+            var counts = (await tx.QueryAsync<(string Status, int N)>("select p.status, count(*) " + Where + " group by p.status", filter))
+                .ToDictionary(c => c.Status, c => c.N, StringComparer.Ordinal);
+            int total;
+            IReadOnlyList<Guid> page;
+            if (none)
             {
-                var mine = credits[r.Id];
-                var paid = mine.Where(c => c.ReceivedOn <= today).Aggregate(System.Numerics.BigInteger.Zero, (s, c) => s + PaymentActions.Exact(c.Amount));
-                System.Numerics.BigInteger? outstanding = r.Status is "draft" or "pending_approval" ? null
-                    : PolicyCard.ExactOutstanding(schedules.GetValueOrDefault(r.Id) ?? [], mine.Select(c => new Billing.AllocationRow(c.Amount, c.ReceivedOn, c.Method)), today);
-                return new PolicyListItem(r.Id, r.Number, r.Policyholder, r.Product, r.Objects, r.EffectiveFrom, r.EffectiveTo, r.Status, r.Currency.Trim(),
-                    PaymentActions.Exact(r.Premium), paid, outstanding, reinsured.Contains(r.Id));
-            }).ToList();
-            return new PolicyList(items, total, today);
+                (total, page) = (0, []);
+            }
+            else if (request.Payment == PolicyPayment.All)
+            {
+                total = (await tx.QueryAsync<int>("select count(*) " + Where + StatusFilter, filter)).Single();
+                page = (await tx.QueryAsync<Guid>($"select p.id {Where}{StatusFilter} {order} offset @offset rows fetch next @limit rows only",
+                    new { filter.all, filter.pattern, filter.status, filter.objects, offset = request.Offset, limit = request.Limit })).ToList();
+            }
+            else
+            {
+                // Every active policy the search finds, by what it still owes as of the day (the same rule as its row's amount).
+                var candidates = (await tx.QueryAsync<Guid>($"select p.id {Where}{StatusFilter} {order}", filter)).ToList();
+                var owed = await OutstandingAsync(tx, candidates, today);
+                var kept = candidates.Where(id => request.Payment == PolicyPayment.Paid ? owed[id] == 0 : owed[id] > 0).ToList();
+                (total, page) = (kept.Count, kept.Skip(request.Offset).Take(request.Limit).ToList());
+            }
+            return new PolicyList(await ItemsAsync(tx, page, today), total, counts, today);
         }, ct);
+    }
+
+    private const string StatusFilter = " and (@status is null or p.status = @status)";
+
+    /// <summary>What each policy's schedule still asks as of the day, read a thousand policies at a time (SQL Server's parameter limit).</summary>
+    private static async Task<Dictionary<Guid, System.Numerics.BigInteger>> OutstandingAsync(Tx tx, IReadOnlyList<Guid> ids, DateOnly today)
+    {
+        var owed = new Dictionary<Guid, System.Numerics.BigInteger>();
+        foreach (var chunk in ids.Chunk(1000))
+        {
+            var schedules = await Billing.LoadSchedulesAsync(tx, chunk, today);
+            var credits = await CreditsAsync(tx, chunk);
+            foreach (var id in chunk)
+                owed[id] = PolicyCard.ExactOutstanding(schedules.GetValueOrDefault(id) ?? [], credits[id].Select(c => new Billing.AllocationRow(c.Amount, c.ReceivedOn, c.Method)), today);
+        }
+        return owed;
+    }
+
+    private static async Task<ILookup<Guid, Credit>> CreditsAsync(Tx tx, IReadOnlyCollection<Guid> ids) =>
+        (ids.Count == 0 ? [] : await tx.QueryAsync<Credit>("""
+            select i.policy_id as PolicyId, a.amount as Amount, p.received_on as ReceivedOn, p.method as Method
+            from core.payment_allocation a join core.payment p on p.id = a.payment_id
+            join core.installment i on i.id = a.installment_id where i.policy_id in @ids
+            """, new { ids })).ToLookup(c => c.PolicyId);
+
+    /// <summary>The rows of one page (at most 200 policies), in the page's order.</summary>
+    private static async Task<IReadOnlyList<PolicyListItem>> ItemsAsync(Tx tx, IReadOnlyList<Guid> ids, DateOnly today)
+    {
+        if (ids.Count == 0) return [];
+        var rows = (await tx.QueryAsync<Row>("""
+            select p.id as Id, p.number as Number, h.display_name as Policyholder, pr.name_ka as Product,
+                   (select string_agg(o.description, '; ') from core.insured_object o where o.policy_id = p.id) as Objects,
+                   p.effective_from as EffectiveFrom, p.effective_to as EffectiveTo,
+                   (select coalesce(sum(l.premium), 0) from core.policy_line l where l.policy_id = p.id)
+                   + (select coalesce(sum(l.premium), 0) from core.policy_line l join core.policy r on r.id = l.policy_id
+                      where r.replaces_policy_id = p.id and r.status = N'active'
+                        and not exists (select 1 from core.premium_transaction t join core.policy_line rl on rl.id = t.policy_line_id
+                                        where rl.policy_id = r.id)) as Premium,
+                   p.premium_currency as Currency, p.status as Status
+            from core.policy p
+            join core.contract c on c.id = p.contract_id
+            join core.party h on h.id = c.policyholder_id
+            left join core.product pr on pr.id = p.product_id
+            where p.id in @ids
+            """, new { ids })).ToDictionary(r => r.Id);
+        var schedules = await Billing.LoadSchedulesAsync(tx, ids.ToArray(), today);
+        var credits = await CreditsAsync(tx, ids.ToArray());
+        var reinsured = (await tx.QueryAsync<Guid>("""
+            select distinct l.policy_id from core.premium_cession c
+            join core.premium_transaction t on t.id = c.premium_transaction_id
+            join core.policy_line l on l.id = t.policy_line_id
+            where l.policy_id in @ids and c.booked_on <= @today
+            """, new { ids, today })).ToHashSet();
+        return ids.Select(id =>
+        {
+            var r = rows[id];
+            var mine = credits[r.Id];
+            var paid = mine.Where(c => c.ReceivedOn <= today).Aggregate(System.Numerics.BigInteger.Zero, (s, c) => s + PaymentActions.Exact(c.Amount));
+            System.Numerics.BigInteger? outstanding = r.Status is "draft" or "pending_approval" ? null
+                : PolicyCard.ExactOutstanding(schedules.GetValueOrDefault(r.Id) ?? [], mine.Select(c => new Billing.AllocationRow(c.Amount, c.ReceivedOn, c.Method)), today);
+            return new PolicyListItem(r.Id, r.Number, r.Policyholder, r.Product, r.Objects, r.EffectiveFrom, r.EffectiveTo, r.Status, r.Currency.Trim(),
+                PaymentActions.Exact(r.Premium), paid, outstanding, reinsured.Contains(r.Id));
+        }).ToList();
     }
 }

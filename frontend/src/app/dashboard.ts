@@ -136,9 +136,9 @@ import { MoneyPipe } from './money';
             <h2>შენს ყურადღებას ელოდება</h2>
             <p>დღის სამუშაო სია</p>
           </div>
-          <span class="count-badge">{{ store.pending().length }}</span>
+          <span class="count-badge">{{ store.overviewPending() }}</span>
         </div>
-        @for (p of store.pending().slice(0, 2); track p.number) {
+        @for (p of store.pendingPreview(); track p.number) {
           <a class="task-row" routerLink="/policies" [queryParams]="{ policy: p.id }"
             ><span class="task-icon"><ui-icon name="clock" /></span>
             <div>
@@ -198,7 +198,7 @@ import { MoneyPipe } from './money';
             </tr>
           </thead>
           <tbody>
-            @for (p of store.policies().slice(0, 4); track p.number) {
+            @for (p of store.latest(); track p.number) {
               <tr>
                 <td>
                   <a class="policy-link" routerLink="/policies" [queryParams]="{ policy: p.id }">{{
@@ -247,6 +247,9 @@ export class Dashboard {
   readonly fullName =
     document.querySelector('app-root')?.getAttribute('data-full-name') ?? 'მომხმარებელი';
   readonly label = statusLabel;
+  constructor() {
+    this.store.loadOverview();
+  }
   percent() {
     return (
       Math.round(

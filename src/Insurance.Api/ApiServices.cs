@@ -75,6 +75,7 @@ public static class Problems
     public const string InvalidPagingCode = "invalid-paging";
     public const string NoSuchPolicyCode = "no-such-policy";
     public const string InsufficientScopeCode = "insufficient-scope";
+    public const string InvalidFilterCode = "invalid-filter";
 
     /// <summary>The API's scope a bearer token must grant (ADR 0003).</summary>
     public const string ApiScope = "api";
@@ -85,6 +86,10 @@ public static class Problems
     public static IResult InvalidPaging(int maxLimit) => Results.Problem(statusCode: StatusCodes.Status400BadRequest,
         title: $"გვერდის პარამეტრები არასწორია: offset ≥ 0, limit 1-დან {maxLimit}-მდე",
         extensions: new Dictionary<string, object?> { ["code"] = InvalidPagingCode });
+
+    public static IResult InvalidFilter(string name, IEnumerable<string> allowed) => Results.Problem(statusCode: StatusCodes.Status400BadRequest,
+        title: $"ფილტრი „{name}“ არასწორია: დასაშვებია {string.Join(", ", allowed)}",
+        extensions: new Dictionary<string, object?> { ["code"] = InvalidFilterCode, ["parameter"] = name });
 
     /// <summary>A valid token without the API's scope (RFC 6750 §3.1): 403 with the Bearer challenge naming the scope it lacks.</summary>
     public static IResult InsufficientScope(HttpContext context)
