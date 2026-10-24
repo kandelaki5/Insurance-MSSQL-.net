@@ -27,6 +27,9 @@ public sealed class BrowserPolicyApiTests(BrowserApp app) : IClassFixture<Browse
         await W.RateAsync("USD", from, 2.7m);
 
         var viewer = await app.SignedInPageAsync("viewer");
+        // The home page after the sign-in has already been through the backend for the browser; without its cookie the list goes again.
+        Assert.Contains(await viewer.Context.CookiesAsync(), c => c.Name == "bff");
+        await viewer.Context.ClearCookiesAsync(new() { Name = "bff" });
         var requests = new List<string>();
         viewer.Request += (_, r) => requests.Add(r.Url);
         await viewer.GotoAsync(app.BaseUrl + "/policies");
@@ -45,6 +48,12 @@ public sealed class BrowserPolicyApiTests(BrowserApp app) : IClassFixture<Browse
         Assert.Contains(requests, u => u.Contains("/api/v1/policies?", StringComparison.Ordinal));
         Assert.Contains(requests, u => u.EndsWith($"/api/v1/policies/{usd.Id}", StringComparison.Ordinal));
         Assert.DoesNotContain(requests, u => Regex.IsMatch(u, "/policies(/[0-9a-f-]{36})?\\?handler=Data"));
+        // Through the backend for the browser (ADR 0003): the provider's round trip once, then its HttpOnly cookie; no token in the page.
+        Assert.Contains(requests, u => u.Contains("/bff/login?returnUrl=", StringComparison.Ordinal));
+        Assert.Contains(requests, u => u.Contains("/signin-oidc?code=", StringComparison.Ordinal));
+        var bff = Assert.Single(await viewer.Context.CookiesAsync(), c => c.Name == "bff");
+        Assert.True(bff.HttpOnly);
+        Assert.Null(await viewer.EvaluateAsync<string?>("() => document.cookie.includes('bff=') ? 'visible' : null"));
     }
 
     /// <summary>

@@ -47,7 +47,8 @@ public static class ApiServices
         {
             var users = context.HttpContext.RequestServices.GetRequiredService<ICurrentUserSource>();
             if (await users.CurrentAsync() is not null) return await next(context);
-            return await users.InsufficientScopeAsync() ? Problems.InsufficientScope(context.HttpContext) : Problems.NotSignedIn();
+            return await users.InsufficientScopeAsync() ? Problems.InsufficientScope(context.HttpContext)
+                : Problems.NotSignedIn(context.HttpContext.RequestServices.GetRequiredService<Microsoft.Extensions.Options.IOptions<ApiOptions>>().Value.SignInPath);
         });
         signedIn.MapGet("/me", async (ICurrentUserSource users) =>
             {
@@ -62,6 +63,12 @@ public static class ApiServices
         PolicyCardEndpoints.Map(signedIn);
         return app;
     }
+}
+
+/// <summary>What the host tells the API: where a browser signs in to it (the backend for the browser's login, ADR 0003), if anywhere.</summary>
+public sealed class ApiOptions
+{
+    public string? SignInPath { get; set; }
 }
 
 public sealed record HealthResponse(string Status, int Migrations, string? LastMigration);
@@ -80,8 +87,13 @@ public static class Problems
     /// <summary>The API's scope a bearer token must grant (ADR 0003).</summary>
     public const string ApiScope = "api";
 
-    public static IResult NotSignedIn() => Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "სისტემაში შესვლა საჭიროა",
-        extensions: new Dictionary<string, object?> { ["code"] = NotSignedInCode });
+    /// <summary>Nobody signed in for the API; <paramref name="signIn"/>, where the site has one, is where a browser signs in to it.</summary>
+    public static IResult NotSignedIn(string? signIn = null)
+    {
+        var extensions = new Dictionary<string, object?> { ["code"] = NotSignedInCode };
+        if (signIn is not null) extensions["signIn"] = signIn;
+        return Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "სისტემაში შესვლა საჭიროა", extensions: extensions);
+    }
 
     public static IResult InvalidPaging(int maxLimit) => Results.Problem(statusCode: StatusCodes.Status400BadRequest,
         title: $"გვერდის პარამეტრები არასწორია: offset ≥ 0, limit 1-დან {maxLimit}-მდე",

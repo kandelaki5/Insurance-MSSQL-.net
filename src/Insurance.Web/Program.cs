@@ -27,6 +27,8 @@ builder.Services.AddScoped<ICurrentUserSource, HttpCurrentUserSource>();
 // ADR 0003: the embedded OpenID Connect provider and the API's bearer tokens (Development; elsewhere when configured).
 builder.Services.AddInsuranceIdentity(builder.Environment, builder.Configuration);
 builder.Services.AddSwaggerSecurity(builder.Environment, builder.Configuration);
+builder.Services.AddInsuranceBff(builder.Environment, builder.Configuration);
+if (Bff.Enabled(builder.Environment, builder.Configuration)) builder.Services.Configure<ApiOptions>(o => o.SignInPath = Bff.LoginPath);
 builder.Services.Configure<SanctionsOptions>(builder.Configuration.GetSection("Insurance:Sanctions"));
 
 // Georgian (and every other) text is written as it is, not as &#x...; entities.
@@ -73,6 +75,7 @@ app.UseAuthentication();
 app.UseInsuranceSwaggerUi(app.Environment, app.Configuration);
 app.MapRazorPages();
 app.MapInsuranceIdentity(app.Environment, app.Configuration);
+app.MapInsuranceBff(app.Environment, app.Configuration);
 app.MapInsuranceApi(app.Environment, app.Configuration);
 app.Run();
 

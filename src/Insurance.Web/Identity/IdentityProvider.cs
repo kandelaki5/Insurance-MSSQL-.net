@@ -74,21 +74,36 @@ public static class IdentityProvider
     /// <summary>This site's address of a path, as the request reached it (the forwarded scheme and host only from a trusted proxy).</summary>
     private static string Here(HttpRequest request, string path) => $"{request.Scheme}://{request.Host}{request.PathBase}{path}";
 
-    /// <summary>The clients: Swagger UI only (public, PKCE, its own callback on this site).</summary>
+    /// <summary>
+    /// The clients, each with its callback on this site: Swagger UI (public, PKCE, no secret) and the site's own backend for the browser
+    /// (Bff: confidential, PKCE and its secret).
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, string> Callbacks = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        [SwaggerClient] = SwaggerRedirectPath, [Bff.Client] = Bff.CallbackPath,
+    };
+
     private static ValueTask ValidateAuthorization(OpenIddictServerEvents.ValidateAuthorizationRequestContext context)
     {
         var request = context.Transaction.GetHttpRequest()!;
-        if (context.ClientId != SwaggerClient)
+        if (context.ClientId is not { } client || !Callbacks.TryGetValue(client, out var callback)
+            || (client == Bff.Client && !Bff.Enabled(request.HttpContext.RequestServices.GetRequiredService<IHostEnvironment>(), request.HttpContext.RequestServices.GetRequiredService<IConfiguration>())))
             context.Reject(Errors.InvalidClient, "unknown client");
-        else if (context.RedirectUri != Here(request, SwaggerRedirectPath))
+        else if (context.RedirectUri != Here(request, callback))
             context.Reject(Errors.InvalidRequest, "the redirect address is not this client's");
         return default;
     }
 
     private static ValueTask ValidateToken(OpenIddictServerEvents.ValidateTokenRequestContext context)
     {
-        if (context.ClientId != SwaggerClient || !string.IsNullOrEmpty(context.ClientSecret))
-            context.Reject(Errors.InvalidClient, "unknown client");
+        var services = context.Transaction.GetHttpRequest()!.HttpContext.RequestServices;
+        var valid = context.ClientId switch
+        {
+            SwaggerClient => string.IsNullOrEmpty(context.ClientSecret),
+            Bff.Client => services.GetService<Bff.Secret>() is { } secret && secret.Matches(context.ClientSecret),
+            _ => false,
+        };
+        if (!valid) context.Reject(Errors.InvalidClient, "unknown client or wrong secret");
         return default;
     }
 
@@ -114,7 +129,8 @@ public static class IdentityProvider
             identity.SetClaim(Claims.Subject, user.Id.ToString()).SetClaim(Claims.Name, user.Username).SetClaim(SessionClaim, Auth.SessionId(token!));
             identity.SetScopes(request.GetScopes().Intersect([Scopes.OpenId, Scopes.Profile, ApiScope]));
             identity.SetResources(Audience);
-            identity.SetDestinations(claim => claim.Type == Claims.Name ? [Destinations.AccessToken, Destinations.IdentityToken] : [Destinations.AccessToken]);
+            // The name and the session also in the ID token: the backend for the browser keeps no token, only what the ID token said.
+            identity.SetDestinations(claim => claim.Type is Claims.Name or SessionClaim ? [Destinations.AccessToken, Destinations.IdentityToken] : [Destinations.AccessToken]);
             return Results.SignIn(new ClaimsPrincipal(identity), authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         }).ExcludeFromDescription();
         return app;
