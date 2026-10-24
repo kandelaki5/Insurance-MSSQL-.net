@@ -31,10 +31,10 @@ public sealed class OidcTests(WebApp app) : IClassFixture<WebApp>
     }
 
     private static string AuthorizeUrl(string challenge, string state = "s-1", string client = IdentityProvider.SwaggerClient, string callback = Callback,
-        string method = "S256") =>
+        string method = "S256", string scope = "openid api") =>
         QueryHelpers.AddQueryString(IdentityProvider.AuthorizePath, new Dictionary<string, string?>
         {
-            ["client_id"] = client, ["redirect_uri"] = callback, ["response_type"] = "code", ["scope"] = "openid api", ["state"] = state,
+            ["client_id"] = client, ["redirect_uri"] = callback, ["response_type"] = "code", ["scope"] = scope, ["state"] = state,
             ["code_challenge"] = challenge, ["code_challenge_method"] = method,
         });
 
@@ -50,11 +50,11 @@ public sealed class OidcTests(WebApp app) : IClassFixture<WebApp>
             ["grant_type"] = "authorization_code", ["code"] = code, ["redirect_uri"] = Callback, ["client_id"] = clientId, ["code_verifier"] = verifier,
         }));
 
-    private async Task<(HttpClient Browser, Guid UserId, string AccessToken)> TokenAsync(string role)
+    private async Task<(HttpClient Browser, Guid UserId, string AccessToken)> TokenAsync(string role, string scope = "openid api")
     {
         var (browser, userId) = await app.SignedInAsync(role);
         var (verifier, challenge) = Pkce();
-        var code = CodeOf(await browser.GetAsync(AuthorizeUrl(challenge)));
+        var code = CodeOf(await browser.GetAsync(AuthorizeUrl(challenge, scope: scope)));
         Assert.NotNull(code);
         var r = await ExchangeAsync(app.Client(), code, verifier);
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
@@ -198,5 +198,33 @@ public sealed class OidcTests(WebApp app) : IClassFixture<WebApp>
         var flow = doc.GetProperty("components").GetProperty("securitySchemes").GetProperty("oauth2").GetProperty("flows").GetProperty("authorizationCode");
         Assert.Equal(IdentityProvider.AuthorizePath, flow.GetProperty("authorizationUrl").GetString());
         Assert.Equal(IdentityProvider.TokenPath, flow.GetProperty("tokenUrl").GetString());
+    }
+
+    /// <summary>
+    /// Codex R006-02: a real token of a live session obtained with scope=openid only is known but not let in — 403 insufficient_scope
+    /// with the Bearer challenge naming "api", never a fallback to the session cookie beside it; with "api" it is let in. A bad token
+    /// stays 401.
+    /// </summary>
+    [Fact]
+    public async Task A_token_without_the_api_scope_is_403_insufficient_scope_even_beside_a_valid_cookie_and_one_with_it_reads_the_api()
+    {
+        var (browser, _, openIdOnly) = await TokenAsync("accountant", scope: "openid");
+        foreach (var client in new[] { app.Client(), browser })
+        {
+            var r = await MeAsync(openIdOnly, client);
+            Assert.Equal(HttpStatusCode.Forbidden, r.StatusCode);
+            Assert.Equal("application/problem+json", r.Content.Headers.ContentType?.MediaType);
+            Assert.Equal(Insurance.Api.Problems.InsufficientScopeCode, JsonDocument.Parse(await r.Content.ReadAsStringAsync()).RootElement.GetProperty("code").GetString());
+            Assert.Equal("Bearer error=\"insufficient_scope\", scope=\"api\"", r.Headers.WwwAuthenticate.ToString());
+            var list = new HttpRequestMessage(HttpMethod.Get, "/api/v1/policies");
+            list.Headers.Authorization = new AuthenticationHeaderValue("Bearer", openIdOnly);
+            Assert.Equal(HttpStatusCode.Forbidden, (await client.SendAsync(list)).StatusCode);
+        }
+        var (_, _, withApi) = await TokenAsync("accountant");
+        Assert.Equal(HttpStatusCode.OK, (await MeAsync(withApi)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await MeAsync(openIdOnly[..^4] + "AAAA", browser)).StatusCode);
+        // Once its session has ended, the openid-only token is nothing (401), not merely short of a scope.
+        Assert.Equal(HttpStatusCode.Redirect, (await WebApp.PostFormAsync(browser, "/logout", [], "/")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await MeAsync(openIdOnly)).StatusCode);
     }
 }

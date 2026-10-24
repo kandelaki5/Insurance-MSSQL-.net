@@ -21,7 +21,7 @@ namespace Insurance.Web.Identity;
 public static class IdentityProvider
 {
     public const string Audience = "insurance-api";
-    public const string ApiScope = "api";
+    public const string ApiScope = Insurance.Api.Problems.ApiScope;
     public const string SwaggerClient = "insurance-swagger";
     public const string SwaggerRedirectPath = "/api/swagger/oauth2-redirect.html";
     public const string AuthorizePath = "/connect/authorize";

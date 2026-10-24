@@ -20,7 +20,8 @@ public static class PolicyCardEndpoints
             .WithSummary("One policy: its coverages, current and issued premium, receivable, schedule, payments, cessions and changes, as of today.")
             .Produces<PolicyCardResponse>()
             .ProducesProblem(StatusCodes.Status404NotFound)
-            .ProducesProblem(StatusCodes.Status401Unauthorized);
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
     }
 
     private static Money? Maybe(decimal? amount, string currency) => amount is { } a ? Money.Of(PaymentActions.Exact(a), currency) : null;

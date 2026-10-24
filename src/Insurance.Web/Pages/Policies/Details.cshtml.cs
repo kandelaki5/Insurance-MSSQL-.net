@@ -71,7 +71,8 @@ public sealed class DetailsModel(Rates rates, IPolicyCardQuery cards) : AppPageM
     {
         // One reporting day for the whole card, taken once (Codex PR #18 review, item 3).
         Today = Db.Today();
-        return await Db.ReadTxAsync(async tx =>
+        // One snapshot for the whole card (Codex R006-03): what every reader sees and what it offers this reader, one committed state.
+        return await Db.SnapshotAsync(async tx =>
         {
             // The figures every reader sees (IPolicyCardQuery, the same as /api/v1/policies/{id}).
             if (await cards.ReadAsync(tx, id, Today) is not { } card) return false;

@@ -44,9 +44,11 @@ public static class ApiServices
             .AllowAnonymous();
 
         var signedIn = api.MapGroup("").AddEndpointFilter(async (context, next) =>
-            await context.HttpContext.RequestServices.GetRequiredService<ICurrentUserSource>().CurrentAsync() is null
-                ? Problems.NotSignedIn()
-                : await next(context));
+        {
+            var users = context.HttpContext.RequestServices.GetRequiredService<ICurrentUserSource>();
+            if (await users.CurrentAsync() is not null) return await next(context);
+            return await users.InsufficientScopeAsync() ? Problems.InsufficientScope(context.HttpContext) : Problems.NotSignedIn();
+        });
         signedIn.MapGet("/me", async (ICurrentUserSource users) =>
             {
                 var u = (await users.CurrentAsync())!;
@@ -54,7 +56,8 @@ public static class ApiServices
             })
             .WithSummary("The signed-in user: name, role and whether the role may write (finer rights are checked per action).")
             .Produces<MeResponse>()
-            .ProducesProblem(StatusCodes.Status401Unauthorized);
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
         PolicyEndpoints.Map(signedIn);
         PolicyCardEndpoints.Map(signedIn);
         return app;
@@ -71,6 +74,10 @@ public static class Problems
     public const string NotSignedInCode = "not-signed-in";
     public const string InvalidPagingCode = "invalid-paging";
     public const string NoSuchPolicyCode = "no-such-policy";
+    public const string InsufficientScopeCode = "insufficient-scope";
+
+    /// <summary>The API's scope a bearer token must grant (ADR 0003).</summary>
+    public const string ApiScope = "api";
 
     public static IResult NotSignedIn() => Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "სისტემაში შესვლა საჭიროა",
         extensions: new Dictionary<string, object?> { ["code"] = NotSignedInCode });
@@ -78,6 +85,14 @@ public static class Problems
     public static IResult InvalidPaging(int maxLimit) => Results.Problem(statusCode: StatusCodes.Status400BadRequest,
         title: $"გვერდის პარამეტრები არასწორია: offset ≥ 0, limit 1-დან {maxLimit}-მდე",
         extensions: new Dictionary<string, object?> { ["code"] = InvalidPagingCode });
+
+    /// <summary>A valid token without the API's scope (RFC 6750 §3.1): 403 with the Bearer challenge naming the scope it lacks.</summary>
+    public static IResult InsufficientScope(HttpContext context)
+    {
+        context.Response.Headers.WWWAuthenticate = $"Bearer error=\"insufficient_scope\", scope=\"{ApiScope}\"";
+        return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "ტოკენი API-ის უფლებას (scope \"api\") არ შეიცავს",
+            extensions: new Dictionary<string, object?> { ["code"] = InsufficientScopeCode });
+    }
 
     public static IResult NoSuchPolicy() => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "ასეთი პოლისი არ არსებობს",
         extensions: new Dictionary<string, object?> { ["code"] = NoSuchPolicyCode });

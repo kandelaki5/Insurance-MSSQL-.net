@@ -9,4 +9,10 @@ namespace Insurance.Application.Ports;
 public interface ICurrentUserSource
 {
     Task<CurrentUser?> CurrentAsync();
+
+    /// <summary>
+    /// True when the request carried a valid access token of a live session that does not grant the API's scope: the caller is known
+    /// but may not use the API with that token (403 insufficient_scope, not 401). Always false for the session cookie.
+    /// </summary>
+    Task<bool> InsufficientScopeAsync();
 }

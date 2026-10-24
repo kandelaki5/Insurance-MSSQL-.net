@@ -5,14 +5,19 @@ using static Insurance.Application.Ports.PolicyCardView;
 
 namespace Insurance.Infrastructure.Policies;
 
-/// <summary>The policy card's common figures on SQL Server (the card's reads before B2, moved unchanged).</summary>
+/// <summary>
+/// The policy card's common figures on SQL Server (the card's reads before B2), in one snapshot transaction when the query owns it
+/// (Db.SnapshotAsync, Codex R006-03): the header, the premium ledger, the schedule, the payments and their allocations are one committed
+/// state, so the receivable can never count a payment the payments list does not show. The valuation rate is read apart (Rates may load
+/// the day's official rate from the National Bank, which no transaction should wait on); it is the reporting day's published rate.
+/// </summary>
 public sealed class PolicyCardQuery(Db db, Rates rates) : IPolicyCardQuery
 {
     public Task<PolicyCardView?> ReadAsync(Guid id, CancellationToken ct = default)
     {
         // One reporting day for the whole card, taken once (Codex PR #18 review, item 3).
         var today = db.Today();
-        return db.ReadTxAsync(tx => ReadAsync(tx, id, today), ct);
+        return db.SnapshotAsync(tx => ReadAsync(tx, id, today), ct);
     }
 
     public async Task<PolicyCardView?> ReadAsync(Tx tx, Guid id, DateOnly today)

@@ -6,7 +6,8 @@ using Insurance.Domain.Common;
 namespace Insurance.Infrastructure.Policies;
 
 /// <summary>
-/// The policy list on SQL Server, the page, its count and its amounts in one read transaction (one use case, one transaction). The
+/// The policy list on SQL Server, the page, its count and its amounts in one snapshot transaction (Db.SnapshotAsync: every statement
+/// sees the same committed state, so the count and the rows cannot disagree — Codex R006-03). The
 /// search and the rows are the old list's (Pages/Policies before B2); the order is newest first with the id breaking a tie, so that a
 /// page boundary never repeats or skips a policy.
 /// </summary>
@@ -45,7 +46,7 @@ public sealed class PolicyListQuery(Db db) : IPolicyListQuery
         var q = JsText.Trim(request.Search);
         var filter = new { all = q == "", pattern = Pattern(q) };
         var today = db.Today();
-        return await db.ReadTxAsync(async tx =>
+        return await db.SnapshotAsync(async tx =>
         {
             var total = (await tx.QueryAsync<int>("select count(*) " + Where, filter)).Single();
             var rows = (await tx.QueryAsync<Row>($"""

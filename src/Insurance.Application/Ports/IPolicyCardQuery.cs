@@ -12,10 +12,10 @@ namespace Insurance.Application.Ports;
 /// </summary>
 public interface IPolicyCardQuery
 {
-    /// <summary>The card as of today in Tbilisi, in its own read transaction; null when there is no such policy.</summary>
+    /// <summary>The card as of today in Tbilisi, in its own snapshot transaction (one committed state); null when there is no such policy.</summary>
     Task<PolicyCardView?> ReadAsync(Guid id, CancellationToken ct = default);
 
-    /// <summary>The card as of <paramref name="today"/> inside the caller's transaction.</summary>
+    /// <summary>The card as of <paramref name="today"/> inside the caller's transaction, which should be a snapshot (Db.SnapshotAsync).</summary>
     Task<PolicyCardView?> ReadAsync(Tx tx, Guid id, DateOnly today);
 }
 

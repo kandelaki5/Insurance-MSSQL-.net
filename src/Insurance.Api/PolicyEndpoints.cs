@@ -21,7 +21,8 @@ public static class PolicyEndpoints
             .WithSummary("The policies, newest first, searched by policy number, contract number, client or id number; paged by offset and limit (1–200, default 50).")
             .Produces<PolicyListResponse>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
-            .ProducesProblem(StatusCodes.Status401Unauthorized);
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
     }
 
     private static PolicyListItemResponse Item(PolicyListItem p) => new(p.Id, p.Number, p.Policyholder, p.Product, p.Objects, p.EffectiveFrom,
