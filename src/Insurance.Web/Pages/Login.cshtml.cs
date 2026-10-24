@@ -4,6 +4,8 @@ using Insurance.Web.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
+using Insurance.Web.Identity;
+
 namespace Insurance.Web.Pages;
 
 [AllowAnonymousPage]
@@ -11,8 +13,14 @@ public sealed class LoginModel(Auth auth, RequestUser requestUser) : PageModel
 {
     public string? FormError { get; private set; }
 
+    /// <summary>
+    /// Where a sign-in goes: home, or back to the OpenID Connect authorization request that sent the visitor here (ADR 0003) —
+    /// only that endpoint of this site, never another address.
+    /// </summary>
+    private string Next() => IdentityProvider.ReturnPath(Request.Query["returnUrl"].Count == 1 ? Request.Query["returnUrl"][0] : null) ?? "/";
+
     public async Task<IActionResult> OnGetAsync() =>
-        await requestUser.GetAsync(HttpContext) is not null ? Redirect("/") : Page();
+        await requestUser.GetAsync(HttpContext) is not null ? Redirect(Next()) : Page();
 
     public async Task<IActionResult> OnPostAsync()
     {
@@ -25,7 +33,7 @@ public sealed class LoginModel(Auth auth, RequestUser requestUser) : PageModel
             return Page();
         }
         RequestUser.SetCookie(HttpContext, await auth.CreateSessionAsync(userId.Value));
-        return Redirect("/");
+        return Redirect(Next());
     }
 
     /// <summary>

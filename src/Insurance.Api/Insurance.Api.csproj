@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The HTTP API, /api/v1 (ADR 0001/0004): endpoints, DTO mapping, ProblemDetails, OpenAPI. No SQL and no financial formula here; it
+       sees the Application's ports only, never Infrastructure (the host composes them). -->
+  <PropertyGroup>
+    <RootNamespace>Insurance.Api</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Insurance.Application\Insurance.Application.csproj" />
+    <ProjectReference Include="..\Insurance.Domain\Insurance.Domain.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+  </ItemGroup>
+</Project>

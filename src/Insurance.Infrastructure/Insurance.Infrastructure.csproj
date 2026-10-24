@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Adapters behind the Application's ports (ADR 0001/0002): Dapper + SqlClient queries and repositories. Moved here from Application
+       module by module; what is still in Application is listed in docs/architecture/route-map.md. -->
+  <PropertyGroup>
+    <RootNamespace>Insurance.Infrastructure</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Insurance.Application\Insurance.Application.csproj" />
+    <ProjectReference Include="..\Insurance.Domain\Insurance.Domain.csproj" />
+  </ItemGroup>
+</Project>

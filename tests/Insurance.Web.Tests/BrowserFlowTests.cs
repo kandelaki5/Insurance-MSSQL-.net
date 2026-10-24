@@ -207,7 +207,7 @@ public sealed class BrowserFlowTests(BrowserApp app) : IClassFixture<BrowserApp>
         var cells = await coverage.Locator("td").AllInnerTextsAsync();
         Assert.Equal(["400.00", "400.00", "320.00"], cells.TakeLast(3));
         // The list's rows come late on purpose (as on a slow server, CI run 40014359740): the test reads them once drawn.
-        await head.RouteAsync("**/policies?*handler=Data*", async route => { await Task.Delay(1500); await route.ContinueAsync(); });
+        await head.RouteAsync("**/api/v1/policies?*", async route => { await Task.Delay(1500); await route.ContinueAsync(); });
         await head.GotoAsync(app.BaseUrl + $"/policies?q={Uri.EscapeDataString(o.Number)}");
         await LoadedAsync(head, o.Number);
         var listed = await head.InnerTextAsync("main");

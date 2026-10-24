@@ -1,5 +1,9 @@
+using Insurance.Api;
 using Insurance.Application;
 using Insurance.Application.Data;
+using Insurance.Application.Ports;
+using Insurance.Infrastructure;
+using Insurance.Web.Identity;
 using Insurance.Application.Services;
 using Insurance.Web.Infrastructure;
 
@@ -15,6 +19,16 @@ builder.Services.AddSingleton<Auth>();
 builder.Services.AddScoped<RequestUser>();
 builder.Services.AddHttpClient();
 builder.Services.AddApplicationServices();
+// The layers (docs/architecture, ADR 0001): the adapters behind the Application's ports and the /api/v1 endpoints, in this one site.
+builder.Services.AddInsuranceInfrastructure();
+builder.Services.AddInsuranceApi();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUserSource, HttpCurrentUserSource>();
+// ADR 0003: the embedded OpenID Connect provider and the API's bearer tokens (Development; elsewhere when configured).
+builder.Services.AddInsuranceIdentity(builder.Environment, builder.Configuration);
+builder.Services.AddSwaggerSecurity(builder.Environment, builder.Configuration);
+builder.Services.AddInsuranceBff(builder.Environment, builder.Configuration);
+if (Bff.Enabled(builder.Environment, builder.Configuration)) builder.Services.Configure<ApiOptions>(o => o.SignInPath = Bff.LoginPath);
 builder.Services.Configure<SanctionsOptions>(builder.Configuration.GetSection("Insurance:Sanctions"));
 
 // Georgian (and every other) text is written as it is, not as &#x...; entities.
@@ -40,7 +54,9 @@ app.UseForwardedHeaders();
 app.RequireHttpsOutsideDevelopment();
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Error");
+    // An unexpected error: the API answers it as problem details with no detail of the error, the pages with the error page.
+    app.UseWhen(c => c.Request.Path.StartsWithSegments(ApiServices.Prefix), api => api.UseExceptionHandler());
+    app.UseWhen(c => !c.Request.Path.StartsWithSegments(ApiServices.Prefix), pages => pages.UseExceptionHandler("/Error"));
     app.UseHsts();
 }
 app.Use(async (context, next) =>
@@ -54,7 +70,13 @@ app.Use(async (context, next) =>
 });
 app.UseStaticFiles();
 app.UseRouting();
+// The OpenID Connect provider's endpoints are authentication request handlers.
+app.UseAuthentication();
+app.UseInsuranceSwaggerUi(app.Environment, app.Configuration);
 app.MapRazorPages();
+app.MapInsuranceIdentity(app.Environment, app.Configuration);
+app.MapInsuranceBff(app.Environment, app.Configuration);
+app.MapInsuranceApi(app.Environment, app.Configuration);
 app.Run();
 
 public partial class Program;

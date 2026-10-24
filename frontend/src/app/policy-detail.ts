@@ -10,12 +10,13 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { DatePipe, DecimalPipe } from '@angular/common';
-import { DemoStore, Policy, statusLabel } from './demo-store';
+import { DatePipe } from '@angular/common';
+import { DemoStore, Policy, PolicyCard, statusLabel } from './demo-store';
+import { MoneyPipe, isZero } from './money';
 import { Icon } from './icon';
 @Component({
   selector: 'policy-detail',
-  imports: [Icon, DatePipe, DecimalPipe],
+  imports: [Icon, DatePipe, MoneyPipe],
   template: `<div class="overlay" (click)="close.emit()"></div>
     <section
       #panel
@@ -45,50 +46,49 @@ import { Icon } from './icon';
           <div class="detail-client">
             <span class="client-avatar large-avatar"><ui-icon name="users" /></span>
             <div>
-              <h3>{{ p.client }}</h3>
+              <h3>{{ p.policyholder }}</h3>
               <p>{{ p.product }}</p>
             </div>
           </div>
           <div class="vehicle-card">
             <span class="icon-tile lavender"><ui-icon name="car" /></span>
             <div>
-              <strong>{{ p.vehicle || '—' }}</strong>
+              <strong>{{ p.objects || '—' }}</strong>
             </div>
           </div>
           <h3 class="detail-section-title">მოქმედების პერიოდი</h3>
           <div class="date-range">
             <div>
-              <span>დაწყება</span><strong>{{ p.from | date: 'dd.MM.yyyy' }}</strong>
+              <span>დაწყება</span><strong>{{ p.effectiveFrom | date: 'dd.MM.yyyy' }}</strong>
             </div>
             <ui-icon name="arrow" />
             <div>
-              <span>დასრულება</span><strong>{{ p.to | date: 'dd.MM.yyyy' }}</strong>
+              <span>დასრულება</span><strong>{{ p.effectiveTo | date: 'dd.MM.yyyy' }}</strong>
             </div>
           </div>
           <h3 class="detail-section-title">პრემია და მიმდინარე ნაშთი</h3>
           <div class="finance-summary">
             <div>
-              <span>სრული პრემია</span
-              ><strong>{{ p.premium | number: '1.2-2' }} {{ p.currency }}</strong>
+              <span>სრული პრემია</span><strong>{{ p.premium | money }} {{ p.currency }}</strong>
             </div>
             <div>
               <span>მიმდინარე გადაუხდელი</span
-              ><strong>{{ p.outstanding | number: '1.2-2' }} {{ p.currency }}</strong>
+              ><strong>{{ p.receivable.outstanding | money }} {{ p.currency }}</strong>
             </div>
             <div>
               <span>ვადაგადაცილებული</span
-              ><strong>{{ p.overdue | number: '1.2-2' }} {{ p.currency }}</strong>
+              ><strong>{{ p.receivable.overdue | money }} {{ p.currency }}</strong>
             </div>
             @if (p.currency !== 'GEL') {
               <div>
                 <span>ნაშთის GEL შეფასება</span
-                ><strong>{{ p.outstandingGel | number: '1.2-2' }} ₾</strong>
+                ><strong>{{ p.receivable.outstandingGel | money }} ₾</strong>
               </div>
             }
-            @if (p.overpaid) {
+            @if (!zero(p.receivable.overpaid)) {
               <div>
                 <span>ზედმეტად ჩათვლილი</span
-                ><strong>{{ p.overpaid | number: '1.2-2' }} {{ p.currency }}</strong>
+                ><strong>{{ p.receivable.overpaid | money }} {{ p.currency }}</strong>
               </div>
             }
           </div>
@@ -111,7 +111,7 @@ import { Icon } from './icon';
                 <div class="ri-split">
                   <div>
                     <span>წილი · {{ c.sharePercent }}%</span
-                    ><strong>{{ c.amountGel | number: '1.2-2' }} ₾</strong>
+                    ><strong>{{ c.amountGel | money }} ₾</strong>
                   </div>
                   <div>
                     <span>{{ c.isCancellation ? 'გაუქმება' : 'დარიცხვა' }}</span
@@ -127,8 +127,7 @@ import { Icon } from './icon';
               <div>
                 <span>{{ i.dueOn | date: 'dd.MM.yyyy' }}</span
                 ><strong
-                  >{{ i.outstanding | number: '1.2-2' }} / {{ i.amount | number: '1.2-2' }}
-                  {{ p.currency }}</strong
+                  >{{ i.outstanding | money }} / {{ i.amount | money }} {{ p.currency }}</strong
                 >
               </div>
             } @empty {
@@ -147,23 +146,23 @@ import { Icon } from './icon';
     </section>`,
 })
 export class PolicyDetail {
-  policy = input.required<Policy>();
+  /** The policy to show: its id and number are enough, the card reads the rest. */
+  policy = input.required<Pick<Policy, 'id' | 'number'>>();
   close = output<void>();
   label = statusLabel;
+  zero = isZero;
   panel = viewChild.required<ElementRef<HTMLElement>>('panel');
   private store = inject(DemoStore);
-  data = signal<any>(null);
+  data = signal<PolicyCard | null>(null);
   error = signal('');
   constructor() {
     effect((onCleanup) => {
       this.data.set(null);
       this.error.set('');
-      const sub = this.store
-        .detail(this.policy().id)
-        .subscribe({
-          next: (p) => this.data.set(p),
-          error: () => this.error.set('პოლისის ბარათი ვერ ჩაიტვირთა.'),
-        });
+      const sub = this.store.detail(this.policy().id).subscribe({
+        next: (p) => this.data.set(p),
+        error: () => this.error.set('პოლისის ბარათი ვერ ჩაიტვირთა.'),
+      });
       onCleanup(() => sub.unsubscribe());
     });
     afterNextRender(() => this.panel().nativeElement.focus());
