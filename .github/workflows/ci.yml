@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          # A throwaway password for the CI container only; it protects nothing outside this job.
+          MSSQL_SA_PASSWORD: Ci_only_Pass_2026!
+        ports: ['1433:1433']
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'Ci_only_Pass_2026!' -Q 'select 1' -b"
+          --health-interval 10s --health-timeout 5s --health-retries 20
+      # The old program's fictional world for the data migration tests (Codex R05).
+      postgres:
+        image: postgres:17
+        env:
+          # A throwaway password for the CI container only.
+          POSTGRES_PASSWORD: Ci_only_Pg_2026
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      INSURANCE_TEST_SQL_MASTER: Server=localhost,1433;User ID=sa;Password=Ci_only_Pass_2026!;TrustServerCertificate=True;Encrypt=True
+      INSURANCE_TEST_PG_WORLD: Host=localhost;Port=5432;Database=insurance_world;Username=postgres;Password=Ci_only_Pg_2026;SSL Mode=Disable
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Angular workspace — clean install and production build
+        # Codex INS-DOTNET-MSSQL-004 A6: frontend/ builds from its lock file into src/Insurance.Web/wwwroot/ui, and the build must be the
+        # committed one, so what the web app serves (and what a deploy copies) is the source's own build.
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+      - name: The committed workspace build is the source's
+        run: git diff --exit-code -- src/Insurance.Web/wwwroot/ui/main.js src/Insurance.Web/wwwroot/ui/styles.css
+      - run: dotnet build --configuration Release
+      - name: The old program's world in PostgreSQL
+        # tests/parity/legacy-world/world.sql: a dump of the world build-world.ts makes with the old program's own code
+        # (fictional data only); restored with the server's own psql, which reads the dump's \restrict lines.
+        run: |
+          docker exec ${{ job.services.postgres.id }} psql -U postgres -v ON_ERROR_STOP=1 -qc "create database insurance_world"
+          docker exec -i ${{ job.services.postgres.id }} psql -U postgres -d insurance_world -v ON_ERROR_STOP=1 -q < tests/parity/legacy-world/world.sql
+      - name: Browser for the browser tests
+        run: pwsh tests/Insurance.Web.Tests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+      - run: dotnet test --configuration Release --no-build --logger "trx" --results-directory TestResults
+      - name: No test skipped
+        # A skipped test is not a passed one: the run fails when any test of any project did not run (Codex R05).
+        run: |
+          python3 - <<'PY'
+          import glob, re, sys
+          bad = []
+          for f in glob.glob('TestResults/*.trx'):
+              c = re.search(r'<Counters [^>]*>', open(f, encoding='utf-8').read()).group(0)
+              n = {k: int(v) for k, v in re.findall(r'(\w+)="(\d+)"', c)}
+              print(f, 'total', n['total'], 'passed', n['passed'], 'failed', n['failed'], 'notExecuted', n['notExecuted'])
+              if n['notExecuted'] or n['failed'] or n['passed'] != n['total']: bad.append(f)
+          if not glob.glob('TestResults/*.trx') or bad: sys.exit('tests not run or not passed: ' + ', '.join(bad))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: TestResults
+      - name: Refuse committed secrets or data files
+        run: |
+          # The only spreadsheets allowed are the regulator's blank templates, each exactly as listed by its hash in
+          # src/Insurance.Domain/Regulatory/Templates/SHA256SUMS; any other spreadsheet, PDF or .env file fails.
+          if git ls-files | grep -E '(^|/)\.env(\.|$)|\.xlsx$|\.xls$|\.pdf$' | grep -v -E '^\.env(\.test)?\.example$' | grep -v -E '^src/Insurance\.Domain/Regulatory/Templates/[^/]+\.xlsx$'; then
+            echo "Secrets or data files must not be committed" && exit 1
+          fi
+          for f in $(git ls-files 'src/Insurance.Domain/Regulatory/Templates/*.xlsx'); do
+            grep -qx "$(sha256sum "$f" | cut -d' ' -f1)  $(basename "$f")" src/Insurance.Domain/Regulatory/Templates/SHA256SUMS || { echo "Not a listed blank template: $f" && exit 1; }
+          done
+
+  # The rules that need no database, on Windows with Georgian regional settings and Tbilisi time (Codex R04): the same
+  # answers as on Linux, whatever the system's time-zone data, culture or case tables.
+  windows-domain:
+    runs-on: windows-latest
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Georgian regional settings and Tbilisi time
+        shell: pwsh
+        run: |
+          tzutil /s "Georgian Standard Time"
+          Set-Culture ka-GE
+          Set-WinSystemLocale ka-GE
+          tzutil /g
+      - run: dotnet test tests/Insurance.Domain.Tests --configuration Release --logger "trx" --results-directory TestResults
+      - name: No test skipped
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem TestResults -Filter *.trx
+          if (-not $files) { throw 'no test results' }
+          foreach ($f in $files) {
+            $c = ([xml](Get-Content $f.FullName -Raw)).TestRun.ResultSummary.Counters
+            "$($f.Name) total $($c.total) passed $($c.passed) failed $($c.failed) notExecuted $($c.notExecuted)"
+            if ([int]$c.notExecuted -ne 0 -or [int]$c.failed -ne 0 -or $c.passed -ne $c.total) { throw "tests not run or not passed: $($f.Name)" }
+          }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-windows
+          path: TestResults

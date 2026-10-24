@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <PackageReference Include="Xunit.SkippableFact" Version="1.5.23" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Insurance.Application\Insurance.Application.csproj" />
+    <ProjectReference Include="..\..\src\Insurance.Tools\Insurance.Tools.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\database\postgres\*.sql" LinkBase="postgres" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\parity\cases\common.json" Link="parity\common.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The S3 report parity worlds (tests/parity/generate/reports.ts): rows and the old reports over them. -->
+    <None Include="..\parity\cases\reports.json" Link="parity\reports.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

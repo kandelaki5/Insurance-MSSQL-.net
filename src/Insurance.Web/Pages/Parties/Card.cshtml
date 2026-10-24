@@ -1,0 +1,406 @@
+@page "/parties/{id}"
+@model Insurance.Web.Pages.Parties.CardModel
+@using System.Globalization
+@using Insurance.Application.Services
+@using Insurance.Domain.Common
+@using Insurance.Domain.Finance
+@{
+    ViewData["Title"] = Model.DisplayName;
+    var t = Ka.Party.RiskCard.FactorNames;
+    var level = Model.Level;
+    string Dd(string iso) => Fmt.Date(Dates.ParseIsoDate(iso));
+    var ownerValues = Model.OwnerValues;
+    string Ov(string name) => ownerValues.GetValueOrDefault(name) ?? "";
+}
+@functions {
+    private static Microsoft.AspNetCore.Html.IHtmlContent ErrorOf(IReadOnlyDictionary<string, string> errors, string name) =>
+        errors.TryGetValue(name, out var message) ? new Microsoft.AspNetCore.Html.HtmlString($"<div class=\"field-error\">{System.Net.WebUtility.HtmlEncode(message)}</div>") : Microsoft.AspNetCore.Html.HtmlString.Empty;
+}
+<h1>
+    @Model.DisplayName <span class="badge">@Ka.Party.Segment.GetValueOrDefault(Model.Segment)</span>
+    @if (level is not null)
+    {
+        <span class="badge @level">@Ka.Party.Risk.GetValueOrDefault(level)</span>
+    }
+    else
+    {
+        <span class="badge warn">@Ka.Party.RiskCard.NotAssessed</span>
+    }
+    @if (Model.ReviewState == "overdue")
+    {
+        <span class="badge high" style="margin-left: 6px">@Ka.Party.RiskCard.Overdue</span>
+    }
+    @if (Model.ReviewState == "soon")
+    {
+        <span class="badge warn" style="margin-left: 6px">@Ka.Party.RiskCard.DueSoon</span>
+    }
+    @if (Model.SanctionsBlocked)
+    {
+        <span class="badge high" style="margin-left: 6px">@SanctionsTexts.Blocked</span>
+    }
+    @if (Model.Suspension is not null)
+    {
+        <span class="badge high" style="margin-left: 6px">@AmlTexts.Suspension.Active</span>
+    }
+</h1>
+@if (!string.IsNullOrEmpty(Model.SavedFlag))
+{
+    <div class="alert ok">@Ka.Party.Saved</div>
+}
+@if (!string.IsNullOrEmpty(Model.Screened))
+{
+    <div class="alert @(JsNumber.Parse(Model.Hits ?? "NaN") > 0 ? "warn" : "ok")">@SanctionsTexts.Screen.Done: @SanctionsTexts.Screen.Screened @Model.Screened, @SanctionsTexts.Screen.Hits @(Model.Hits)@if (Model.Reused is { Length: > 0 } reusedCount && reusedCount != "0") { @($", {SanctionsTexts.Screen.Reused} {reusedCount}") }</div>
+}
+<partial name="_PartyForm" model="Model.PartyFormModel" />
+
+@if (Model.Kyc is { } kyc)
+{
+    <h2 class="section">@Ka.Party.Kyc.Title</h2>
+    <p class="note">@Ka.Party.Kyc.Note</p>
+    <div class="card">
+        <dl class="facts">
+            <div><dt>@Ka.Party.Kyc.Tier</dt><dd><strong>@Ka.Party.Kyc.Tiers.GetValueOrDefault(kyc.Status.Tier.ToSnakeCode())</strong></dd></div>
+            <div><dt>@Ka.Party.Kyc.AnnualPremium</dt><dd>@Fmt.Fixed(kyc.Input.AnnualPremiumGel, 2)</dd></div>
+            <div><dt>@Ka.Party.Kyc.NextThreshold</dt><dd>@(kyc.Status.NextThresholdGel is { } next ? next.ToString("#,0.###", CultureInfo.InvariantCulture) : "—")</dd></div>
+            <div><dt>@Ka.Party.Kyc.RelationshipFrom</dt><dd>@(kyc.Input.RelationshipFrom is { } from ? Fmt.Date(from) : "—")</dd></div>
+            @if (kyc.Status.OwnerVerificationDueOn is { } due)
+            {
+                <div><dt>@Ka.Party.Kyc.OwnerDue</dt><dd>@Fmt.Date(due)</dd></div>
+            }
+            <div class="wide">
+                <dd>
+                    @if (kyc.Status.Issues.Count == 0)
+                    {
+                        <span class="badge low">@Ka.Party.Kyc.Complete</span>
+                    }
+                    else
+                    {
+                        foreach (var issue in kyc.Status.Issues)
+                        {
+                            var code = issue.ToSnakeCode();
+                            <span class="badge @(code.EndsWith("overdue", StringComparison.Ordinal) ? "high" : "warn")" style="margin-right: 6px; margin-bottom: 4px">@Ka.Party.Kyc.Issues.GetValueOrDefault(code)</span>
+                        }
+                    }
+                </dd>
+            </div>
+        </dl>
+    </div>
+
+    @if (Model.Kind == "organization")
+    {
+        <h2 class="section">@Ka.Party.Owners.Title</h2>
+        <p class="note">@Ka.Party.Owners.Note</p>
+        @if (kyc.Owners.Count == 0)
+        {
+            <div class="card empty">@Ka.Party.Owners.None</div>
+        }
+        else
+        {
+            <table>
+                <thead>
+                <tr>
+                    <th>@Ka.Party.Fields["displayName"]</th>
+                    <th>@Ka.Party.Owners.PersonalNumber</th>
+                    <th>@Ka.Party.Owners.Criterion</th>
+                    <th class="num">@Ka.Party.Owners.SharePercent</th>
+                    <th>@Ka.Party.Owners.DocumentNumber</th>
+                    <th>@Ka.Party.Fields["identifiedAt"]</th>
+                    <th>@Ka.Party.Fields["verifiedAt"]</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var o in kyc.Owners)
+                {
+                    <tr>
+                        <td>
+                            @o.LastName @o.FirstName
+                            @if (o.IsPep)
+                            {
+                                <span class="badge high" style="margin-left: 6px">@Ka.Party.Fields["isPep"]</span>
+                            }
+                            @if (o.IsNominee)
+                            {
+                                <span class="badge warn" style="margin-left: 6px">@Ka.Party.Owners.IsNominee</span>
+                            }
+                            @if (!o.IsDirect)
+                            {
+                                <span class="badge" style="margin-left: 6px">@Ka.Party.Owners.IsIndirect</span>
+                            }
+                        </td>
+                        <td>@(o.PersonalNumber ?? "—")@(o.Citizenship is { Length: > 0 } cz ? $" ({cz})" : "")</td>
+                        <td>@Ka.Party.Owners.Criteria.GetValueOrDefault(o.Criterion)</td>
+                        <td class="num">@(o.SharePercent is { } sp ? Fmt.Plain(sp) : "")</td>
+                        <td>
+                            @(o.DocumentNumber ?? "—")@(o.DocumentCountry is { Length: > 0 } dc ? $" ({dc})" : "")
+                            @if (o.DocumentValidTo is { } validTo && validTo < Model.Today)
+                            {
+                                <span class="badge high" style="margin-left: 6px">@Ka.Party.Owners.DocumentExpired</span>
+                            }
+                        </td>
+                        <td>@(o.IdentifiedAt is { } ia ? Fmt.Date(ia) : "—")</td>
+                        <td>@(o.VerifiedAt is { } va ? Fmt.Date(va) + (o.VerificationSource is { Length: > 0 } vs ? $" · {vs}" : "") : "—")</td>
+                        <td>
+                            @if (Model.Me.CanWrite)
+                            {
+                                <form method="post" asp-page-handler="OwnerUpdate" class="row-actions">
+                                    <input type="hidden" name="id" value="@o.Id" />
+                                    <input type="hidden" name="party_id" value="@Model.Id" />
+                                    @if (o.VerifiedAt is null)
+                                    {
+                                        <input name="verification_source" placeholder="@Ka.Party.Owners.VerificationSource" style="width: 160px" />
+                                        <button class="btn secondary" name="action" value="verify">@Ka.Party.Owners.Verify</button>
+                                    }
+                                    <button class="btn secondary" name="action" value="remove">@Ka.Party.Owners.Remove</button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+        @if (Model.Me.CanWrite)
+        {
+            async Task OwnerText(string name, string label, string type = "text", string? cls = null)
+            {
+                <div class="@cls">
+                    <label for="owner_@name">@label</label>
+                    @if (type == "date")
+                    {
+                        <date-input id="owner_@name" name="@name" value="@Ov(name)" min="1900-01-01" max="2100-12-31" />
+                    }
+                    else
+                    {
+                        <input id="owner_@name" name="@name" type="@type" value="@Ov(name)" />
+                    }
+                    @ErrorOf(Model.OwnerErrors, name)
+                </div>
+            }
+            async Task OwnerCheck(string name, string label)
+            {
+                <div class="check">
+                    <input id="owner_@name" name="@name" type="checkbox" checked="@(Ov(name) == "on")" />
+                    <label for="owner_@name">@label</label>
+                </div>
+            }
+            var criterion = ownerValues.GetValueOrDefault("criterion") ?? "share";
+            <form method="post" asp-page-handler="Owner" class="card">
+                <h3>@Ka.Party.Owners.Add</h3>
+                @if (Model.OwnerMessage is not null)
+                {
+                    <div class="alert ok">@Model.OwnerMessage</div>
+                }
+                <input type="hidden" name="party_id" value="@Model.Id" />
+                <div class="grid">
+                    @{
+                        await OwnerText("last_name", Ka.Party.Fields["lastName"]);
+                        await OwnerText("first_name", Ka.Party.Fields["firstName"]);
+                        await OwnerText("birth_date", Ka.Party.Fields["birthDate"], "date");
+                        await OwnerText("personal_number", Ka.Party.Owners.PersonalNumber);
+                        await OwnerText("citizenship", Ka.Party.Owners.Citizenship);
+                        await OwnerText("birth_place", Ka.Party.Owners.BirthPlace);
+                        await OwnerText("document_number", Ka.Party.Owners.DocumentNumber);
+                        await OwnerText("document_issued_on", Ka.Party.Owners.DocumentIssuedOn, "date");
+                        await OwnerText("document_country", Ka.Party.Owners.DocumentCountry);
+                        await OwnerText("document_issuer", Ka.Party.Owners.DocumentIssuer);
+                        await OwnerText("document_valid_to", Ka.Party.Owners.DocumentValidTo, "date");
+                    }
+                    <div>
+                        <label for="owner_criterion">@Ka.Party.Owners.Criterion</label>
+                        <select id="owner_criterion" name="criterion">
+                            @foreach (var (value, title) in Ka.Party.Owners.Criteria)
+                            {
+                                <option value="@value" selected="@(value == criterion)">@title</option>
+                            }
+                        </select>
+                    </div>
+                    @{
+                        await OwnerText("share_percent", Ka.Party.Owners.SharePercent, "number");
+                        await OwnerText("identified_at", Ka.Party.Fields["identifiedAt"], "date");
+                        await OwnerText("verified_at", Ka.Party.Fields["verifiedAt"], "date");
+                        await OwnerText("verification_source", Ka.Party.Owners.VerificationSource);
+                        await OwnerText("sanctions_checked_at", Ka.Party.Fields["sanctionsCheckedAt"], "date");
+                        await OwnerCheck("is_indirect", Ka.Party.Owners.IsIndirect);
+                        await OwnerCheck("is_nominee", Ka.Party.Owners.IsNominee);
+                        await OwnerCheck("is_pep", Ka.Party.Fields["isPep"]);
+                        await OwnerText("note", Ka.Party.Owners.NoteField, "text", "wide");
+                    }
+                </div>
+                <div class="toolbar" style="margin-top: 12px; margin-bottom: 0">
+                    <button class="btn">@Ka.Party.Owners.Save</button>
+                </div>
+            </form>
+        }
+    }
+}
+
+@if (Model.ComplianceRole)
+{
+    <h2 class="section">@SanctionsTexts.Title</h2>
+    <div class="card">
+        <div class="row-actions">
+            <span>@SanctionsTexts.Last: @(Model.ScreeningRows.Count > 0 ? $"{Model.ScreeningRows[0].ScreenedAt} — {SanctionsTexts.Outcomes.GetValueOrDefault(Model.ScreeningRows[0].Outcome)}" : SanctionsTexts.Never)</span>
+            @if (Model.Me.CanWrite)
+            {
+                <form method="post" asp-page-handler="Screen">
+                    <input type="hidden" name="party_id" value="@Model.Id" />
+                    <button class="btn secondary">@SanctionsTexts.Screen.One</button>
+                </form>
+            }
+        </div>
+    </div>
+    @if (Model.ScreeningRows.Count > 0)
+    {
+        <h3>@SanctionsTexts.History</h3>
+        <partial name="/Pages/Compliance/_ScreeningTable.cshtml" model="Model.ScreeningTable" />
+    }
+
+    <partial name="/Pages/Compliance/_SuspensionSection.cshtml" model="Model.SuspensionSection" />
+    @if (Aml.IsComplianceRole(Model.Me))
+    {
+        <div class="toolbar" style="margin-top: 10px">
+            <a class="btn secondary" href="/compliance/aml-cases/new?party=@Uri.EscapeDataString(Model.IdNumberForCase)">@AmlTexts.Cases.New</a>
+        </div>
+    }
+}
+
+<h2 class="section">@Ka.Party.RiskCard.Title</h2>
+<p class="note">@Ka.Party.RiskCard.Note</p>
+@if (Model.Risk is { } risk)
+{
+    var computedLevel = risk.Assessment.Level.ToSnakeCode();
+    <div class="card">
+        <dl class="facts">
+            <div>
+                <dt>@Ka.Party.RiskCard.Current</dt>
+                <dd>@(level is not null ? Ka.Party.Risk.GetValueOrDefault(level) : Ka.Party.RiskCard.NotAssessed)@(Model.RiskAssessedOn is { } assessed ? $" ({Dd(assessed)})" : "")</dd>
+            </div>
+            <div><dt>@Ka.Party.RiskCard.ReviewDue</dt><dd>@(Model.ReviewOn is { } rv ? Fmt.Date(rv) : "—")</dd></div>
+            <div><dt>@Ka.Party.RiskCard.Computed</dt><dd><span class="badge @computedLevel">@Ka.Party.Risk.GetValueOrDefault(computedLevel)</span> (@Ka.Party.RiskCard.Score: @risk.Assessment.Score)</dd></div>
+            <div><dt>@Ka.Party.RiskCard.AnnualPremium</dt><dd>@Fmt.Fixed(risk.Facts.AnnualPremiumGel, 2)</dd></div>
+            <div><dt>@Ka.Party.RiskCard.PreviousYearPremium</dt><dd>@Fmt.Fixed(risk.Facts.PreviousYearPremiumGel, 2)</dd></div>
+            <div class="wide">
+                <dt>@Ka.Party.RiskCard.Factors</dt>
+                <dd>
+                    @if (risk.Assessment.Factors.Count == 0)
+                    {
+                        @Ka.Party.RiskCard.NoFactors
+                    }
+                    else
+                    {
+                        <ul class="changes">
+                            @foreach (var factor in risk.Assessment.Factors)
+                            {
+                                var code = factor.Code.ToSnakeCode();
+                                <li>@(t.GetValueOrDefault(code) ?? code) (@(factor.Points > 0 ? "+" : "")@factor.Points@(factor.Decisive ? " — " + Ka.Party.Risk["high"] : ""))</li>
+                            }
+                        </ul>
+                    }
+                </dd>
+            </div>
+        </dl>
+        @if (Model.Me.CanWrite)
+        {
+            <div style="margin-top: 14px">
+                <form method="post" asp-page-handler="Risk">
+                    @if (Model.RiskMessage is not null)
+                    {
+                        <div class="alert @(Model.RiskErrors.ContainsKey("level") ? "error" : "ok")">@Model.RiskMessage</div>
+                    }
+                    <input type="hidden" name="party_id" value="@Model.Id" />
+                    <div class="toolbar" style="margin-bottom: 10px">
+                        <button class="btn" name="mode" value="accept">@Ka.Party.RiskCard.Accept</button>
+                    </div>
+                    <div class="grid">
+                        <div>
+                            <label for="level">@Ka.Party.RiskCard.OverrideLevel</label>
+                            <select id="level" name="level">
+                                <option value="" selected>—</option>
+                                @foreach (var (value, title) in Ka.Party.Risk)
+                                {
+                                    if (value == computedLevel) continue;
+                                    <option value="@value">@title</option>
+                                }
+                            </select>
+                            @ErrorOf(Model.RiskErrors, "level")
+                        </div>
+                        <div class="wide">
+                            <label for="reason">@Ka.Party.RiskCard.OverrideReason</label>
+                            <input id="reason" name="reason" type="text" />
+                            @ErrorOf(Model.RiskErrors, "reason")
+                        </div>
+                    </div>
+                    <div class="toolbar" style="margin-top: 10px; margin-bottom: 0">
+                        <button class="btn secondary" name="mode" value="override">@Ka.Party.RiskCard.Override</button>
+                    </div>
+                </form>
+            </div>
+        }
+    </div>
+}
+@if (Model.Assessments.Count > 0)
+{
+    <h3>@Ka.Party.RiskCard.History</h3>
+    <table>
+        <thead>
+        <tr>
+            <th>@Ka.Party.Fields["riskAssessedOn"]</th>
+            <th>@Ka.Audit.User</th>
+            <th>@Ka.Party.RiskCard.Computed</th>
+            <th>@Ka.Party.Fields["riskLevel"]</th>
+            <th>@Ka.Party.RiskCard.Factors</th>
+            <th>@Ka.Party.RiskCard.OverrideReason</th>
+            <th>@Ka.Party.RiskCard.ReviewDue</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var a in Model.Assessments)
+        {
+            var names = string.Join("; ", PartyRisk.FactorCodes(a.Factors).Select(c => t.GetValueOrDefault(c) ?? c));
+            <tr>
+                <td>@Fmt.Date(a.AssessedOn)</td>
+                <td>@(a.UserName ?? Ka.Audit.System)</td>
+                <td>@Ka.Party.Risk.GetValueOrDefault(a.ComputedLevel) (@a.Score)</td>
+                <td><span class="badge @a.Level">@Ka.Party.Risk.GetValueOrDefault(a.Level)</span> @(a.IsOverride ? Ka.Party.RiskCard.Manual : Ka.Party.RiskCard.ByRules)</td>
+                <td>@(names == "" ? "—" : names)</td>
+                <td>@(a.Reason ?? "—")</td>
+                <td>@Fmt.Date(a.ReviewDueOn)</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+<h2>@Ka.Party.Sections.History</h2>
+<table>
+    <thead>
+    <tr>
+        <th>@Ka.Audit.At</th>
+        <th>@Ka.Audit.User</th>
+        <th>@Ka.Audit.Action</th>
+        <th>@Ka.Audit.Changes</th>
+    </tr>
+    </thead>
+    <tbody>
+    @foreach (var row in Model.History)
+    {
+        <tr>
+            <td>@row.At</td>
+            <td>@(row.UserName ?? Ka.Audit.System)</td>
+            <td>@Ka.Audit.Actions.GetValueOrDefault(row.Action)</td>
+            <td>
+                @if (row.Action == "update")
+                {
+                    <ul class="changes">
+                        @foreach (var c in Insurance.Web.Pages.Parties.CardModel.Changes(row))
+                        {
+                            <li>@c.Label: <span class="old">@c.From</span> → @c.To</li>
+                        }
+                    </ul>
+                }
+            </td>
+        </tr>
+    }
+    </tbody>
+</table>

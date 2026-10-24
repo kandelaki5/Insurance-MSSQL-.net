@@ -1,0 +1,123 @@
+@page "/settings"
+@model Insurance.Web.Pages.Settings.IndexModel
+@using Insurance.Application.Texts.Screens
+@using Insurance.Domain.Common
+@{
+    ViewData["Title"] = Ka.Nav.Settings;
+    var invalid = Model.HttpContext.Request.Query["invalid"].Count == 1 ? Model.HttpContext.Request.Query["invalid"][0] : null;
+    var saved = Model.HttpContext.Request.Query["saved"].Count == 1 ? Model.HttpContext.Request.Query["saved"][0] : null;
+    var seriesAnswer = Model.HttpContext.Request.Query["series"].Count == 1 ? Model.HttpContext.Request.Query["series"][0] : null;
+    var problem = Model.HttpContext.Request.Query["problem"].Count == 1 ? Model.HttpContext.Request.Query["problem"][0] : null;
+    var other = Model.HttpContext.Request.Query["other"].Count == 1 ? Model.HttpContext.Request.Query["other"][0] : null;
+    var failed = !string.IsNullOrEmpty(problem) ? Model.SeriesRows.FirstOrDefault(s => s.Code == seriesAnswer) : null;
+    var alike = problem == "kind" ? Model.SeriesRows.FirstOrDefault(s => s.Code == other) : null;
+    var labels = SettingKeys.Labels;
+    var keys = labels.Keys.ToList();
+    var groups = new[]
+    {
+        (Ka.Settings.Company, keys.Where(k => !k.StartsWith("aml.", StringComparison.Ordinal) && !k.StartsWith("accounting.", StringComparison.Ordinal) && !k.StartsWith("policy.", StringComparison.Ordinal) && !k.StartsWith("payment.", StringComparison.Ordinal) && !k.StartsWith("claim.", StringComparison.Ordinal)).ToList()),
+        (Ka.Settings.Policy, keys.Where(k => k.StartsWith("policy.", StringComparison.Ordinal)).ToList()),
+        (ClaimTexts.Title, keys.Where(k => k.StartsWith("claim.", StringComparison.Ordinal)).ToList()),
+        (Ka.Settings.Aml, keys.Where(k => k.StartsWith("aml.", StringComparison.Ordinal)).ToList()),
+        (Ka.Settings.Accounting, keys.Where(k => k.StartsWith("accounting.", StringComparison.Ordinal) || k.StartsWith("payment.", StringComparison.Ordinal)).ToList()),
+    };
+}
+<h1>@Ka.Nav.Settings</h1>
+<p class="note">@Ka.Settings.Note</p>
+@if (invalid is not null && SettingKeys.PhoneKeys.Contains(invalid))
+{
+    <div class="alert error">@labels[invalid]: @Ka.Party.Errors.Phone. @Ka.Settings.NotSaved</div>
+}
+@if (invalid is not null && SettingKeys.DayKeys.Contains(invalid))
+{
+    <div class="alert error">@labels[invalid]: @Ka.Settings.InvalidDays. @Ka.Settings.NotSaved</div>
+}
+@if (invalid is not null && SettingKeys.AmountKeys.Contains(invalid))
+{
+    <div class="alert error">@labels[invalid]: @Ka.Settings.InvalidAmount. @Ka.Settings.NotSaved</div>
+}
+@if (invalid is not null && SettingKeys.ChoiceKeys.ContainsKey(invalid))
+{
+    <div class="alert error">@labels[invalid]: @Ka.Settings.InvalidChoice. @Ka.Settings.NotSaved</div>
+}
+@if (!string.IsNullOrEmpty(saved))
+{
+    <div class="alert ok">@Ka.Settings.Saved</div>
+}
+@if (seriesAnswer == "saved")
+{
+    <div class="alert ok">@Ka.Settings.Numbering.Saved</div>
+}
+@if (failed is not null && !string.IsNullOrEmpty(problem))
+{
+    <div class="alert error">@Model.Label(failed): @(Ka.Settings.Numbering.Problems.GetValueOrDefault(problem) ?? problem)@(alike is not null ? $": {Model.Label(alike)} ({(alike.Prefix == "" ? "—" : alike.Prefix)}, {Ka.Settings.Numbering.Digits}: {alike.Padding}). {Ka.Settings.Numbering.KindHint}" : ""). @Ka.Settings.NotSaved</div>
+}
+<form method="post" asp-page-handler="SaveSettings">
+    @foreach (var (title, groupKeys) in groups)
+    {
+        <div class="card">
+            <h2>@title</h2>
+            <div class="grid">
+                @foreach (var key in groupKeys)
+                {
+                    var wide = key.EndsWith("address", StringComparison.Ordinal) || key.StartsWith("complaints_c", StringComparison.Ordinal) || key.EndsWith("countries", StringComparison.Ordinal);
+                    var stored = Model.Stored.GetValueOrDefault(key);
+                    <div class="@(wide ? "wide" : null)">
+                        <label for="@key">@labels[key]</label>
+                        @if (SettingKeys.PhoneKeys.Contains(key))
+                        {
+                            var phone = Phone.SplitPhone(stored);
+                            <div style="display: flex; gap: 6px">
+                                <input id="@(key)_code" name="@(key)_code" type="text" inputmode="tel" aria-label="@Ka.Party.Fields["phoneCode"]" style="width: 72px" value="@phone.Code" />
+                                <input id="@key" name="@key" type="tel" inputmode="tel" value="@phone.Number" />
+                            </div>
+                        }
+                        else if (SettingKeys.ChoiceKeys.TryGetValue(key, out var choices))
+                        {
+                            var current = stored ?? choices[0];
+                            <select id="@key" name="@key">
+                                @foreach (var value in choices)
+                                {
+                                    <option value="@value" selected="@(value == current)">@(Ka.Settings.Choices.GetValueOrDefault(key)?.GetValueOrDefault(value) ?? value)</option>
+                                }
+                            </select>
+                        }
+                        else
+                        {
+                            <input id="@key" name="@key" type="text" inputmode="@(SettingKeys.DayKeys.Contains(key) ? "numeric" : SettingKeys.AmountKeys.Contains(key) ? "decimal" : null)"
+                                   value="@(stored ?? "")" placeholder="@(SettingKeys.DayKeys.Contains(key) ? CloseDeadline.DefaultCloseWithinDays.ToString(System.Globalization.CultureInfo.InvariantCulture) : null)" />
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    <div class="toolbar">
+        <button class="btn">@Ka.Common.Save</button>
+    </div>
+</form>
+<form method="post" asp-page-handler="SaveNumberSeries">
+    <div class="card">
+        <h2>@Ka.Settings.Numbering.Title</h2>
+        <p class="note">@Ka.Settings.Numbering.Note</p>
+        <table>
+            <thead>
+            <tr><th>@Ka.Settings.Numbering.Series</th><th>@Ka.Settings.Numbering.Prefix</th><th>@Ka.Settings.Numbering.Digits</th><th>@Ka.Settings.Numbering.Next</th></tr>
+            </thead>
+            <tbody>
+            @foreach (var s in Model.SeriesRows)
+            {
+                <tr>
+                    <td><label for="prefix:@s.Code">@Model.Label(s)</label></td>
+                    <td><input id="prefix:@s.Code" name="prefix:@s.Code" type="text" value="@s.Prefix" maxlength="10" style="width: 110px" /></td>
+                    <td><input name="digits:@s.Code" type="number" min="1" max="12" value="@s.Padding" aria-label="@Model.Label(s) — @Ka.Settings.Numbering.Digits" style="width: 70px" /></td>
+                    <td>@(Numbering.FormatNumber(s.Prefix, s.Padding, s.NextValue) ?? "—")</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        <div class="toolbar">
+            <button class="btn">@Ka.Settings.Numbering.Save</button>
+        </div>
+    </div>
+</form>

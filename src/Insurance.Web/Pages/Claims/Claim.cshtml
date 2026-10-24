@@ -1,0 +1,577 @@
+@page "/claims/{id:guid}"
+@model Insurance.Web.Pages.Claims.ClaimModel
+@using F = Insurance.Application.Texts.ClaimTexts.Fields
+@using A = Insurance.Application.Texts.ClaimTexts.Actions
+@using PR = Insurance.Application.Texts.ClaimTexts.PaymentRequests
+@using RR = Insurance.Application.Texts.ClaimTexts.ReserveRequests
+@using RI = Insurance.Application.Texts.ReinsuranceTexts.ClaimShare
+@using Insurance.Application.Services
+@{
+    var d = Model.Data;
+    var claim = d.Claim;
+    var cur = Model.Currency;
+    var id = Model.Id;
+    ViewData["Title"] = $"{d.Event?.Number ?? claim.Number} · {claim.ClassCode}";
+    var classes = d.Parts.Select(p => p.ClassCode).Distinct().Count();
+    var reserveFlag = Model.Flag("reserve");
+    var paymentFlag = Model.Flag("payment");
+    var reversalFlag = Model.Flag("reversal");
+    var today = Fmt.Iso(Model.Today);
+}
+<h1>
+    @(d.Event?.Number ?? claim.Number) · @claim.ClassCode <span class="badge @ClaimModel.Badge(claim.Status)">@ClaimTexts.Status.GetValueOrDefault(claim.Status)</span>
+    @if (claim.IsTotalLoss)
+    {
+        <span class="badge high" style="margin-left: 6px">@F.IsTotalLoss</span>
+    }
+</h1>
+@if (!string.IsNullOrEmpty(Model.Flag("registered")))
+{
+    <div class="alert ok">@ClaimTexts.Registered</div>
+}
+@if (!string.IsNullOrEmpty(Model.Flag("paid")))
+{
+    <div class="alert ok">@A.Pay: @Ka.Party.Saved</div>
+}
+@if (Model.Flag("recovery") == "not-allowed")
+{
+    <div class="alert error">@ClaimTexts.RecoveryNotAllowed</div>
+}
+@if (reserveFlag is not null && ClaimTexts.ReserveOutcomes.TryGetValue(reserveFlag, out var reserveText))
+{
+    <div class="alert @(reserveFlag is "requested" or "approved" ? "ok" : "error")">@reserveText</div>
+}
+@if (paymentFlag is not null && ClaimTexts.PaymentOutcomes.TryGetValue(paymentFlag, out var paymentText))
+{
+    <div class="alert @(paymentFlag == "approved" ? "ok" : paymentFlag == "requested" ? "warn" : "error")">@paymentText</div>
+}
+@if (reversalFlag is not null && ClaimTexts.ReversalOutcomes.TryGetValue(reversalFlag, out var reversalText))
+{
+    <div class="alert @(reversalFlag == "ok" ? "ok" : "error")">@reversalText</div>
+}
+@if (claim.Status == "rejected")
+{
+    <div class="alert warn">@F.RejectionReason: @claim.RejectionReason</div>
+}
+
+@if (d.Event is { } ev)
+{
+    <div class="card">
+        <h2>@ClaimTexts.Sections.Event — @ev.Number</h2>
+        <table>
+            <thead>
+            <tr><th>@F.ClassCode</th><th>@F.Coverage</th><th>@F.Status</th><th>@F.CurrentReserve</th><th>@F.PaidTotal</th></tr>
+            </thead>
+            <tbody>
+            @foreach (var p in d.Parts)
+            {
+                <tr>
+                    <td>@p.ClassCode</td>
+                    <td>
+                        @if (p.Id == id)
+                        {
+                            <strong>@(p.Coverage ?? p.ClassCode)</strong>
+                        }
+                        else
+                        {
+                            <a href="/claims/@p.Id">@(p.Coverage ?? p.ClassCode)</a>
+                        }
+                    </td>
+                    <td>@ClaimTexts.Status.GetValueOrDefault(p.Status)</td>
+                    <td>@ClaimModel.Money(p.Reserve) @cur</td>
+                    <td>@ClaimModel.Money(p.Paid) @cur</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        <p class="note">@ClaimTexts.Sections.EventCount(classes)</p>
+        @if (Model.Writable && Model.Open && d.FreeLines.Count > 0)
+        {
+            var addLine = Model.FormValue("coverage", "policy_line_id", "");
+            <form method="post" action="@Model.Action("AddCoverage")" asp-antiforgery="true" class="toolbar" style="align-items: flex-end; flex-wrap: wrap">
+                <input type="hidden" name="claim_id" value="@id" />
+                @if (Model.FormMessage("coverage") is { } coverageMessage)
+                {
+                    <div class="alert error">@coverageMessage</div>
+                }
+                <div>
+                    <label for="add_line">@ClaimTexts.AddCoverage</label>
+                    <select id="add_line" name="policy_line_id" required>
+                        <option value="" selected="@(addLine == "")">—</option>
+                        @foreach (var l in d.FreeLines)
+                        {
+                            <option value="@l.Id" selected="@(addLine == l.Id.ToString())">@l.Name (@l.ClassCode)</option>
+                        }
+                    </select>
+                    @if (Model.FormFieldError("coverage", "policy_line_id") is { } e1) { <div class="field-error">@e1</div> }
+                </div>
+                <div>
+                    <label for="add_reported">@F.ReportedOn</label>
+                    <date-input id="add_reported" name="reported_on" value="@Model.FormValue("coverage", "reported_on", today)" required />
+                    @if (Model.FormFieldError("coverage", "reported_on") is { } e2) { <div class="field-error">@e2</div> }
+                </div>
+                <div>
+                    <label for="add_reserve">@F.InitialReserve, @cur</label>
+                    <input id="add_reserve" name="initial_reserve" type="number" step="0.01" min="0" value="@Model.FormValue("coverage", "initial_reserve", "")" required />
+                    @if (Model.FormFieldError("coverage", "initial_reserve") is { } e3) { <div class="field-error">@e3</div> }
+                </div>
+                <button class="btn secondary">@ClaimTexts.AddCoverage</button>
+            </form>
+        }
+    </div>
+}
+
+<div class="card">
+    <h2>@ClaimTexts.Sections.Facts</h2>
+    <dl class="facts">
+        <div><dt>@F.Policy</dt><dd><a href="/policies/@claim.PolicyId">@claim.PolicyNumber</a> (@PolicyTexts.Status.GetValueOrDefault(claim.PolicyStatus))</dd></div>
+        <div><dt>@F.Policyholder</dt><dd>@claim.Policyholder</dd></div>
+        <div><dt>@F.Object</dt><dd>@claim.Object</dd></div>
+        <div><dt>@F.Coverage</dt><dd>@(claim.Coverage ?? claim.ClassCode) (@claim.ClassCode)</dd></div>
+        <div><dt>@F.SumInsured</dt><dd>@(claim.SumInsured is { } si ? Model.InPolicyCurrency(si, claim.LimitGel) : "—")</dd></div>
+        <div><dt>@F.Deductible</dt><dd>@(claim.Deductible is { } de ? Model.InPolicyCurrency(de, claim.DeductibleGel) : "—")</dd></div>
+        <div><dt>@F.OccurredOn</dt><dd>@Fmt.Date(claim.OccurredOn)@(string.IsNullOrEmpty(claim.OccurredPlace) ? "" : $", {claim.OccurredPlace}")</dd></div>
+        <div><dt>@F.ReportedOn</dt><dd>@Fmt.Date(claim.ReportedOn)</dd></div>
+        <div><dt>@F.ClaimedAmount</dt><dd>@(claim.ClaimedAmount is { } ca ? $"{ClaimModel.Money(ca)} {cur}" : "—")</dd></div>
+        <div class="wide"><dt>@F.Description</dt><dd>@claim.Description</dd></div>
+        <div><dt>@F.CurrentReserve</dt><dd><strong>@ClaimModel.MoneyTetri(Model.ReserveTetri) @cur</strong></dd></div>
+        <div><dt>@F.PaidTotal</dt><dd>@ClaimModel.MoneyTetri(Model.PaidTetri) @cur</dd></div>
+        @if (claim.ApprovedAmount is { } approved)
+        {
+            <div><dt>@F.ApprovedAmount</dt><dd>@ClaimModel.Money(approved) @cur (@F.Deductible: @ClaimModel.Money(claim.DeductibleAmount))</dd></div>
+        }
+        <div class="wide">
+            <dt>@RI.Title</dt>
+            <dd>
+                @if (d.Shares.Count == 0)
+                {
+                    @RI.None
+                }
+                else
+                {
+                    <ul class="changes">
+                        @foreach (var s in d.Shares)
+                        {
+                            <li>
+                                <a href="/reinsurance/treaties/@s.TreatyId">@s.TreatyNumber</a> · @s.TreatyName (@ReinsuranceTexts.Kinds.GetValueOrDefault(ClaimModel.Kind(s.Kind))@(s.Kind != Insurance.Domain.Finance.TreatyKind.ExcessOfLoss ? $", {Fmt.Plain(s.SharePercent)} %" : "")):
+                                @RI.InReserve @ClaimModel.MoneyTetri(s.InReserve) @cur; @RI.InPaid @ClaimModel.MoneyTetri(s.InPaid) @cur
+                            </li>
+                        }
+                    </ul>
+                }
+            </dd>
+        </div>
+    </dl>
+</div>
+
+@if (Model.Writable && Model.Open)
+{
+    <div class="card">
+        <h2>@ClaimTexts.Sections.Decision</h2>
+        <div class="row-actions">
+            @if (claim.Status == "registered")
+            {
+                <form method="post" action="@Model.Action("Decide")" asp-antiforgery="true">
+                    <input type="hidden" name="claim_id" value="@id" />
+                    <input type="hidden" name="decision" value="review" />
+                    <button class="btn secondary">@A.StartReview</button>
+                </form>
+            }
+            @if (claim.Status is "registered" or "in_review")
+            {
+                <form method="post" action="@Model.Action("Decide")" asp-antiforgery="true" class="inline-form">
+                    <input type="hidden" name="claim_id" value="@id" />
+                    <input type="hidden" name="decision" value="approve" />
+                    <input name="approved_amount" type="number" step="0.01" min="0" placeholder="@($"{F.ApprovedAmount}, {cur}")" required value="@ClaimModel.Text(claim.ClaimedAmount)" />
+                    <label class="check" style="padding-top: 0"><input name="is_total_loss" type="checkbox" /> @F.IsTotalLoss</label>
+                    <button class="btn">@A.Approve</button>
+                </form>
+                <form method="post" action="@Model.Action("Decide")" asp-antiforgery="true" class="inline-form">
+                    <input type="hidden" name="claim_id" value="@id" />
+                    <input type="hidden" name="decision" value="reject" />
+                    <input name="rejection_reason" type="text" placeholder="@F.RejectionReason" required />
+                    <button class="btn secondary">@A.Reject</button>
+                </form>
+            }
+            @if (claim.Status is "approved" or "paid")
+            {
+                <form method="post" action="@Model.Action("Decide")" asp-antiforgery="true">
+                    <input type="hidden" name="claim_id" value="@id" />
+                    <input type="hidden" name="decision" value="close" />
+                    <button class="btn secondary">@A.Close</button>
+                </form>
+            }
+        </div>
+    </div>
+}
+@if (Model.Writable && !Model.Open)
+{
+    <form method="post" action="@Model.Action("Decide")" asp-antiforgery="true" class="toolbar">
+        <input type="hidden" name="claim_id" value="@id" />
+        <input type="hidden" name="decision" value="reopen" />
+        <button class="btn secondary">@A.Reopen</button>
+    </form>
+}
+
+@if (!(Model.RecordsPayment && claim.Status is "approved" or "paid" && Model.RemainingTetri > 0) && Model.FormMessage("pay") is { } refusedPay)
+{
+    @* The pay form was sent but is no longer shown (the permission was taken away meanwhile): its answer is still given. *@
+    <div class="alert error">@refusedPay</div>
+}
+@if (Model.RecordsPayment && claim.Status is "approved" or "paid" && Model.RemainingTetri > 0)
+{
+    var payeeKind = Model.FormValue("pay", "payee_kind", "policyholder");
+    var mode = Model.FormValue("pay", "total_loss_mode", "earned_unpaid");
+    <form method="post" action="@Model.Action("PayClaim")" asp-antiforgery="true" class="card">
+        <h2>@A.Pay</h2>
+        <p class="note">@(claim.CrossCurrency ? ClaimTexts.Notes.PaymentGel : ClaimTexts.Notes.Payment)</p>
+        @if (Model.FormMessage("pay") is { } payMessage)
+        {
+            <div class="alert error">@payMessage</div>
+        }
+        <input type="hidden" name="claim_id" value="@id" />
+        <div class="grid">
+            <div>
+                <label for="amount">@F.Amount, @cur</label>
+                <input id="amount" name="amount" type="number" step="0.01" min="0" value="@Model.FormValue("pay", "amount", Billing.TetriText(Model.RemainingTetri))" required />
+                @if (Model.FormFieldError("pay", "amount") is { } e1) { <div class="field-error">@e1</div> }
+            </div>
+            <div>
+                <label for="paid_on">@F.BookedOn</label>
+                <date-input id="paid_on" name="paid_on" value="@Model.FormValue("pay", "paid_on", today)" max="@today" required />
+                @if (Model.FormFieldError("pay", "paid_on") is { } e2) { <div class="field-error">@e2</div> }
+            </div>
+            <div>
+                <label for="payee_kind">@F.Payee</label>
+                <select id="payee_kind" name="payee_kind">
+                    @foreach (var (value, title) in F.PayeeKinds)
+                    {
+                        <option value="@value" selected="@(payeeKind == value)">@title</option>
+                    }
+                </select>
+                @if (Model.FormFieldError("pay", "payee_kind") is { } e3) { <div class="field-error">@e3</div> }
+            </div>
+            <div>
+                <label for="payee_id_number">@F.PayeeIdNumber</label>
+                <input id="payee_id_number" name="payee_id_number" type="text" value="@Model.FormValue("pay", "payee_id_number", "")" />
+                <div class="hint">@ClaimTexts.Notes.Payee</div>
+                @if (Model.FormFieldError("pay", "payee_id_number") is { } e4) { <div class="field-error">@e4</div> }
+            </div>
+            @if (claim.IsTotalLoss)
+            {
+                <div class="wide">
+                    <label for="total_loss_mode">@F.TotalLossMode</label>
+                    <select id="total_loss_mode" name="total_loss_mode">
+                        @foreach (var (value, title) in F.TotalLossModes)
+                        {
+                            <option value="@value" selected="@(mode == value)">@title</option>
+                        }
+                    </select>
+                </div>
+            }
+            else
+            {
+                <div class="check">
+                    <input id="offset_premium" name="offset_premium" type="checkbox" checked="@(Model.FormValue("pay", "offset_premium", "") == "on")" />
+                    <label for="offset_premium">@F.PremiumOffset</label>
+                </div>
+            }
+            <div class="wide">
+                <label for="note">@F.Note</label>
+                <input id="note" name="note" type="text" value="@Model.FormValue("pay", "note", "")" />
+                <div class="hint">@ClaimTexts.Notes.Offset</div>
+            </div>
+        </div>
+        <div class="toolbar" style="margin-top: 14px; margin-bottom: 0">
+            <button class="btn">@A.Pay</button>
+        </div>
+    </form>
+}
+@if (d.PaymentRequests.Count > 0)
+{
+    <div class="card">
+        <h2>@PR.Title</h2>
+        <p class="note">@PR.Note</p>
+        <table>
+            <thead>
+            <tr>
+                <th>@F.BookedOn</th>
+                <th class="num">@PR.Gross, @cur</th>
+                <th class="num">@F.NetPaid, @cur</th>
+                <th class="num">@PR.NetGel</th>
+                <th>@F.Payee</th>
+                <th>@PR.RequestedBy</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var q in d.PaymentRequests)
+            {
+                <tr>
+                    <td>@Fmt.Date(q.PaidOn)</td>
+                    <td class="num">@ClaimModel.Money(q.Amount)</td>
+                    <td class="num">@ClaimModel.Money(q.NetPaid)</td>
+                    <td class="num">@ClaimModel.Money(q.NetPaidGel)</td>
+                    <td>@q.PayeeName</td>
+                    <td>@q.Requester</td>
+                    <td>
+                        @if (q.Approver is { } approver)
+                        {
+                            @PR.Approved(approver)
+                        }
+                        else if (Model.AuthorisesPayment && claim.Status is "approved" or "paid")
+                        {
+                            <form method="post" action="@Model.Action("ApproveClaimPaymentRequest")" asp-antiforgery="true">
+                                <input type="hidden" name="claim_id" value="@id" />
+                                <input type="hidden" name="request_id" value="@q.Id" />
+                                <button class="btn">@PR.Approve</button>
+                            </form>
+                        }
+                        else
+                        {
+                            @PR.Pending
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+
+<h2 class="section">@ClaimTexts.Sections.Reserve</h2>
+<p class="note">@ClaimTexts.Notes.Reserve</p>
+<table style="max-width: 760px">
+    <thead>
+    <tr>
+        <th>@F.BookedOn</th>
+        <th class="num">@F.Change, @cur</th>
+        <th>@F.Reason</th>
+        <th>@Ka.Audit.User</th>
+    </tr>
+    </thead>
+    <tbody>
+    @foreach (var r in d.Reserves)
+    {
+        <tr>
+            <td>@Fmt.Date(r.BookedOn)</td>
+            <td class="num">@ClaimModel.Money(r.Change)</td>
+            <td>@r.Reason</td>
+            <td>@r.UserName</td>
+        </tr>
+    }
+    </tbody>
+</table>
+@if (Model.Writable && Model.Open)
+{
+    <form method="post" action="@Model.Action("ChangeReserve")" asp-antiforgery="true" class="inline-form" style="margin-top: 10px">
+        <input type="hidden" name="claim_id" value="@id" />
+        <date-input name="booked_on" value="@today" max="@today" required />
+        <input name="new_level" type="number" step="0.01" min="0" placeholder="@($"{F.NewLevel}, {cur}")" required />
+        <input name="reason" type="text" placeholder="@F.Reason" required style="width: 260px" />
+        <button class="btn secondary">@A.AddReserve</button>
+    </form>
+}
+<p class="note">@ClaimTexts.Notes.ReserveRequest</p>
+@if (d.ReserveRequests.Count > 0)
+{
+    <h3>@RR.Title</h3>
+    <table style="max-width: 960px">
+        <thead>
+        <tr>
+            <th>@F.BookedOn</th>
+            <th class="num">@RR.From, @cur</th>
+            <th class="num">@RR.To, @cur</th>
+            <th class="num">@F.Change, @cur</th>
+            <th>@F.Reason</th>
+            <th>@RR.RequestedBy</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var q in d.ReserveRequests)
+        {
+            // A pending request goes stale once the reserve moved since it was asked (its base is not the level now).
+            var stale = q.Approver is null && Billing.Tetri(q.BaseLevel) != Model.ReserveTetri;
+            <tr>
+                <td>@Fmt.Date(q.BookedOn)</td>
+                <td class="num">@ClaimModel.Money(q.BaseLevel)</td>
+                <td class="num">@ClaimModel.Money(q.NewLevel)</td>
+                <td class="num">@ClaimModel.Money(q.Change)</td>
+                <td>@q.Reason</td>
+                <td>@q.Requester</td>
+                <td>
+                    @if (q.Approver is { } approver)
+                    {
+                        @RR.Approved(approver)
+                    }
+                    else if (stale)
+                    {
+                        @RR.Stale
+                    }
+                    else if (q.CreatedBy == Model.Me.Id)
+                    {
+                        @RR.Own
+                    }
+                    else if (Model.ApprovesReserve && Model.Open)
+                    {
+                        <form method="post" action="@Model.Action("ApproveReserveRequest")" asp-antiforgery="true">
+                            <input type="hidden" name="claim_id" value="@id" />
+                            <input type="hidden" name="request_id" value="@q.Id" />
+                            <button class="btn">@A.ApproveReserve</button>
+                        </form>
+                    }
+                    else
+                    {
+                        @RR.Pending
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+<h2 class="section">@ClaimTexts.Sections.Payments</h2>
+@if (d.Payments.Count == 0)
+{
+    <div class="card empty">@Ka.Common.NoData</div>
+}
+else
+{
+    <table>
+        <thead>
+        <tr>
+            <th>@F.BookedOn</th>
+            <th class="num">@F.Amount, @cur</th>
+            <th class="num">@F.DeductibleWithheld</th>
+            <th class="num">@F.PremiumOffset</th>
+            <th class="num">@F.NetPaid, @cur</th>
+            <th class="num">@F.NetPaid, ₾</th>
+            <th>@F.Payee</th>
+            <th>@F.PaymentKind</th>
+            <th>@F.Note</th>
+            @if (Model.ReversesPayment)
+            {
+                <th></th>
+            }
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var p in d.Payments)
+        {
+            <tr>
+                <td>@Fmt.Date(p.PaidOn)</td>
+                <td class="num">@ClaimModel.Money(p.Amount)</td>
+                <td class="num">@ClaimModel.Money(p.DeductibleWithheld)</td>
+                <td class="num">
+                    @ClaimModel.Money(p.PremiumOffset)
+                    @if (Model.SetOffConversion(p) is { } conversion)
+                    {
+                        <br /><span class="hint">@conversion</span>
+                    }
+                </td>
+                <td class="num">@ClaimModel.Money(p.NetPaid)</td>
+                <td class="num">@ClaimModel.Money(p.NetPaidGel)</td>
+                <td>@F.PayeeKinds.GetValueOrDefault(p.PayeeKind)@(p.PayeeName is { } pn ? $" — {pn}" : "")</td>
+                <td>
+                    @F.PaymentKinds.GetValueOrDefault(p.Kind)
+                    @if (p.ReversesOn is { } ro)
+                    {
+                        <br />@F.Reverses(Fmt.Date(ro))
+                    }
+                    @if (p.ReversalReason is { } why)
+                    {
+                        <br />@F.ReversalReasons.GetValueOrDefault(why)
+                    }
+                    @if (p.ReturnedOn is { } back)
+                    {
+                        <br />@($"{F.ReturnedOn}: {Fmt.Date(back)}, {F.BankReference}: {p.BankReference}")
+                    }
+                    @if (p.ReversedOn is { } rd)
+                    {
+                        <br />@F.ReversedBy(Fmt.Date(rd))
+                    }
+                </td>
+                <td>@p.Note</td>
+                @if (Model.ReversesPayment)
+                {
+                    <td>
+                        @if (p.Kind == "payment" && p.ReversedOn is null)
+                        {
+                            <details>
+                                <summary>@A.Reverse</summary>
+                                <form method="post" action="@Model.Action("ReverseClaimPayment")" asp-antiforgery="true" class="inline-form">
+                                    <input type="hidden" name="claim_id" value="@id" />
+                                    <input type="hidden" name="claim_payment_id" value="@p.Id" />
+                                    <label>
+                                        @F.ReversalReason
+                                        <select name="reason">
+                                            @foreach (var (value, title) in F.ReversalReasons)
+                                            {
+                                                <option value="@value" selected="@(value == "correction")">@title</option>
+                                            }
+                                        </select>
+                                    </label>
+                                    <label>@F.ReversedOn <date-input name="reversed_on" value="@today" max="@today" required /></label>
+                                    <label>@F.ReturnedOn <date-input name="returned_on" max="@today" /></label>
+                                    <label>@F.BankReference <input name="bank_reference" type="text" maxlength="100" /></label>
+                                    <label>@F.Note <input name="note" type="text" /></label>
+                                    <p class="note">@ClaimTexts.Notes.Reversal</p>
+                                    <button class="btn secondary">@A.Reverse</button>
+                                </form>
+                            </details>
+                        }
+                    </td>
+                }
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+<h2 class="section">@ClaimTexts.Sections.Recoveries</h2>
+@if (d.Recoveries.Count == 0)
+{
+    <div class="card empty">@Ka.Common.NoData</div>
+}
+else
+{
+    <table style="max-width: 760px">
+        <thead>
+        <tr>
+            <th>@F.ReceivedOn</th>
+            <th>@F.RecoveryKind</th>
+            <th class="num">@F.AmountGel</th>
+            <th>@F.Note</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var r in d.Recoveries)
+        {
+            <tr>
+                <td>@Fmt.Date(r.ReceivedOn)</td>
+                <td>@F.RecoveryKinds.GetValueOrDefault(r.Kind)</td>
+                <td class="num">@ClaimModel.Money(r.AmountGel)</td>
+                <td>@r.Note</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+@if (Model.ReceivesRecovery && claim.Status is "approved" or "paid" or "closed")
+{
+    <form method="post" action="@Model.Action("AddRecovery")" asp-antiforgery="true" class="inline-form" style="margin-top: 10px">
+        <input type="hidden" name="claim_id" value="@id" />
+        <select name="kind" style="width: auto">
+            @foreach (var (value, title) in F.RecoveryKinds)
+            {
+                <option value="@value" selected="@(value == "subrogation")">@title</option>
+            }
+        </select>
+        <date-input name="received_on" value="@today" max="@today" required />
+        <input name="amount_gel" type="number" step="0.01" min="0" placeholder="@F.AmountGel" required />
+        <input name="note" type="text" placeholder="@F.Note" />
+        <button class="btn secondary">@A.AddRecovery</button>
+    </form>
+}

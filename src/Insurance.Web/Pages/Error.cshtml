@@ -1,0 +1,15 @@
+@page "/Error"
+@model Insurance.Web.Pages.ErrorModel
+@{
+    Layout = "_Bare";
+}
+<main class="login">
+    <div class="card">
+        <h1>შეცდომა</h1>
+        <p>მოთხოვნა ვერ შესრულდა. სცადეთ თავიდან ან მიმართეთ ადმინისტრატორს.</p>
+        @if (Model.RequestId is not null)
+        {
+            <p class="hint">@Model.RequestId</p>
+        }
+    </div>
+</main>

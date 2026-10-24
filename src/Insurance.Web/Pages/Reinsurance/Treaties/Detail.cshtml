@@ -1,0 +1,88 @@
+@page "/reinsurance/treaties/{id}"
+@model Insurance.Web.Pages.Reinsurance.Treaties.DetailModel
+@{
+    var tr = Model.Tr;
+    ViewData["Title"] = tr.Number;
+    string Money(decimal v) => Billing.GroupedTetri(Billing.Tetri(v));
+    var terms = tr.Kind == "surplus"
+        ? $"{ReinsuranceTexts.Fields.Retention}: {Money(tr.Retention ?? 0)} {tr.Currency}; {ReinsuranceTexts.Fields.Lines}: {tr.Lines}"
+        : tr.Kind == "excess_of_loss"
+            ? $"{ReinsuranceTexts.Fields.Priority}: {Money(tr.Priority ?? 0)} {tr.Currency}; {ReinsuranceTexts.Fields.TreatyLimit}: {(tr.TreatyLimit is { } l ? Money(l) : "∞")}{(tr.TreatyPremium is { } p ? $"; {ReinsuranceTexts.Fields.TreatyPremium}: {Money(p)}" : "")}"
+            : $"{ReinsuranceTexts.Fields.CededPercent.Replace(", %", "")}: {(tr.CededPercent is { } cp ? Fmt.Plain(cp) : "NaN")} %";
+}
+<h1>@tr.Number · @tr.Name <span class="badge @(tr.Status == "active" ? "low" : "")">@ReinsuranceTexts.Statuses.GetValueOrDefault(tr.Status)</span></h1>
+@if (Model.Saved)
+{
+    <div class="alert ok">@ReinsuranceTexts.Saved</div>
+}
+<div class="card">
+    <dl class="facts">
+        <div><dt>@ReinsuranceTexts.Fields.Reinsurer</dt><dd><a href="/parties/@tr.ReinsurerId">@tr.Reinsurer</a></dd></div>
+        <div><dt>@ReinsuranceTexts.Fields.Broker</dt><dd>@(tr.Broker ?? "—")</dd></div>
+        <div><dt>@ReinsuranceTexts.Fields.Kind</dt><dd>@ReinsuranceTexts.Kinds.GetValueOrDefault(tr.Kind)</dd></div>
+        <div><dt>@ReinsuranceTexts.Fields.Period</dt><dd>@Fmt.Date(tr.PeriodFrom) – @Fmt.Date(tr.PeriodTo)</dd></div>
+        <div><dt>@ReinsuranceTexts.Fields.Currency</dt><dd>@tr.Currency</dd></div>
+        <div><dt>@ReinsuranceTexts.Fields.Terms</dt><dd>@terms</dd></div>
+        <div><dt>@ReinsuranceTexts.Fields.CommissionPercent</dt><dd>@Fmt.Plain(tr.CommissionPercent)</dd></div>
+        <div><dt>@ReinsuranceTexts.Fields.BrokerPercent</dt><dd>@Fmt.Plain(tr.BrokerPercent)</dd></div>
+        <div><dt>@ReinsuranceTexts.Fields.ReinsurerRating</dt><dd>@(tr.ReinsurerRating ?? "—") @(string.IsNullOrEmpty(tr.RatingAgency) ? "" : $"({tr.RatingAgency})")</dd></div>
+        <div class="wide"><dt>@ReinsuranceTexts.Fields.Classes</dt><dd>@(tr.Classes ?? "—")</dd></div>
+        @if (!string.IsNullOrEmpty(tr.Note))
+        {
+            <div class="wide"><dt>@ReinsuranceTexts.Fields.Note</dt><dd>@tr.Note</dd></div>
+        }
+    </dl>
+    <div class="row-actions" style="margin-top: 14px">
+        <a class="btn" href="/reinsurance/treaties/@tr.Id/bordereau">@ReinsuranceTexts.Bordereau.Button</a>
+        @if (Model.Me.CanWrite && tr.Status == "active")
+        {
+            <form method="post" asp-page-handler="Close">
+                <input type="hidden" name="id" value="@tr.Id" />
+                <button class="btn secondary">@ReinsuranceTexts.Actions.Close</button>
+            </form>
+        }
+    </div>
+</div>
+
+<h2 class="section">@ReinsuranceTexts.Cessions.Title</h2>
+@if (Model.Cessions.Count == 0)
+{
+    <div class="card empty">@ReinsuranceTexts.Cessions.None</div>
+}
+else
+{
+    <table>
+        <thead>
+        <tr>
+            <th>@PolicyTexts.Fields.Number</th>
+            <th>@Ka.Classes.Code</th>
+            <th>@Ka.Audit.At</th>
+            <th>@ReinsuranceTexts.Fields.Period</th>
+            <th class="num">@ReinsuranceTexts.Cessions.Share</th>
+            <th class="num">@ReinsuranceTexts.Cessions.CededPremium</th>
+            <th class="num">@ReinsuranceTexts.Cessions.CededPremiumGel</th>
+            <th class="num">@ReinsuranceTexts.Cessions.Commission, ₾</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var c in Model.Cessions)
+        {
+            <tr>
+                <td><a href="/policies/@c.PolicyId">@c.PolicyNumber</a>@(c.IsCancellation ? $" ({PolicyTexts.Status["cancelled"]})" : "")</td>
+                <td>@c.ClassCode</td>
+                <td>@Fmt.Date(c.BookedOn)</td>
+                <td>@Fmt.Date(c.CoverFrom) – @Fmt.Date(c.CoverTo)</td>
+                <td class="num">@Fmt.Plain(c.SharePercent)</td>
+                <td class="num">@Money(c.Amount) @c.Currency</td>
+                <td class="num">@Money(c.AmountGel)</td>
+                <td class="num">@Money(c.CommissionGel)</td>
+            </tr>
+        }
+        <tr class="total-row">
+            <td colspan="6"><strong>@Ka.PremiumReport.Total</strong></td>
+            <td class="num"><strong>@Billing.GroupedTetri(Model.Cessions.Sum(c => Billing.Tetri(c.AmountGel)))</strong></td>
+            <td class="num"><strong>@Billing.GroupedTetri(Model.Cessions.Sum(c => Billing.Tetri(c.CommissionGel)))</strong></td>
+        </tr>
+        </tbody>
+    </table>
+}

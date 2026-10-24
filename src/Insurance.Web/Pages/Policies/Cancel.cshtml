@@ -1,0 +1,63 @@
+@page "/policies/{id:guid}/cancel"
+@model Insurance.Web.Pages.Policies.CancelModel
+@using C = Insurance.Application.Texts.PolicyTexts.Cancel
+@using Insurance.Application.Services
+@{
+    ViewData["Title"] = C.Title;
+    var p = Model.Preview;
+    var cur = Model.Currency;
+    var id = RouteData.Values["id"];
+}
+<h1>@C.Title: @Model.Number</h1>
+<p class="note">@C.Note</p>
+<div class="card" id="cancel-preview" data-previews="@Model.PreviewsJson" data-return="@C.ReturnToClient" data-owed="@C.StillOwed" data-start="@Model.StartOn">
+    <h2>@C.PreviewTitle (<span data-p="0">@Fmt.Date(p.On)</span>)</h2>
+    <dl class="facts">
+        <div><dt>@PolicyTexts.Finance.Written</dt><dd><span data-p="1">@Billing.GroupedTetri(p.Written)</span> @cur</dd></div>
+        <div><dt>@C.Refund</dt><dd><span data-p="2">@Billing.GroupedTetri(p.Refund)</span> @cur</dd></div>
+        <div><dt>@C.Retained</dt><dd><span data-p="3">@Billing.GroupedTetri(p.Retained)</span> @cur</dd></div>
+        <div><dt>@C.PaidSoFar</dt><dd><span data-p="4">@Billing.GroupedTetri(p.Paid)</span> @cur</dd></div>
+        <div>
+            <dt data-p="label">@(p.Balance < 0 ? C.ReturnToClient : C.StillOwed)</dt>
+            <dd><strong><span data-p="5">@Billing.GroupedTetri(Math.Abs(p.Balance))</span> @cur</strong></dd>
+        </div>
+    </dl>
+</div>
+<form method="post">
+    @if (Model.FormError is not null)
+    {
+        <div class="alert error">@Model.FormError</div>
+    }
+    <input type="hidden" name="policy_id" value="@id" />
+    <div class="card">
+        <div class="grid">
+            <div>
+                <label for="cancel_on">@C.CancelOn</label>
+                <date-input id="cancel_on" name="cancel_on" value="@Model.Value("cancel_on")" min="@Fmt.Iso(Model.MinDate)" max="@Fmt.Iso(Model.MaxDate)" required />
+                @if (Model.Error("cancel_on") is { } dateError)
+                {
+                    <div class="field-error">@dateError</div>
+                }
+                else
+                {
+                    <div class="hint">@C.DateHint</div>
+                }
+            </div>
+            <div class="wide">
+                <label for="reason">@C.Reason</label>
+                <input id="reason" name="reason" type="text" value="@Model.Value("reason")" required />
+                @if (Model.Error("reason") is { } reasonError)
+                {
+                    <div class="field-error">@reasonError</div>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="toolbar">
+        <button class="btn danger">@C.Confirm</button>
+        <a class="btn secondary" href="/policies/@id">@Ka.Common.Cancel</a>
+    </div>
+</form>
+@section Scripts {
+    <script src="~/js/cancel-preview.js" asp-append-version="true"></script>
+}

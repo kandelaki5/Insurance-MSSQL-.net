@@ -1,0 +1,83 @@
+@using Insurance.Application.Data
+@using Insurance.Application.Services
+@using Insurance.Domain.Common
+@inject RequestUser RequestUser
+@inject Db Db
+@{
+    var user = RequestUser.Current;
+    // The change log's and the financial director's panel's links for those who may see them (audit.log.view,
+    // finance.panel.view), from one read; each page checks again. A failed read only hides the links here — each page
+    // refuses on its own.
+    Func<string, bool> sees;
+    try
+    {
+        var inputs = await PermissionStore.ReadAsync(Db, user.Id);
+        sees = key => Permissions.EvaluatePermission(user.Subject, key, inputs.Overrides, inputs.Groups).Allowed;
+    }
+    catch (Exception)
+    {
+        sees = _ => false;
+    }
+    var role = user.RoleCode;
+}
+<!DOCTYPE html>
+<html lang="ka"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><meta name="theme-color" content="#f7f8fc"/>
+<title>@(ViewData["Title"] is string title ? title + " — " : "")@Ka.AppName</title>
+<link rel="stylesheet" href="~/ui/styles.css" asp-append-version="true"/>
+<link rel="stylesheet" href="~/css/workspace.css" asp-append-version="true"/>
+</head><body>
+<nav id="server-navigation" hidden aria-hidden="true">
+            <a href="/">@Ka.Nav.Home</a>
+            <a href="/policies">@Ka.Nav.Policies</a>
+            <a href="/policies/pending">@Ka.Nav.PendingPolicies</a>
+            <a href="/payments/overdue">@BillingTexts.Nav</a>
+            <a href="/claims">@ClaimTexts.Nav</a>
+            <a href="/complaints">@ComplaintTexts.Nav</a>
+            <a href="/parties">@Ka.Nav.Parties</a>
+            <a href="/intermediaries">@Ka.Nav.Intermediaries</a>
+            <div class="nav-group">@Ka.Nav.Reference</div>
+            <a href="/reference/classes">@Ka.Nav.Classes</a>
+            <a href="/reference/rates">@Ka.Nav.Rates</a>
+            <div class="nav-group">@ReinsuranceTexts.NavGroup</div>
+            <a href="/reinsurance/treaties">@ReinsuranceTexts.Title</a>
+            @if (role is "admin" or "operations_head" or "accountant")
+            {
+                <div class="nav-group">@SanctionsTexts.NavGroup</div>
+                <a href="/compliance/sanctions">@SanctionsTexts.Nav</a>
+                <a href="/compliance/aml-cases">@AmlTexts.Cases.Nav</a>
+                <a href="/compliance/aml-report">@AmlTexts.Nav</a>
+            }
+            @if (role is "admin" or "accountant")
+            {
+                <div class="nav-group">@Ka.Nav.Accounting</div>
+                <a href="/accounting/periods">@Ka.Nav.Periods</a>
+                <a href="/accounting/premium-report">@Ka.Nav.PremiumReport</a>
+                <a href="/accounting/policy-premium">@PolicyPremiumTexts.Nav</a>
+                <a href="/accounting/impairment">@ImpairmentTexts.Nav</a>
+                <a href="/accounting/regulatory">@RegulatoryTexts.Nav</a>
+                <a href="/accounting/ri-commission">@RiCommissionTexts.Nav</a>
+            }
+            @if (sees("audit.log.view"))
+            {
+                <a href="/audit">@AuditTexts.Nav</a>
+            }
+            @if (sees("finance.panel.view"))
+            {
+                <a href="/finance/panel">@FdPanelTexts.Nav</a>
+            }
+            @if (role == "admin")
+            {
+                <div class="nav-group">@Ka.Nav.Admin</div>
+                <a href="/users">@Ka.Nav.Users</a>
+                <a href="/settings">@Ka.Nav.Settings</a>
+                <a href="/settings/products">@Ka.Settings.ProductTexts.Nav</a>
+            }
+</nav>
+<form id="server-logout" method="post" action="/logout" hidden>@Html.AntiForgeryToken()</form>
+<app-root data-full-name="@user.FullName" data-role-name="@user.RoleName" data-can-write="@user.CanWrite.ToString().ToLowerInvariant()"></app-root>
+<div id="server-content" hidden>@RenderBody()</div>
+<noscript><p class="noscript-note">პროგრამის სამუშაო სივრცისთვის ჩართეთ JavaScript.</p><style>#server-content[hidden]{display:block;padding:24px}</style></noscript>
+<script src="~/js/date-input.js" asp-append-version="true"></script>
+@await RenderSectionAsync("Scripts",required:false)
+<script src="~/ui/main.js" type="module" asp-append-version="true"></script>
+</body></html>

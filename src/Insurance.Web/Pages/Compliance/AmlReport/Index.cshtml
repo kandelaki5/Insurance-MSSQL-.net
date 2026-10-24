@@ -1,0 +1,145 @@
+@page "/compliance/aml-report"
+@model Insurance.Web.Pages.Compliance.AmlReport.IndexModel
+@using Insurance.Application.Services
+@{
+    ViewData["Title"] = AmlTexts.Title;
+    var r = Model.Report;
+    var c = AmlTexts.Columns;
+    var year = r.Period.From.Year.ToString("0000", System.Globalization.CultureInfo.InvariantCulture);
+    string Money(long tetri) => Billing.GroupedTetri(tetri);
+    string Risk(string key)
+    {
+        var parts = key.Split(':');
+        return $"{AmlTexts.Risk.GetValueOrDefault(parts[0]) ?? parts[0]} — {AmlTexts.Segment.GetValueOrDefault(parts[1]) ?? parts[1]}";
+    }
+}
+@{
+    void GroupTable(IReadOnlyList<Insurance.Application.Services.AmlReport.ClientGroupRow> rows, string keyLabel, Func<string, string> keyName)
+    {
+        var total = (Start: rows.Sum(x => x.ActiveAtStart), Clients: rows.Sum(x => x.IssuedClients), Premium: rows.Sum(x => x.IssuedPremiumGel), End: rows.Sum(x => x.ActiveAtEnd));
+        <table>
+            <thead>
+            <tr><th>@keyLabel</th><th class="num">@c["activeAtStart"]</th><th class="num">@c["issuedClients"]</th><th class="num">@c["issuedPremiumGel"]</th><th class="num">@c["activeAtEnd"]</th></tr>
+            </thead>
+            <tbody>
+            @foreach (var row in rows)
+            {
+                <tr><td>@keyName(row.Key)</td><td class="num">@row.ActiveAtStart</td><td class="num">@row.IssuedClients</td><td class="num">@Money(row.IssuedPremiumGel)</td><td class="num">@row.ActiveAtEnd</td></tr>
+            }
+            <tr class="total-row"><td><strong>@AmlTexts.Total</strong></td><td class="num"><strong>@total.Start</strong></td><td class="num"><strong>@total.Clients</strong></td><td class="num"><strong>@Money(total.Premium)</strong></td><td class="num"><strong>@total.End</strong></td></tr>
+            </tbody>
+        </table>
+    }
+}
+<h1>@AmlTexts.Title</h1>
+<p class="note">@AmlTexts.Note</p>
+<form class="toolbar">
+    <div>
+        <label for="year">@AmlTexts.Year</label>
+        <input id="year" name="year" type="number" value="@year" style="width: 110px" />
+    </div>
+    <div>
+        <label for="half">@AmlTexts.Period</label>
+        <select id="half" name="half" style="width: auto">
+            @foreach (var (value, title) in AmlTexts.Halves)
+            {
+                <option value="@value" selected="@(value == Model.HalfValue)">@title</option>
+            }
+        </select>
+    </div>
+    <button class="btn secondary" style="align-self: flex-end">@AmlTexts.Show</button>
+    <a class="btn" style="align-self: flex-end" href="/compliance/aml-report/xlsx?year=@year&amp;half=@Model.HalfValue">@AmlTexts.Download</a>
+    <span class="hint" style="align-self: flex-end">@r.Period.Label: @Fmt.Iso(r.Period.From) – @Fmt.Iso(r.Period.To)</span>
+</form>
+
+<h2 class="section">@AmlTexts.Forms.N2</h2>
+@{ GroupTable(r.ByRisk, $"{c["risk"]} / {c["segment"]}", Risk); }
+
+<h2 class="section">@AmlTexts.Forms.N3</h2>
+@if (r.ByCountry.Count == 0)
+{
+    <div class="card empty">@AmlTexts.None</div>
+}
+else
+{
+    <table>
+        <thead>
+        <tr><th>@c["country"]</th><th class="num">@c["personClients"]</th><th class="num">@c["otherClients"]</th><th class="num">@c["personPremiumGel"]</th><th class="num">@c["otherPremiumGel"]</th><th class="num">@c["personActiveAtEnd"]</th><th class="num">@c["otherActiveAtEnd"]</th></tr>
+        </thead>
+        <tbody>
+        @foreach (var x in r.ByCountry)
+        {
+            <tr><td>@x.CountryCode</td><td class="num">@x.PersonClients</td><td class="num">@x.OtherClients</td><td class="num">@Money(x.PersonPremiumGel)</td><td class="num">@Money(x.OtherPremiumGel)</td><td class="num">@x.PersonActiveAtEnd</td><td class="num">@x.OtherActiveAtEnd</td></tr>
+        }
+        </tbody>
+    </table>
+}
+
+<h2 class="section">@AmlTexts.Forms.N4</h2>
+@{ GroupTable(r.ByLine, c["line"], key => AmlTexts.Line.GetValueOrDefault(key) ?? key); }
+
+@foreach (var (form, rows) in new[] { ("n5", r.NonCash), ("n6", r.Cash) })
+{
+    <div>
+        <h2 class="section">@AmlTexts.Forms.ByKey[form]</h2>
+        @if (form == "n5")
+        {
+            <p class="note">@AmlTexts.N5Note</p>
+        }
+        <table style="max-width: 640px">
+            <thead><tr><th>@c["operation"]</th><th class="num">@c["count"]</th><th class="num">@c["amountGel"]</th></tr></thead>
+            <tbody>
+            @foreach (var o in rows)
+            {
+                <tr><td>@AmlTexts.Operation.GetValueOrDefault(o.Kind)</td><td class="num">@o.Count</td><td class="num">@Money(o.AmountGel)</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+
+<h2 class="section">@AmlTexts.Forms.N8</h2>
+@if (r.Sanctioned.Count == 0)
+{
+    <div class="card empty">@AmlTexts.None</div>
+}
+else
+{
+    <table style="max-width: 640px">
+        <thead><tr><th>@c["country"]</th><th class="num">@c["frozenClients"]</th><th class="num">@c["suspendedClients"]</th></tr></thead>
+        <tbody>
+        @foreach (var s in r.Sanctioned)
+        {
+            <tr><td>@s.CountryCode</td><td class="num">@s.Clients</td><td class="num">@s.Suspended</td></tr>
+        }
+        </tbody>
+    </table>
+}
+
+<h2 class="section">@AmlTexts.Forms.N9</h2>
+@if (r.StrReports.Count == 0)
+{
+    <div class="card empty">@AmlTexts.None</div>
+}
+else
+{
+    <table>
+        <thead>
+        <tr><th>@c["strType"]</th><th>@c["residency"]</th><th>@c["country"]</th><th>@c["line"]</th><th>@c["additionalInfo"]</th><th>@c["caseNumber"]</th><th>@c["sentAt"]</th></tr>
+        </thead>
+        <tbody>
+        @foreach (var s in r.StrReports)
+        {
+            <tr>
+                <td>@AmlTexts.Cases.StrTypes.GetValueOrDefault(s.StrType)</td>
+                <td>@(s.IsResident ? AmlTexts.Residency["resident"] : AmlTexts.Residency["non_resident"])</td>
+                <td>@s.CountryCode</td>
+                <td>@(s.ClassCode is not null ? $"{s.ClassCode}. {s.ClassName ?? ""}" : "—")</td>
+                <td>@(s.OtherBasis ?? "")</td>
+                <td>@s.CaseNumber</td>
+                <td>@s.SentAt</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}

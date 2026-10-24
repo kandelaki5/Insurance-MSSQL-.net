@@ -1,0 +1,63 @@
+@page "/accounting/periods"
+@model Insurance.Web.Pages.Accounting.PeriodsModel
+@{
+    ViewData["Title"] = Ka.Periods.Title;
+}
+<h1>@Ka.Periods.Title</h1>
+<p class="note">@Ka.Periods.Note @Ka.Periods.Deadline(Model.CloseWithin)</p>
+@if (Model.Answer is { } answer && Model.AnswerText is { } text)
+{
+    <div class="alert @(answer.Outcome == "done" ? "ok" : "error")">@(answer.Month != "" ? Month.MonthNameKa(answer.Month) + ": " : "")@text</div>
+}
+<table style="max-width: 760px">
+    <thead>
+    <tr>
+        <th>@Ka.Periods.Month</th>
+        <th>@Ka.Periods.Status</th>
+        <th>@Ka.Periods.ClosedAt</th>
+        <th>@Ka.Periods.ClosedBy</th>
+        <th></th>
+    </tr>
+    </thead>
+    <tbody>
+    @foreach (var m in Model.Months)
+    {
+        <tr>
+            <td>@Month.MonthNameKa(m.Month)</td>
+            <td>
+                @if (m.Closed is not null)
+                {
+                    <span class="badge low">@Ka.Periods.Closed</span>
+                }
+                else if (!m.Ended)
+                {
+                    <span class="badge">@Ka.Periods.Open</span>
+                }
+                else if (m.Overdue)
+                {
+                    <span class="badge high">@Ka.Periods.OverdueClose</span>
+                }
+                else
+                {
+                    <span class="badge warn">@Ka.Periods.DueSoon</span>
+                }
+            </td>
+            <td>@m.Closed?.ClosedAt</td>
+            <td>@m.Closed?.ClosedBy</td>
+            <td>
+                @if (m.Closable)
+                {
+                    <form method="post" asp-page-handler="Close">
+                        <input type="hidden" name="period_start" value="@Fmt.Iso(m.Month)" />
+                        <button class="btn secondary">@Ka.Periods.Close</button>
+                    </form>
+                }
+                @if (m.PreviousOpen)
+                {
+                    <span class="hint">@Ka.Periods.PreviousOpen</span>
+                }
+            </td>
+        </tr>
+    }
+    </tbody>
+</table>

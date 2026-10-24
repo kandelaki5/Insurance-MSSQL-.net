@@ -1,0 +1,107 @@
+@page "/claims/new"
+@model Insurance.Web.Pages.Claims.NewModel
+@using F = Insurance.Application.Texts.ClaimTexts.Fields
+@{
+    ViewData["Title"] = ClaimTexts.New;
+    var p = Model.Policy;
+}
+<h1>@ClaimTexts.New</h1>
+<form class="toolbar" method="get" action="/claims/new">
+    <div style="flex: 1; max-width: 360px">
+        <label for="policy">@F.PolicyNumber</label>
+        <input id="policy" name="policy" type="text" value="@Model.Number" placeholder="CAS000001" />
+    </div>
+    <button class="btn secondary" style="align-self: flex-end">@Ka.Common.Search</button>
+    <a class="btn secondary" style="align-self: flex-end" href="/claims">@Ka.Common.Cancel</a>
+</form>
+@if (Model.Number != "" && !Model.Usable)
+{
+    <div class="alert error">@ClaimTexts.Errors.Policy</div>
+}
+@if (p is not null && Model.Usable)
+{
+    <div class="card">
+        <dl class="facts">
+            <div><dt>@F.Policy</dt><dd><a href="/policies/@p.Id">@p.Number</a></dd></div>
+            <div><dt>@F.Policyholder</dt><dd>@p.Policyholder</dd></div>
+            <div><dt>@F.Object</dt><dd>@p.Object</dd></div>
+        </dl>
+    </div>
+    <form method="post">
+        @if (Model.FormError is not null)
+        {
+            <div class="alert error">@Model.FormError</div>
+        }
+        @if (Model.Error("policy_number") is { } policyError)
+        {
+            <div class="field-error">@policyError</div>
+        }
+        <input type="hidden" name="policy_number" value="@p.Number" />
+        <input type="hidden" name="request_key" value="@Model.RequestKey" />
+        <div class="card">
+            <div class="grid">
+                <div>
+                    <label for="occurred_on">@F.OccurredOn</label>
+                    <date-input id="occurred_on" name="occurred_on" value="@Model.Value("occurred_on")" min="@Fmt.Iso(p.EffectiveFrom)" max="@Fmt.Iso(p.EffectiveTo.AddDays(-1))" required />
+                    @if (Model.Error("occurred_on") is { } e1) { <div class="field-error">@e1</div> }
+                </div>
+                <div>
+                    <label for="reported_on">@F.ReportedOn</label>
+                    <date-input id="reported_on" name="reported_on" value="@Model.Value("reported_on")" required />
+                    @if (Model.Error("reported_on") is { } e2) { <div class="field-error">@e2</div> }
+                </div>
+                <div>
+                    <label for="occurred_place">@F.OccurredPlace</label>
+                    <input id="occurred_place" name="occurred_place" type="text" value="@Model.Value("occurred_place")" />
+                </div>
+                <div class="wide">
+                    <label for="description">@F.Description</label>
+                    <input id="description" name="description" type="text" value="@Model.Value("description")" required />
+                    @if (Model.Error("description") is { } e3) { <div class="field-error">@e3</div> }
+                </div>
+            </div>
+        </div>
+        <div class="card">
+            <h2>@F.Coverage</h2>
+            @if (Model.Error("policy_line_id") is { } e4) { <div class="field-error">@e4</div> }
+            <table>
+                <thead>
+                <tr>
+                    <th></th>
+                    <th>@F.Coverage</th>
+                    <th>@F.SumInsured@(Model.CrossCurrency ? $", {p.PremiumCurrency.Trim()}" : "")</th>
+                    <th>@F.Deductible@(Model.CrossCurrency ? $", {p.PremiumCurrency.Trim()}" : "")</th>
+                    <th>@F.ClaimedAmount, @Model.ClaimCurrency</th>
+                    <th>@F.InitialReserve, @Model.ClaimCurrency</th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var c in Model.Lines)
+                {
+                    var name = c.Name ?? c.ClassCode;
+                    <tr>
+                        <td><input id="line:@c.Id" name="line:@c.Id" type="checkbox" checked="@(Model.Value($"line:{c.Id}") == "on")" /></td>
+                        <td><label for="line:@c.Id">@name (@c.ClassCode)</label></td>
+                        <td>@NewModel.Show(c.SumInsured)</td>
+                        <td>@NewModel.Show(c.Deductible)</td>
+                        <td><input name="claimed:@c.Id" type="number" step="0.01" min="0" value="@Model.Value($"claimed:{c.Id}")" aria-label="@($"{name} — {F.ClaimedAmount}")" style="width: 120px" /></td>
+                        <td>
+                            <input name="reserve:@c.Id" type="number" step="0.01" min="0" value="@Model.Value($"reserve:{c.Id}")" aria-label="@($"{name} — {F.InitialReserve}")" style="width: 120px" />
+                            @if (Model.Error($"reserve:{c.Id}") is { } e5) { <div class="field-error">@e5</div> }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+            <div class="hint">@F.ReserveHint</div>
+            @if (Model.CrossCurrency)
+            {
+                <div class="hint">@ClaimTexts.Notes.GelOnForeign</div>
+            }
+        </div>
+        <div class="toolbar">
+            <button class="btn">@ClaimTexts.Register</button>
+            <a class="btn secondary" href="/claims">@Ka.Common.Cancel</a>
+        </div>
+    </form>
+}

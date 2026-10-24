@@ -1,0 +1,88 @@
+@model Insurance.Web.Pages.Compliance.ScreeningTableView
+@{
+    var f = SanctionsTexts.Fields.ByKey;
+    static string Badge(string outcome) => outcome is "clear" or "false_positive" ? "low" : outcome == "confirmed" ? "high" : "warn";
+}
+@* Screening rows with their matches and, for open ones, the decision form. *@
+<table>
+    <thead>
+    <tr>
+        <th>@f["screenedAt"]</th>
+        @if (Model.ShowParty)
+        {
+            <th>@f["party"]</th>
+        }
+        <th>@f["subject"]</th>
+        <th>@f["matches"]</th>
+        <th>@f["outcome"]</th>
+        <th>@f["note"]</th>
+        @if (Model.Writable)
+        {
+            <th></th>
+        }
+    </tr>
+    </thead>
+    <tbody>
+    @foreach (var r in Model.Rows)
+    {
+        var matches = r.MatchList;
+        <tr>
+            <td>@r.ScreenedAt</td>
+            @if (Model.ShowParty)
+            {
+                <td><a href="/parties/@r.PartyId">@r.PartyName</a></td>
+            }
+            <td>@SanctionsTexts.SubjectKinds.GetValueOrDefault(r.SubjectKind): @r.SubjectName</td>
+            <td>
+                @if (matches.Count == 0)
+                {
+                    @("—")
+                }
+                else
+                {
+                    <ul class="changes">
+                        @foreach (var m in matches)
+                        {
+                            <li>
+                                <strong>@m.Name</strong> (@m.Reference, @m.ListType) · @f["listedAs"]: @m.MatchedName · @f["score"]: @(Math.Floor(m.Score * 100 + 0.5))%@(" · ")@f["reasons"]: @string.Join(", ", m.Reasons.Select(x => SanctionsTexts.Reasons.GetValueOrDefault(x)))
+                                @if (m.Strong)
+                                {
+                                    <span class="badge high" style="margin-left: 6px">@SanctionsTexts.Strong</span>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+            </td>
+            <td><span class="badge @Badge(r.Outcome)">@SanctionsTexts.Outcomes.GetValueOrDefault(r.Outcome)</span></td>
+            <td>@if (r.ReusesId is not null)
+                {
+                    <span class="muted">@SanctionsTexts.ReusedDecision (@r.ReusedDecidedAt):</span>
+                }
+                @(r.Note ?? "—")@(r.DecidedByName is not null ? $" ({r.DecidedByName})" : "")</td>
+            @if (Model.Writable)
+            {
+                <td>
+                    @if (r.Outcome is "possible" or "confirmed")
+                    {
+                        <form method="post" asp-page-handler="DecideScreening" class="row-actions">
+                            <input type="hidden" name="id" value="@r.Id" />
+                            <input type="hidden" name="back" value="@Model.Back" />
+                            <input name="note" placeholder="@f["note"]" required style="width: 200px" />
+                            @if (r.Outcome == "possible")
+                            {
+                                <button class="btn secondary" name="decision" value="dismiss">@SanctionsTexts.Actions.Dismiss</button>
+                                <button class="btn danger" name="decision" value="confirm">@SanctionsTexts.Actions.Confirm</button>
+                            }
+                            else
+                            {
+                                <button class="btn secondary" name="decision" value="lift">@SanctionsTexts.Actions.Lift</button>
+                            }
+                        </form>
+                    }
+                </td>
+            }
+        </tr>
+    }
+    </tbody>
+</table>

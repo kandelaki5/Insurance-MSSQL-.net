@@ -1,0 +1,144 @@
+@page "/policies/{id:guid}/payment"
+@model Insurance.Web.Pages.Policies.PaymentModel
+@using Insurance.Application.Services
+@using T = Insurance.Application.Texts.BillingTexts.Payment
+@using A = Insurance.Application.Texts.BillingTexts.Payment.Advances
+@{
+    ViewData["Title"] = T.Title;
+    var id = RouteData.Values["id"];
+    string Money(decimal v) => PolicyCard.Stored(v);
+}
+<h1>@T.Title: @Model.Number</h1>
+<p class="note">@T.OutstandingNow: @PaymentActions.Decimal(Model.Outstanding).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) @Model.Currency</p>
+@if (Model.Advances.Count > 0)
+{
+    <h2 class="section">@A.Title</h2>
+    <p class="note">@A.Note</p>
+    <table style="max-width: 760px">
+        <thead>
+        <tr>
+            <th>@T.ReceivedOn</th>
+            <th>@T.Method</th>
+            <th class="num">@T.AmountGel</th>
+            <th class="num">@A.Available</th>
+            <th>@T.Reference</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var r in Model.Advances)
+        {
+            <tr>
+                <td>@Fmt.Date(r.ReceivedOn)</td>
+                <td>@(T.MethodLabels.GetValueOrDefault(r.Method) ?? r.Method)</td>
+                <td class="num">@Money(r.AmountGel)</td>
+                <td class="num"><strong>@Money(r.AvailableGel)</strong></td>
+                <td>@r.Reference</td>
+                <td>
+                    <form method="post" asp-page-handler="Allocate" class="inline-form">
+                        <input type="hidden" name="policy_id" value="@id" />
+                        <input type="hidden" name="payment_id" value="@r.Id" />
+                        <button class="btn" disabled="@(Model.Outstanding <= 0)">@A.Allocate</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+    @if (Model.Receives)
+    {
+        <h2 class="section">@T.Record</h2>
+    }
+}
+@if (Model.OverpaidRows.Count > 0)
+{
+    <h2 class="section">@A.OverpaidTitle</h2>
+    <p class="note">@A.OverpaidNote</p>
+    <table style="max-width: 760px">
+        <thead>
+        <tr>
+            <th>@T.ReceivedOn</th>
+            <th>@T.Method</th>
+            <th class="num">@T.AmountGel</th>
+            <th class="num">@A.OverpaidAvailable</th>
+            <th>@A.FromPolicies</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var r in Model.OverpaidRows)
+        {
+            <tr>
+                <td>@Fmt.Date(r.ReceivedOn)</td>
+                <td>@(T.MethodLabels.GetValueOrDefault(r.Method) ?? r.Method)</td>
+                <td class="num">@Money(r.PaymentGel)</td>
+                <td class="num"><strong>@PolicyCard.Grouped(r.Gel)</strong></td>
+                <td>@r.Policies</td>
+                <td>
+                    <form method="post" asp-page-handler="Transfer" class="inline-form">
+                        <input type="hidden" name="policy_id" value="@id" />
+                        <input type="hidden" name="payment_id" value="@r.PaymentId" />
+                        <button class="btn" disabled="@(Model.Outstanding <= 0)">@A.Transfer</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+    @if (Model.Advances.Count == 0 && Model.Receives)
+    {
+        <h2 class="section">@T.Record</h2>
+    }
+}
+@if (Model.Receives)
+{
+    <form method="post">
+        @if (Model.FormError is not null)
+        {
+            <div class="alert error">@Model.FormError</div>
+        }
+        <input type="hidden" name="policy_id" value="@id" />
+        <div class="card">
+            <div class="grid">
+                <div>
+                    <label for="amount_gel">@T.AmountGel</label>
+                    <input id="amount_gel" name="amount_gel" type="number" step="0.01" min="0" value="@Model.Value("amount_gel")" />
+                    @if (Model.Error("amount_gel") is { } amountError)
+                    {
+                        <div class="field-error">@amountError</div>
+                    }
+                </div>
+                <div>
+                    <label for="received_on">@T.ReceivedOn</label>
+                    <date-input id="received_on" name="received_on" value="@Model.Value("received_on")" />
+                    @if (Model.Error("received_on") is { } dateError)
+                    {
+                        <div class="field-error">@dateError</div>
+                    }
+                </div>
+                <div>
+                    <label for="method">@T.Method</label>
+                    <select id="method" name="method">
+                        @foreach (var (value, title) in T.Methods)
+                        {
+                            <option value="@value" selected="@(Model.Value("method", "bank") == value)">@title</option>
+                        }
+                    </select>
+                    @if (Model.Error("method") is { } methodError)
+                    {
+                        <div class="field-error">@methodError</div>
+                    }
+                </div>
+                <div class="wide">
+                    <label for="reference">@T.Reference</label>
+                    <input id="reference" name="reference" type="text" value="@Model.Value("reference")" />
+                    <div class="hint">@T.RateNote</div>
+                </div>
+            </div>
+        </div>
+        <div class="toolbar">
+            <button class="btn">@T.Submit</button>
+            <a class="btn secondary" href="/policies/@id">@Ka.Common.Cancel</a>
+        </div>
+    </form>
+}

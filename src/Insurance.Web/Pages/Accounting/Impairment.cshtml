@@ -1,0 +1,104 @@
+@page "/accounting/impairment"
+@model Insurance.Web.Pages.Accounting.ImpairmentModel
+@using Insurance.Domain.Finance
+@{
+    ViewData["Title"] = ImpairmentTexts.Title;
+    var r = Model.Report;
+    string M(long v) => Billing.GroupedTetri(v);
+    string C(string key) => ImpairmentTexts.Columns[key];
+    string Band(AgeBand b) => ImpairmentTexts.Bands.ByKey[char.ToLowerInvariant(b.ToString()[0]) + b.ToString()[1..]];
+}
+<h1>@ImpairmentTexts.Title</h1>
+<p class="note">@ImpairmentTexts.Note</p>
+<form class="toolbar">
+    <div>
+        <label for="date">@ImpairmentTexts.Date</label>
+        <date-input id="date" name="date" value="@Fmt.Iso(Model.AsOfDate)" style="width: 170px" />
+    </div>
+    <button class="btn secondary" style="align-self: flex-end">@ImpairmentTexts.Show</button>
+    @if (Model.Exportable)
+    {
+        <a class="btn" style="align-self: flex-end" href="/accounting/impairment/xlsx?date=@Fmt.Iso(Model.AsOfDate)">@ImpairmentTexts.Download</a>
+    }
+    @if (r is not null && r.Rates.Count > 0)
+    {
+        <span class="hint" style="align-self: flex-end">@ImpairmentTexts.RatesUsed: @string.Join(", ", r.Rates.Select(x => $"{x.Currency} {Fmt.Plain(x.Rate)} ({Fmt.Date(x.Date)})"))</span>
+    }
+</form>
+@if (!Model.Exact)
+{
+    <p class="note"><strong>@ImpairmentTexts.Inexact</strong></p>
+}
+else if (!Model.Exportable)
+{
+    <p class="note"><strong>@ImpairmentTexts.NotForExcel</strong></p>
+}
+@if (r is not null)
+{
+<h2 class="section">@ImpairmentTexts.TotalsTitle</h2>
+<table style="max-width: 820px">
+    <thead>
+    <tr><th>@C("debtorKind")</th><th class="num">@C("policies")</th><th class="num">@C("unpaidPremiumGel")</th><th class="num">@C("unpaidEarnedGel")</th><th class="num">@C("reserveGel")</th></tr>
+    </thead>
+    <tbody>
+    @foreach (var row in r.Totals)
+    {
+        <tr class="@(row.Kind == "all" ? "total-row" : null)">
+            <td>@if (row.Kind == "all") { <strong>@ImpairmentTexts.Kinds["all"]</strong> } else { @ImpairmentTexts.Kinds[row.Kind] }</td>
+            <td class="num">@row.Policies</td>
+            <td class="num">@M(row.UnpaidPremiumGel)</td>
+            <td class="num">@M(row.UnpaidEarnedGel)</td>
+            <td class="num">@if (row.Kind == "all") { <strong>@M(row.ReserveGel)</strong> } else { @M(row.ReserveGel) }</td>
+        </tr>
+    }
+    </tbody>
+</table>
+
+<h2 class="section">@ImpairmentTexts.RowsTitle</h2>
+@if (r.Rows.Count == 0)
+{
+    <div class="card empty">@ImpairmentTexts.None</div>
+}
+else
+{
+    <table>
+        <thead>
+        <tr>
+            <th>@C("policyNumber")</th>
+            <th>@C("policyholder")</th>
+            <th>@C("debtorKind")</th>
+            <th class="num">@C("premium")</th>
+            <th class="num">@C("earnedTotal")</th>
+            <th class="num">@C("paid")</th>
+            <th class="num">@C("unpaidEarned")</th>
+            @foreach (var band in Impairment.AgeBands)
+            {
+                <th class="num">@Band(band)</th>
+            }
+            <th class="num">@C("reserve")</th>
+            <th class="num">@C("reserveGel")</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var row in r.Rows)
+        {
+            <tr>
+                <td><a href="/policies/@row.PolicyId">@row.PolicyNumber</a></td>
+                <td>@row.Policyholder</td>
+                <td>@ImpairmentTexts.Kinds[row.PrimaryKind]</td>
+                <td class="num">@M(row.Premium) @row.Currency</td>
+                <td class="num">@M(row.Impairment.TotalEarned)</td>
+                <td class="num">@M(row.Impairment.Paid)</td>
+                <td class="num">@M(row.Impairment.UnpaidEarned)</td>
+                @foreach (var band in Impairment.AgeBands)
+                {
+                    <td class="num">@M(row.Impairment.Unpaid[band])</td>
+                }
+                <td class="num">@M(row.Impairment.TotalReserve)</td>
+                <td class="num">@M(row.ReserveGel)</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+}

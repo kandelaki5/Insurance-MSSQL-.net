@@ -1,0 +1,241 @@
+@page "/accounting/regulatory"
+@model Insurance.Web.Pages.Accounting.Regulatory.IndexModel
+@using Insurance.Domain.Regulatory
+@using T = Insurance.Application.Texts.RegulatoryTexts
+@{
+    ViewData["Title"] = T.Title;
+    var m = Model;
+    string G(string? text) => Insurance.Web.Pages.Accounting.Regulatory.IndexModel.Grouped(text);
+    string D(string iso) => $"{iso[8..10]}.{iso[5..7]}.{iso[..4]}";
+}
+@functions {
+    private Microsoft.AspNetCore.Html.IHtmlContent Warning(IReadOnlyList<PrecisionProblem> problems)
+    {
+        var e = (Func<string, string>)System.Net.WebUtility.HtmlEncode;
+        var b = new System.Text.StringBuilder();
+        b.Append("<div class=\"card\"><p><strong>").Append(e(T.PrecisionPage)).Append("</strong></p><ul>");
+        foreach (var p in problems.Take(10)) b.Append("<li>").Append(e($"{p.Sheet}!{p.Ref}: {p.Exact} → {p.Excel}")).Append("</li>");
+        if (problems.Count > 10) b.Append("<li>").Append(e(T.PrecisionMore(problems.Count - 10))).Append("</li>");
+        b.Append("</ul></div>");
+        return new Microsoft.AspNetCore.Html.HtmlString(b.ToString());
+    }
+}
+<h1>@T.Title</h1>
+<p class="note">@T.Note</p>
+<form class="toolbar">
+    <div>
+        <label for="month">@T.Month</label>
+        <input id="month" name="month" type="month" value="@m.Month" />
+    </div>
+    <button class="btn secondary" style="align-self: flex-end">@T.Show</button>
+    <span class="hint" style="align-self: flex-end">@T.Date(D(m.Date))</span>
+</form>
+
+<h2 class="section">@T.Groups.Reserves</h2>
+@if (m.ReservesProblems.Count == 0)
+{
+    <p><a class="btn" href="/accounting/regulatory/reserves/xlsx?month=@m.Month">@T.Download</a></p>
+}
+else
+{
+    @Warning(m.ReservesProblems)
+}
+<p class="note">@T.Coverage</p>
+<h3>@T.Form11</h3>
+<table>
+    <thead>
+    <tr>
+        <th>@T.Columns.Code</th>
+        <th>@T.Columns.Name</th>
+        @foreach (var c in ReservesPlacement.Form11Columns)
+        {
+            <th class="num">@T.Columns.ByKey[c]</th>
+        }
+    </tr>
+    </thead>
+    <tbody>
+    @foreach (var (code, row) in ReservesPlacement.Form11AllRows)
+    {
+        var parent = !m.Filled.Contains(row) && ReservesPlacement.Form11AllRows.Any(r => r.Code.StartsWith(code + ".", StringComparison.Ordinal));
+        <tr class="@(parent ? "total-row" : null)">
+            <td>@code</td>
+            <td>@m.Wb.TemplateText(ReservesPlacement.Form11, $"B{row}")</td>
+            @foreach (var c in ReservesPlacement.Form11Columns)
+            {
+                <td class="num">@G(m.WbValue(ReservesPlacement.Form11, $"{c}{row}"))</td>
+            }
+        </tr>
+    }
+    <tr class="total-row">
+        <td colspan="2"><strong>@T.Total</strong></td>
+        @foreach (var c in ReservesPlacement.Form11Columns)
+        {
+            <td class="num"><strong>@G(m.WbValue(ReservesPlacement.Form11, $"{c}{ReservesPlacement.Form11TotalRow}"))</strong></td>
+        }
+    </tr>
+    </tbody>
+</table>
+<p class="note">@T.Control: <strong>@(m.ControlOk ? T.ControlOk : T.ControlBad)</strong></p>
+@if (m.Unplaced.Count > 0)
+{
+    <h3>@T.Unplaced</h3>
+    <p class="note">@T.UnplacedNote</p>
+    <table>
+        <tbody>
+        @foreach (var u in m.Unplaced)
+        {
+            <tr>
+                <td>@u.Code</td>
+                @foreach (var c in ReservesPlacement.Form11Columns)
+                {
+                    <td class="num">@Insurance.Web.Pages.Accounting.Regulatory.IndexModel.Amount(new System.Numerics.BigInteger(u.Figures[c]))</td>
+                }
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+<h3>@T.Form12</h3>
+<table style="max-width: 760px">
+    <tbody>
+    @foreach (var (reference, _) in ReservesPlacement.Form12Lines)
+    {
+        <tr class="@(reference == "D35" ? "total-row" : null)">
+            <td>@T.Form12Lines[reference]</td>
+            <td class="num">@G(m.WbValue(ReservesPlacement.Form12, reference))</td>
+        </tr>
+    }
+    </tbody>
+</table>
+
+<h2 class="section">@T.Groups.Form1</h2>
+@if (m.N1Problems.Count == 0)
+{
+    <p><a class="btn" href="/accounting/regulatory/form1/xlsx?month=@m.Month">@T.Download</a></p>
+}
+else
+{
+    @Warning(m.N1Problems)
+}
+<p class="note">@T.Form1Coverage</p>
+@foreach (var (title, sheet, lines) in new[] { (T.N17, FinancialAnnex.ReservesSheet, T.N17Lines), (T.N14, FinancialAnnex.ReceivablesSheet, T.N14Lines) })
+{
+    <div>
+        <h3>@title</h3>
+        <table style="max-width: 760px">
+            <tbody>
+            @foreach (var (reference, label) in lines)
+            {
+                <tr class="@(m.N1.IsFormula(sheet, reference) ? "total-row" : null)">
+                    <td>@label</td>
+                    <td class="num">@G(m.N1Value(sheet, reference))</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+<p class="note">@T.ReceivableControl: @Insurance.Web.Pages.Accounting.Regulatory.IndexModel.Amount(m.N14Gross) / @Insurance.Web.Pages.Accounting.Regulatory.IndexModel.Amount(m.ReceivableGel) — <strong>@(m.N14Gross == m.ReceivableGel ? T.ControlOk : T.ControlBad)</strong></p>
+<h3>@T.Balance</h3>
+<table style="max-width: 760px">
+    <tbody>
+    @foreach (var (code, row, coverage) in FinancialAnnex.BalanceLines)
+    {
+        <tr>
+            <td>@code @T.BalanceLines[code]@(coverage switch { FinancialAnnex.BalanceCoverage.Partly => $" — {T.PartlyKept}", FinancialAnnex.BalanceCoverage.NotKept => $" — {T.NotKept}", _ => "" })</td>
+            <td class="num">@(coverage == FinancialAnnex.BalanceCoverage.NotKept ? T.Empty : G(m.N1Value(FinancialAnnex.BalanceSheet, $"E{row}")))</td>
+        </tr>
+    }
+    </tbody>
+</table>
+@* Form 1's profit and loss (old program PR #366): IS, IS-COM, N2-6 and N1-8 read back from the same workbook; what no row takes, named. *@
+<h3>@T.IncomeTitle(D(m.Income.From), D(m.Income.To))</h3>
+<p class="note">@T.IncomeCoverage</p>
+@foreach (var (title, sheet, lines) in new[] { (T.IsTitle, IncomeStatement.IsSheet, T.IsLines), (T.ComTitle, IncomeStatement.CommissionSheet, T.ComLines), (T.OtherExpensesTitle, IncomeStatement.OtherExpensesSheet, T.OtherExpensesLines), (T.DeferredTitle, IncomeStatement.DeferredSheet, T.DeferredLines) })
+{
+    <div>
+        <h3>@title</h3>
+        <table style="max-width: 760px">
+            <tbody>
+            @foreach (var (reference, label) in lines)
+            {
+                <tr class="@(m.N1.IsFormula(sheet, reference) ? "total-row" : null)">
+                    <td>@label</td>
+                    <td class="num">@G(m.N1Value(sheet, reference))</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+<p class="note">@T.ClaimCountCheck(m.Claims.Cases, m.Claims.Losses)</p>
+@if (m.IncomeUnplaced.Count > 0)
+{
+    <h3>@T.Unplaced</h3>
+    <p class="note">@T.IncomeUnplacedNote</p>
+    <table style="max-width: 760px">
+        <tbody>
+        @foreach (var u in m.IncomeUnplaced)
+        {
+            <tr>
+                <td>@T.IncomeParts[u.Part]@(u.Code.Length > 0 ? $" — {u.Code}" : "")@(u.Reason is { } reason ? $" ({T.TreatyReasons[reason]})" : "")</td>
+                <td class="num">@(u.Part is "treaty" or "reinsurerPaid" ? "" : u.Count.ToString(System.Globalization.CultureInfo.InvariantCulture))</td>
+                <td class="num">@Insurance.Web.Pages.Accounting.Regulatory.IndexModel.Amount(u.AmountGel)</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+<h2 class="section">@T.Groups.Statistical</h2>
+<h3>@T.Form6</h3>
+<form class="toolbar">
+    <input type="hidden" name="month" value="@m.Month" />
+    <div>
+        <label for="quarter">@T.Quarter</label>
+        <select id="quarter" name="quarter">
+            @foreach (var q in m.Quarters)
+            {
+                <option value="@q" selected="@(q == m.Quarter)">@q</option>
+            }
+        </select>
+    </div>
+    <button class="btn secondary" style="align-self: flex-end">@T.Show</button>
+    <span class="hint" style="align-self: flex-end">@T.QuarterDate(m.Quarter, D(m.QuarterDay))</span>
+</form>
+<p><a class="btn" href="/accounting/regulatory/form6/xlsx?quarter=@m.Quarter">@T.Download</a></p>
+@if (m.Overflow6.Rows > 0)
+{
+    <p class="note">@T.Form6Overflow(m.Overflow6.Rows, m.Overflow6.Classes)</p>
+}
+<p class="note">@T.Form6Coverage</p>
+@if (m.Form6.Count == 0)
+{
+    <p class="note">@T.Form6None</p>
+}
+else
+{
+    <table>
+        <thead>
+        <tr>
+            @foreach (var c in new[] { "A" }.Concat(Insurance.Domain.Regulatory.Form6.Columns))
+            {
+                <th>@T.Form6Columns[c]</th>
+            }
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var r in m.Form6)
+        {
+            <tr>
+                <td>@r.ClassLabel</td>
+                @foreach (var c in Insurance.Domain.Regulatory.Form6.Columns)
+                {
+                    <td>@(r.Cells.TryGetValue(c, out var v) && !string.IsNullOrEmpty(v) ? v : T.Empty)</td>
+                }
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+<p class="note">@T.OtherStatistical</p>

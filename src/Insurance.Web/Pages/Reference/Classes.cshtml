@@ -1,0 +1,35 @@
+@page "/reference/classes"
+@model Insurance.Web.Pages.Reference.ClassesModel
+@{
+    ViewData["Title"] = Ka.Classes.Title;
+}
+<h1>@Ka.Classes.Title</h1>
+<p class="note">@Ka.Classes.Note</p>
+<table>
+    <thead>
+    <tr>
+        <th>@Ka.Classes.Code</th>
+        <th>@Ka.Classes.Name</th>
+        <th>@Ka.Classes.Category</th>
+        <th class="num">@Ka.Classes.Ibnr</th>
+    </tr>
+    </thead>
+    <tbody>
+    @foreach (var row in Model.Rows)
+    {
+        <tr>
+            <td>@row.Code</td>
+            @if (row.ParentCode is null)
+            {
+                <td><strong>@row.NameKa</strong></td>
+            }
+            else
+            {
+                <td class="child">@row.NameKa</td>
+            }
+            <td>@Ka.Classes.Categories.GetValueOrDefault(row.Category)</td>
+            <td class="num">@Fmt.Plain(row.IbnrPercent)</td>
+        </tr>
+    }
+    </tbody>
+</table>

@@ -1,0 +1,67 @@
+@page "/compliance/aml-cases"
+@model Insurance.Web.Pages.Compliance.AmlCases.IndexModel
+@{
+    var t = AmlTexts.Cases.Fields.ByKey;
+    ViewData["Title"] = AmlTexts.Cases.Title;
+    var statusBadge = new Dictionary<string, string> { ["open"] = "warn", ["examined"] = "low", ["reported"] = "high", ["closed"] = "" };
+}
+<h1>@AmlTexts.Cases.Title</h1>
+<p class="note">@AmlTexts.Cases.Note</p>
+<div class="toolbar">
+    <form style="display: flex; gap: 8px">
+        <select name="status" style="width: auto">
+            <option value="" selected="@(Model.Status == "")">@t["status"]: @AmlTexts.Cases.All</option>
+            @foreach (var (value, title) in AmlTexts.Cases.Statuses)
+            {
+                <option value="@value" selected="@(Model.Status == value)">@title</option>
+            }
+        </select>
+        <button class="btn secondary">@Ka.Common.Search</button>
+    </form>
+    <div class="spacer"></div>
+    @if (Insurance.Application.Services.Aml.IsComplianceRole(Model.Me))
+    {
+        <a class="btn" href="/compliance/aml-cases/new">@AmlTexts.Cases.New</a>
+    }
+</div>
+@if (Model.Rows.Count == 0)
+{
+    <div class="card empty">@Ka.Common.NoData</div>
+}
+else
+{
+    <table>
+        <thead>
+        <tr>
+            <th>@t["number"]</th>
+            <th>@t["openedOn"]</th>
+            <th>@t["party"]</th>
+            <th>@t["source"]</th>
+            <th>@t["status"]</th>
+            <th>@t["strSentAt"]</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var r in Model.Rows)
+        {
+            <tr>
+                <td><a href="/compliance/aml-cases/@r.Id">@r.Number</a></td>
+                <td>@Fmt.Date(r.OpenedOn)</td>
+                <td><a href="/parties/@r.PartyId">@r.PartyName</a></td>
+                <td>@AmlTexts.Cases.Sources.GetValueOrDefault(r.Source)</td>
+                <td><span class="badge @statusBadge.GetValueOrDefault(r.Status)">@AmlTexts.Cases.Statuses.GetValueOrDefault(r.Status)</span></td>
+                <td>
+                    @(r.StrSentAt ?? "—")
+                    @if (r.Late)
+                    {
+                        <span class="badge high" style="margin-left: 6px">@AmlTexts.Cases.LateStr</span>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+@* The register of suspensions in force; new ones are registered on the client or the case. *@
+<partial name="/Pages/Compliance/_SuspensionSection.cshtml" model="Model.Section" />

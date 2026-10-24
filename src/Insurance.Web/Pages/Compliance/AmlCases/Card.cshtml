@@ -1,0 +1,118 @@
+@page "/compliance/aml-cases/{id}"
+@model Insurance.Web.Pages.Compliance.AmlCases.CardModel
+@using Insurance.Domain.Common
+@{
+    var c = Model.Case;
+    var f = AmlTexts.Cases.Fields.ByKey;
+    ViewData["Title"] = c.Number;
+    var v = Model.Decision;
+    string Val(string name) => v.GetValueOrDefault(name) ?? "";
+    var status = c.Status;
+}
+<h1>
+    @c.Number <span class="badge">@AmlTexts.Cases.Statuses.GetValueOrDefault(c.Status)</span>
+    @if (c.Late)
+    {
+        <span class="badge high" style="margin-left: 6px">@AmlTexts.Cases.LateStr</span>
+    }
+</h1>
+@if (Model.Registered)
+{
+    <div class="alert ok">@AmlTexts.Cases.Registered</div>
+}
+<p class="note">@AmlTexts.Cases.Note</p>
+
+<div class="card">
+    <dl class="facts">
+        <div><dt>@f["party"]</dt><dd><a href="/parties/@c.PartyId">@c.PartyName</a> @(c.PartyIdNumber is { Length: > 0 } n ? $"({n})" : "")</dd></div>
+        <div><dt>@f["openedOn"]</dt><dd>@Fmt.Date(c.OpenedOn)</dd></div>
+        <div><dt>@f["source"]</dt><dd>@AmlTexts.Cases.Sources.GetValueOrDefault(c.Source)</dd></div>
+        <div><dt>@f["classCode"]</dt><dd>@(c.ClassCode ?? "—")</dd></div>
+        <div><dt>@f["transactionRef"]</dt><dd>@(c.TransactionRef ?? "—")</dd></div>
+        <div><dt>@f["createdBy"]</dt><dd>@(c.CreatedByName ?? "—")</dd></div>
+        <div class="wide"><dt>@f["description"]</dt><dd>@c.Description</dd></div>
+        @if (!string.IsNullOrEmpty(c.Examination))
+        {
+            <div class="wide"><dt>@f["examination"]</dt><dd>@c.Examination</dd></div>
+        }
+        @if (c.StrSentAt is not null)
+        {
+            <div><dt>@f["suspicionAt"]</dt><dd>@c.SuspicionAt</dd></div>
+            <div><dt>@f["strSentAt"]</dt><dd>@c.StrSentAt</dd></div>
+            <div><dt>@f["strType"]</dt><dd>@(c.StrType is { } st ? AmlTexts.Cases.StrTypes.GetValueOrDefault(st) : "")@(c.StrOtherBasis is { Length: > 0 } ob ? $" — {ob}" : "")</dd></div>
+            <div><dt>@f["fmsReference"]</dt><dd>@(c.FmsReference ?? "—")</dd></div>
+        }
+        @if (c.ClosedOn is { } closed)
+        {
+            <div><dt>@f["closedOn"]</dt><dd>@Fmt.Date(closed)</dd></div>
+        }
+    </dl>
+</div>
+
+@if (Model.Writable && c.Status != "closed")
+{
+    <form method="post" asp-page-handler="Decide" class="card">
+        <h2>@AmlTexts.Cases.DecisionTitle</h2>
+        @if (Model.Notice is not null || Model.FormError is not null)
+        {
+            <div class="alert @(Model.Errors.Count > 0 ? "error" : "ok")">@(Model.FormError ?? Model.Notice)</div>
+        }
+        <input type="hidden" name="id" value="@c.Id" />
+        <div class="grid">
+            <div>
+                <label for="examined_on">@f["examinedOn"]</label>
+                <date-input id="examined_on" name="examined_on" value="@Val("examined_on")" />
+            </div>
+            <div class="wide">
+                <label for="examination">@f["examination"]</label>
+                <textarea id="examination" name="examination" rows="4">@Val("examination")</textarea>
+                @if (Model.Error("examination") is { } e1) { <div class="field-error">@e1</div> }
+            </div>
+            <div>
+                <label for="suspicion_at">@f["suspicionAt"]</label>
+                <input id="suspicion_at" name="suspicion_at" type="datetime-local" value="@Val("suspicion_at")" />
+            </div>
+            <div>
+                <label for="str_sent_at">@f["strSentAt"]</label>
+                <input id="str_sent_at" name="str_sent_at" type="datetime-local" value="@Val("str_sent_at")" />
+                @if (Model.Error("str_sent_at") is { } e2) { <div class="field-error">@e2</div> }
+            </div>
+            <div>
+                <label for="str_type">@f["strType"]</label>
+                <select id="str_type" name="str_type">
+                    <option value="" selected="@(Val("str_type") == "")">—</option>
+                    @foreach (var (value, title) in AmlTexts.Cases.StrTypes)
+                    {
+                        <option value="@value" selected="@(Val("str_type") == value)">@title</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label for="fms_reference">@f["fmsReference"]</label>
+                <input id="fms_reference" name="fms_reference" type="text" value="@Val("fms_reference")" />
+            </div>
+            <div class="wide">
+                <label for="str_other_basis">@f["strOtherBasis"]</label>
+                <input id="str_other_basis" name="str_other_basis" type="text" value="@Val("str_other_basis")" />
+                @if (Model.Error("str_other_basis") is { } e3) { <div class="field-error">@e3</div> }
+            </div>
+            <div class="wide">
+                <label for="note">@f["note"]</label>
+                <input id="note" name="note" type="text" value="@Val("note")" />
+            </div>
+        </div>
+        <div class="toolbar" style="margin-top: 14px; margin-bottom: 0">
+            @if (status is "open" or "examined")
+            {
+                <button class="btn secondary" name="decision" value="examine">@AmlTexts.Cases.Decisions.Examine</button>
+            }
+            <button class="btn" name="decision" value="report">@AmlTexts.Cases.Decisions.Report</button>
+            @if (status is "examined" or "reported")
+            {
+                <button class="btn secondary" name="decision" value="close">@AmlTexts.Cases.Decisions.Close</button>
+            }
+        </div>
+    </form>
+}
+
+<partial name="/Pages/Compliance/_SuspensionSection.cshtml" model="Model.Section" />

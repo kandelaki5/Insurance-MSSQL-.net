@@ -1,0 +1,174 @@
+@page "/finance/panel"
+@model Insurance.Web.Pages.Finance.PanelModel
+@using Insurance.Application.Services
+@using R = Insurance.Application.Texts.Ka.PremiumReport
+@using S = Insurance.Application.Texts.FdPanelTexts.Summary
+@using Cols = Insurance.Application.Texts.FdPanelTexts.Columns
+@{
+    ViewData["Title"] = FdPanelTexts.Title;
+    string Money(System.Numerics.BigInteger v) => PremiumReport.ReportMoney(v);
+}
+<h1>@FdPanelTexts.Title</h1>
+@if (!Model.Allowed)
+{
+    <div class="alert error">@FdPanelTexts.NotAllowed</div>
+}
+else
+{
+    <p class="note">@FdPanelTexts.Note</p>
+    @foreach (var queue in FdPanel.Queues)
+    {
+        var read = Model.Reads[queue];
+        var (title, kind, card, amount) = queue switch
+        {
+            "claim" => (FdPanelTexts.Queues.Claim.Title, FdPanelTexts.Queues.Claim.Kind, FdPanelTexts.Queues.Claim.Card, FdPanelTexts.Queues.Claim.Amount),
+            "refund" => (FdPanelTexts.Queues.Refund.Title, FdPanelTexts.Queues.Refund.Kind, FdPanelTexts.Queues.Refund.Card, FdPanelTexts.Queues.Refund.Amount),
+            _ => (FdPanelTexts.Queues.Reversal.Title, FdPanelTexts.Queues.Reversal.Kind, FdPanelTexts.Queues.Reversal.Card, FdPanelTexts.Queues.Reversal.Amount),
+        };
+        <div class="card" data-queue="@queue">
+            <h2>@title</h2>
+            @if (read.State == FdPanel.ReadState.NotReady)
+            {
+                <div class="alert error">@FdPanelTexts.NotReady</div>
+            }
+            else if (read.State == FdPanel.ReadState.Failed)
+            {
+                <div class="alert error">@FdPanelTexts.Failed</div>
+            }
+            else if (read.Rows.Count == 0)
+            {
+                <div class="empty">@FdPanelTexts.Empty</div>
+            }
+            else
+            {
+                <table>
+                    <thead>
+                    <tr>
+                        <th>@Cols.RequestedOn</th>
+                        <th>@Cols.Kind</th>
+                        <th>@Cols.Request</th>
+                        <th>@card</th>
+                        @if (queue == "reversal")
+                        {
+                            <th>@Cols.Receipt</th>
+                        }
+                        <th class="num">@amount</th>
+                        <th>@Cols.Requester</th>
+                        <th>@Cols.Status</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var r in read.Rows)
+                    {
+                        <tr>
+                            <td>@r.RequestedOn</td>
+                            <td>@kind</td>
+                            <td><code>@r.Id</code></td>
+                            <td><a href="@(queue == "claim" ? $"/claims/{r.CardId}" : $"/policies/{r.CardId}")">@r.CardNumber</a></td>
+                            @if (queue == "reversal")
+                            {
+                                <td><code>@r.ReceiptId</code></td>
+                            }
+                            <td class="num">@FdPanel.AmountText(r.AmountGel)</td>
+                            <td>@r.Requester</td>
+                            <td>@FdPanelTexts.Pending</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            }
+            @if (read.State == FdPanel.ReadState.Ok && (Model.Cursor[queue] is not null || read.Next is not null))
+            {
+                <div class="toolbar" style="margin-top: 12px">
+                    @if (Model.Cursor[queue] is not null)
+                    {
+                        <a href="@Model.Href(queue, null)">@FdPanelTexts.First</a>
+                    }
+                    @if (read.Next is { } next)
+                    {
+                        <a href="@Model.Href(queue, next.ToString())">@FdPanelTexts.Next</a>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    var report = Model.Report;
+    <div class="card" data-section="month">
+        <h2>@S.Title</h2>
+        <form method="get" class="toolbar">
+            <div>
+                <label for="month">@R.Month</label>
+                <input id="month" name="month" type="month" value="@Model.Month" />
+            </div>
+            @foreach (var k in FdPanel.Queues)
+            {
+                if (Model.Cursor[k] is { } c)
+                {
+                    <input type="hidden" name="@k" value="@c" />
+                }
+            }
+            <button class="btn secondary" style="align-self: flex-end">@R.Show</button>
+            @if (report is not null)
+            {
+                <span class="hint" style="align-self: flex-end" data-period="">@Fmt.Date(report.From) – @Fmt.Date(report.To)</span>
+            }
+        </form>
+        @if (report is null)
+        {
+            <div class="alert error">@S.Failed</div>
+        }
+        else
+        {
+            <p class="note">@S.Note</p>
+            <table style="max-width: 760px">
+                <tbody>
+                <tr><th colspan="2">@S.Premium</th></tr>
+                <tr data-figure="financialWritten"><td>@R.FinancialWritten</td><td class="num">@Money(report.Totals.FinancialWrittenGel)</td></tr>
+                <tr data-figure="earned"><td>@R.Earned</td><td class="num">@Money(report.Totals.EarnedGel)</td></tr>
+                <tr data-figure="unearned"><td>@R.Unearned</td><td class="num">@Money(report.Totals.UnearnedGel)</td></tr>
+                <tr><th colspan="2">@R.ClaimsTitle</th></tr>
+                <tr data-figure="paid"><td>@S.PaidGross</td><td class="num">@Money(report.ClaimsTotals.PaidGel)</td></tr>
+                <tr data-figure="rbns"><td>@R.Rbns</td><td class="num">@Money(report.ClaimsTotals.RbnsGel)</td></tr>
+                <tr data-figure="ibnr"><td>@R.Ibnr</td><td class="num">@Money(report.ClaimsTotals.IbnrGel)</td></tr>
+                <tr data-figure="recovered"><td>@R.Recovered</td><td class="num">@Money(report.ClaimsTotals.RecoveredGel)</td></tr>
+                </tbody>
+            </table>
+            <h3>@R.ReceivableTitle (@Fmt.Date(report.To))</h3>
+            @if (report.Receivables.Count == 0)
+            {
+                <div class="empty">@Ka.Common.NoData</div>
+            }
+            else
+            {
+                <table style="max-width: 760px">
+                    <thead>
+                    <tr>
+                        <th>@R.Currency</th>
+                        <th class="num">@R.Outstanding</th>
+                        <th class="num">@R.Overdue</th>
+                        <th class="num">@R.Rate</th>
+                        <th class="num">@R.OutstandingGel</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var x in report.Receivables)
+                    {
+                        <tr data-receivable="@x.Currency">
+                            <td>@x.Currency</td>
+                            <td class="num">@Money(x.Outstanding)</td>
+                            <td class="num">@Money(x.Overdue)</td>
+                            <td class="num">@(x.Currency == "GEL" ? "" : $"{Fmt.Fixed(x.Rate, 4)} ({Fmt.Date(x.RateDate)})")</td>
+                            <td class="num">@Money(x.OutstandingGel)</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            }
+        }
+        <div class="toolbar" style="margin-top: 12px">
+            <a href="/accounting/premium-report?month=@Model.Month">@S.Detailed</a>
+            <a href="/payments/overdue">@S.OverdueToday</a>
+        </div>
+    </div>
+}

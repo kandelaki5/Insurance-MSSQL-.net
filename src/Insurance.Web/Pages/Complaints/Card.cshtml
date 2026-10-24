@@ -1,0 +1,128 @@
+@page "/complaints/{id}"
+@model Insurance.Web.Pages.Complaints.CardModel
+@{
+    var c = Model.C;
+    var f = ComplaintTexts.Fields.ByKey;
+    ViewData["Title"] = c.Number;
+    var v = Model.Respond;
+    string Val(string name) => v.GetValueOrDefault(name) ?? "";
+    var category = c.Category.ToString(System.Globalization.CultureInfo.InvariantCulture);
+}
+<h1>
+    @c.Number <span class="badge @(c.Status == "open" ? "warn" : "low")">@ComplaintTexts.Statuses.GetValueOrDefault(c.Status)</span>
+    @if (Model.Overdue)
+    {
+        <span class="badge high" style="margin-left: 6px">@ComplaintTexts.Overdue</span>
+    }
+</h1>
+@if (Model.Registered)
+{
+    <div class="alert ok">@ComplaintTexts.Registered</div>
+}
+
+<div class="card">
+    <dl class="facts">
+        <div><dt>@f["receivedOn"]</dt><dd>@Fmt.Date(c.ReceivedOn) (@ComplaintTexts.Channels.GetValueOrDefault(c.Channel))</dd></div>
+        <div><dt>@f["deadline"]</dt><dd>@Fmt.Date(Model.Deadline)</dd></div>
+        <div>
+            <dt>@f["customerName"]</dt>
+            <dd>
+                @if (c.PartyId is { } partyId)
+                {
+                    <a href="/parties/@partyId">@c.CustomerName</a>
+                }
+                else
+                {
+                    @c.CustomerName
+                }
+            </dd>
+        </div>
+        <div><dt>@f["customerContact"]</dt><dd>@(c.CustomerContact ?? "—")</dd></div>
+        <div><dt>@f["policyNumber"]</dt><dd>@if (c.PolicyId is { } policyId) { <a href="/policies/@policyId">@c.PolicyNumber</a> } else { @("—") }</dd></div>
+        <div><dt>@f["claimNumber"]</dt><dd>@if (c.ClaimId is { } claimId) { <a href="/claims/@claimId">@c.ClaimNumber</a> } else { @("—") }</dd></div>
+        <div><dt>@f["category"]</dt><dd>@category. @ComplaintTexts.Categories.GetValueOrDefault(category)</dd></div>
+        <div>
+            <dt>@f["acknowledgedAt"]</dt>
+            <dd>
+                @if (c.AcknowledgedAt is not null)
+                {
+                    @c.AcknowledgedAt
+                }
+                else if (Model.Me.CanWrite)
+                {
+                    <form method="post" asp-page-handler="Acknowledge" class="inline-form">
+                        <input type="hidden" name="id" value="@c.Id" />
+                        <button class="btn secondary">@ComplaintTexts.Actions.Acknowledge</button>
+                    </form>
+                }
+                else
+                {
+                    @("—")
+                }
+            </dd>
+        </div>
+        <div class="wide"><dt>@f["description"]</dt><dd>@c.Description</dd></div>
+    </dl>
+</div>
+
+@if (Model.Me.CanWrite)
+{
+    var status = Val("status") == "" ? "open" : Val("status");
+    <form method="post" asp-page-handler="Respond" class="card">
+        <h2>@ComplaintTexts.Actions.Respond</h2>
+        @if (Model.Notice is not null)
+        {
+            <div class="alert ok">@Model.Notice</div>
+        }
+        <input type="hidden" name="id" value="@c.Id" />
+        <div class="grid">
+            <div>
+                <label for="status">@f["status"]</label>
+                <select id="status" name="status">
+                    @foreach (var (value, title) in ComplaintTexts.Statuses)
+                    {
+                        <option value="@value" selected="@(value == status)">@title</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label for="responded_on">@f["respondedOn"]</label>
+                <date-input id="responded_on" name="responded_on" value="@Val("responded_on")" />
+            </div>
+            <div class="wide">
+                <label for="response_text">@f["responseText"]</label>
+                <input id="response_text" name="response_text" type="text" value="@Val("response_text")" />
+                @if (Model.Error("response_text") is { } error)
+                {
+                    <div class="field-error">@error</div>
+                }
+            </div>
+            <div class="wide">
+                <label for="measures">@f["measures"]</label>
+                <input id="measures" name="measures" type="text" value="@Val("measures")" />
+            </div>
+            <div>
+                <label for="outcome">@f["outcome"]</label>
+                <input id="outcome" name="outcome" type="text" value="@Val("outcome")" />
+            </div>
+            <div class="wide">
+                <label for="note">@f["note"]</label>
+                <input id="note" name="note" type="text" value="@Val("note")" />
+            </div>
+        </div>
+        <div class="toolbar" style="margin-top: 14px; margin-bottom: 0">
+            <button class="btn">@ComplaintTexts.Actions.Respond</button>
+        </div>
+    </form>
+}
+else if (!string.IsNullOrEmpty(c.ResponseText))
+{
+    <div class="card">
+        <dl class="facts">
+            <div><dt>@f["respondedOn"]</dt><dd>@(c.RespondedOn is { } r ? Fmt.Date(r) : "")</dd></div>
+            <div class="wide"><dt>@f["responseText"]</dt><dd>@c.ResponseText</dd></div>
+            <div class="wide"><dt>@f["measures"]</dt><dd>@(c.Measures ?? "—")</dd></div>
+            <div><dt>@f["outcome"]</dt><dd>@(c.Outcome ?? "—")</dd></div>
+        </dl>
+    </div>
+}

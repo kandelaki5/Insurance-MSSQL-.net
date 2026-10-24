@@ -1,0 +1,1092 @@
+{
+ "source": "Texts after the baseline 17c1f1f: each item names its origin (an old-program pull request head with the owner's rule, or a rewrite text for an owner decision).",
+ "classes": [
+  "RiCommissionTexts"
+ ],
+ "items": [
+  {
+   "kind": "text",
+   "ts": "(rewrite) sanctions screen: reused count",
+   "cs": "SanctionsTexts.Screen.Reused",
+   "value": "დაიხურა წინა გადაწყვეტილებით",
+   "origin": "rewrite, owner decision 23.10.2026 (false-positive reuse); wording proposed by Claude, not yet approved by the owner"
+  },
+  {
+   "kind": "text",
+   "ts": "(rewrite) sanctions table: reused decision",
+   "cs": "SanctionsTexts.ReusedDecision",
+   "value": "გამოყენებულია წინა გადაწყვეტილება",
+   "origin": "rewrite, owner decision 23.10.2026 (false-positive reuse); wording proposed by Claude, not yet approved by the owner"
+  },
+  {
+   "kind": "text",
+   "ts": "policyTexts.coverageColumns.initialPremium",
+   "cs": "PolicyTexts.CoverageColumns.InitialPremium",
+   "value": "საწყისი პრემია (გაცემისას)",
+   "origin": "Insurance-Software PR #207/#212/#211/#218/#225, policy-texts state at #225 head f9b5a9a (owner 13.10.2026 and 14.10.2026, docs/05 a15/a16, PR #213/#226)"
+  },
+  {
+   "kind": "text",
+   "ts": "policyTexts.coverageColumns.initialPremiumGel",
+   "cs": "PolicyTexts.CoverageColumns.InitialPremiumGel",
+   "value": "საწყისი პრემია ლარში",
+   "origin": "Insurance-Software PR #207/#212/#211/#218/#225, policy-texts state at #225 head f9b5a9a (owner 13.10.2026 and 14.10.2026, docs/05 a15/a16, PR #213/#226)"
+  },
+  {
+   "kind": "text",
+   "ts": "policyTexts.coverageColumns.currentPremium",
+   "cs": "PolicyTexts.CoverageColumns.CurrentPremium",
+   "value": "მიმდინარე პრემია (დამტკიცებული შესწორებებით)",
+   "origin": "Insurance-Software PR #207/#212/#211/#218/#225, policy-texts state at #225 head f9b5a9a (owner 13.10.2026 and 14.10.2026, docs/05 a15/a16, PR #213/#226)"
+  },
+  {
+   "kind": "text",
+   "ts": "policyTexts.endorse.note",
+   "cs": "PolicyTexts.Endorse.Note",
+   "value": "ცვლილება ფორმდება მოთხოვნად და ძალაში შედის დამტკიცების შემდეგ; ნომერი დამტკიცებისას ენიჭება. თუ ძირითადი პოლისის თვე ჯერ ღიაა, ცვლილება თავად პოლისს ასწორებს და მისი ნომერი არ იცვლება; თუ დახურულია — ცვლილება ცალკე პოლისია იმავე ხელშეკრულების ქვეშ, ნომრით „ძირითადი/1“, „ძირითადი/2“…: იწყება ცვლილების თარიღიდან, მთავრდება ძირითად პოლისთან ერთად და ატარებს მხოლოდ პრემიის სხვაობას დარჩენილი ვადისთვის.",
+   "origin": "Insurance-Software PR #207/#212/#211/#218/#225, policy-texts state at #225 head f9b5a9a (owner 13.10.2026 and 14.10.2026, docs/05 a15/a16, PR #213/#226)"
+  },
+  {
+   "kind": "text",
+   "ts": "policyTexts.endorse.correctionReason",
+   "cs": "PolicyTexts.Endorse.CorrectionReason",
+   "value": "გრაფიკი შესწორდა დამტკიცებული ცვლილებით",
+   "origin": "Insurance-Software PR #207/#212/#211/#218/#225, policy-texts state at #225 head f9b5a9a (owner 13.10.2026 and 14.10.2026, docs/05 a15/a16, PR #213/#226)"
+  },
+  {
+   "kind": "text",
+   "ts": "policyTexts.endorse.requestNumber",
+   "cs": "PolicyTexts.Endorse.RequestNumber",
+   "value": "მოთხოვნა",
+   "origin": "Insurance-Software PR #207/#212/#211/#218/#225, policy-texts state at #225 head f9b5a9a (owner 13.10.2026 and 14.10.2026, docs/05 a15/a16, PR #213/#226)"
+  },
+  {
+   "kind": "text",
+   "ts": "policyTexts.endorse.correctionNumber",
+   "cs": "PolicyTexts.Endorse.CorrectionNumber",
+   "value": "შესწორება",
+   "origin": "Insurance-Software PR #207/#212/#211/#218/#225, policy-texts state at #225 head f9b5a9a (owner 13.10.2026 and 14.10.2026, docs/05 a15/a16, PR #213/#226)"
+  },
+  {
+   "kind": "text",
+   "ts": "policyTexts.endorse.periodClosed",
+   "cs": "PolicyTexts.Endorse.PeriodClosed",
+   "value": "ცვლილების თარიღი დახურულ პერიოდშია — დახურულ პერიოდში ცვლილების დამტკიცება შეუძლებელია; ცვლილება ღია პერიოდის თარიღით გააფორმეთ.",
+   "origin": "Insurance-Software PR #207/#212/#211/#218/#225, policy-texts state at #225 head f9b5a9a (owner 13.10.2026 and 14.10.2026, docs/05 a15/a16, PR #213/#226)"
+  },
+  {
+   "kind": "text",
+   "ts": "policyTexts.endorse.errors.periodClosed",
+   "cs": "PolicyTexts.Endorse.Errors.PeriodClosed",
+   "value": "დახურულ პერიოდში ცვლილების გაკეთება შეუძლებელია — აირჩიეთ ღია პერიოდის თარიღი",
+   "origin": "Insurance-Software PR #207/#212/#211/#218/#225, policy-texts state at #225 head f9b5a9a (owner 13.10.2026 and 14.10.2026, docs/05 a15/a16, PR #213/#226)"
+  },
+  {
+   "kind": "text",
+   "ts": "policyTexts.errors.periodClosed",
+   "cs": "PolicyTexts.Errors.PeriodClosed",
+   "value": "დახურულ პერიოდში პოლისი ვერ დაიწყება — თვე დახურულია; აირჩიეთ ღია პერიოდის თარიღი",
+   "origin": "Insurance-Software PR #207/#212/#211/#218/#225, policy-texts state at #225 head f9b5a9a (owner 13.10.2026 and 14.10.2026, docs/05 a15/a16, PR #213/#226)"
+  },
+  {
+   "kind": "map",
+   "ts": "policyTexts.endorse.errors",
+   "cs": "PolicyTexts.Endorse.Errors.ByKey",
+   "entries": [
+    [
+     "notActive",
+     "ცვლილება მხოლოდ მოქმედ პოლისზეა შესაძლებელი"
+    ],
+    [
+     "date",
+     "ცვლილების თარიღი პოლისის მოქმედების ფარგლებში უნდა იყოს"
+    ],
+    [
+     "reason",
+     "აღწერეთ ცვლილების შინაარსი"
+    ],
+    [
+     "coverages",
+     "მონიშნეთ მინიმუმ ერთი დაფარვა"
+    ],
+    [
+     "rate",
+     "ამ თარიღის ოფიციალური კურსი ვერ მოიძებნა"
+    ],
+    [
+     "periodClosed",
+     "დახურულ პერიოდში ცვლილების გაკეთება შეუძლებელია — აირჩიეთ ღია პერიოდის თარიღი"
+    ]
+   ],
+   "origin": "Insurance-Software PR #207/#212/#211/#218/#225, policy-texts state at #225 head f9b5a9a (owner 13.10.2026 and 14.10.2026, docs/05 a15/a16, PR #213/#226)"
+  },
+  {
+   "kind": "map",
+   "ts": "policyTexts.errors",
+   "cs": "PolicyTexts.Errors.ByKey",
+   "entries": [
+    [
+     "policyholder",
+     "ამ ნომრით კლიენტი ვერ მოიძებნა. ჯერ დაამატეთ იგი კლიენტებში."
+    ],
+    [
+     "policyholderRisk",
+     "კლიენტს რისკის დონე არ აქვს მინიჭებული — ჯერ შეაფასეთ კლიენტის ბარათზე (AML კანონი, მუხ. 8)."
+    ],
+    [
+     "policyholderSanctioned",
+     "კლიენტს მომსახურება შეჩერებული აქვს სანქციების სკრინინგის შედეგად — პოლისის გაფორმება დაუშვებელია (AML კანონი, მუხ. 10.7)."
+    ],
+    [
+     "make",
+     "მარკა სავალდებულოა"
+    ],
+    [
+     "model",
+     "მოდელი სავალდებულოა"
+    ],
+    [
+     "vehicleId",
+     "მიუთითეთ სახელმწიფო ნომერი ან VIN"
+    ],
+    [
+     "vin",
+     "VIN უნდა შედგებოდეს 17 სიმბოლოსგან"
+    ],
+    [
+     "year",
+     "გამოშვების წელი არასწორია"
+    ],
+    [
+     "value",
+     "მიუთითეთ ავტომობილის ღირებულება"
+    ],
+    [
+     "dates",
+     "დასრულების თარიღი უნდა იყოს ძალაში შესვლის თარიღის შემდეგ"
+    ],
+    [
+     "periodClosed",
+     "დახურულ პერიოდში პოლისი ვერ დაიწყება — თვე დახურულია; აირჩიეთ ღია პერიოდის თარიღი"
+    ],
+    [
+     "rate",
+     "ამ თარიღის ოფიციალური კურსი ვერ მოიძებნა"
+    ],
+    [
+     "coverages",
+     "აირჩიეთ მინიმუმ ერთი დაფარვა და მიუთითეთ პრემია"
+    ],
+    [
+     "premium",
+     "მიუთითეთ პრემია"
+    ],
+    [
+     "installments",
+     "შენატანების რაოდენობა: 1, 4, 11 ან 12. სხვა გრაფიკი (მაგ. 2 გადახდა) ინდივიდუალურია"
+    ],
+    [
+     "installmentsEleven",
+     "11 გადახდა მხოლოდ ზუსტად 12-თვიან პოლისზეა შესაძლებელი"
+    ],
+    [
+     "mandatory",
+     "ეს დაფარვა სავალდებულოა"
+    ],
+    [
+     "commission",
+     "საკომისიო უნდა იყოს 0-დან 100-მდე"
+    ]
+   ],
+   "origin": "Insurance-Software PR #207/#212/#211/#218/#225, policy-texts state at #225 head f9b5a9a (owner 13.10.2026 and 14.10.2026, docs/05 a15/a16, PR #213/#226)"
+  },
+  {
+   "kind": "map",
+   "ts": "policyTexts.approveOutcomes",
+   "cs": "PolicyTexts.ApproveOutcomes",
+   "entries": [
+    [
+     "done",
+     "პოლისი დამტკიცდა და ძალაშია"
+    ],
+    [
+     "already",
+     "პოლისი უკვე დამტკიცებულია ან აღარ ელოდება დამტკიცებას — არაფერი შეცვლილა"
+    ],
+    [
+     "forbidden",
+     "პოლისის დამტკიცების უფლება არ გაქვთ — არაფერი შეცვლილა"
+    ],
+    [
+     "own",
+     "საკუთარი გაფორმებული პოლისის დამტკიცება არ შეიძლება; დაამტკიცებს სხვა თანამშრომელი — არაფერი შეცვლილა"
+    ],
+    [
+     "invalid",
+     "პოლისი ვერ მოიძებნა — არაფერი შეცვლილა"
+    ],
+    [
+     "policy-period-closed",
+     "შეუძლებელია პოლისის დამტკიცება, თვე დახურულია"
+    ]
+   ],
+   "origin": "Insurance-Software PR #207/#212/#211/#218/#225, policy-texts state at #225 head f9b5a9a (owner 13.10.2026 and 14.10.2026, docs/05 a15/a16, PR #213/#226)"
+  },
+  {
+   "kind": "text",
+   "ts": "impairmentTexts.inexact",
+   "cs": "ImpairmentTexts.Inexact",
+   "value": "ამ თარიღის ზოგიერთი თანხა ძალიან დიდია: ამ გვერდზე და Excel-ში ის თეთრამდე ზუსტად ვერ ჩანს, ამიტომ ციფრები მხოლოდ საორიენტაციოა და Excel-ის ფაილი არ გაიცემა. ფორმა 1-ის N1-4 ამ თანხებს ზუსტად ითვლის (საზედამხედველო ფორმები).",
+   "origin": "Insurance-Software PR #361 head 61de62c (impairment precision guard; Codex INS-PR361-GUARD-FIX-61DE62C-20261020, a technical invariant, no new business rule)"
+  },
+  {
+   "kind": "text",
+   "ts": "impairmentTexts.notForExcel",
+   "cs": "ImpairmentTexts.NotForExcel",
+   "value": "ამ თარიღის ზოგიერთ თანხას 15-ზე მეტი ციფრი აქვს: Excel მას თეთრამდე ზუსტად ვერ შეინახავს, ამიტომ Excel-ის ფაილი არ გაიცემა. გვერდზე ციფრები ზუსტია.",
+   "origin": "Insurance-Software PR #361 head 61de62c (impairment precision guard; Codex INS-PR361-GUARD-FIX-61DE62C-20261020, a technical invariant, no new business rule)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.nav",
+   "cs": "RiCommissionTexts.Nav",
+   "value": "გადამზღვევლის საკომისიო",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.title",
+   "cs": "RiCommissionTexts.Title",
+   "value": "მისაღები საკომისიო გადამზღვევლისგან",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.note",
+   "cs": "RiCommissionTexts.Note",
+   "value": "100%-ით გადაზღვეულ პოლისებზე გადამზღვევლის საკომისიო (ხელშეკრულების პროცენტი პრემიიდან) პრემიასთან ერთად ირიცხება და მოთხოვნად რჩება, სანამ გადამზღვევლთან არ ჩავითვლით ან არ ჩაგვირიცხავს. ჯამი ლარში, საანგარიშო თარიღის კურსით, ფორმა N1-4-ის 00140-ში („სხვა მოთხოვნები გადაზღვევიდან“) იწერება.",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.date",
+   "cs": "RiCommissionTexts.Date",
+   "value": "საანგარიშო თარიღი",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.show",
+   "cs": "RiCommissionTexts.Show",
+   "value": "ჩვენება",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.none",
+   "cs": "RiCommissionTexts.None",
+   "value": "ამ თარიღისთვის 100%-ით გადაზღვეულ ხელშეკრულებებზე საკომისიო არ არის",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.columns.treaty",
+   "cs": "RiCommissionTexts.Columns.Treaty",
+   "value": "ხელშეკრულება",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.columns.reinsurer",
+   "cs": "RiCommissionTexts.Columns.Reinsurer",
+   "value": "გადამზღვეველი",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.columns.currency",
+   "cs": "RiCommissionTexts.Columns.Currency",
+   "value": "ვალუტა",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.columns.accrued",
+   "cs": "RiCommissionTexts.Columns.Accrued",
+   "value": "დარიცხული",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.columns.settled",
+   "cs": "RiCommissionTexts.Columns.Settled",
+   "value": "ანგარიშსწორება",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.columns.balance",
+   "cs": "RiCommissionTexts.Columns.Balance",
+   "value": "მისაღები",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.columns.date",
+   "cs": "RiCommissionTexts.Columns.Date",
+   "value": "თარიღი",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.columns.kind",
+   "cs": "RiCommissionTexts.Columns.Kind",
+   "value": "სახე",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.columns.amount",
+   "cs": "RiCommissionTexts.Columns.Amount",
+   "value": "თანხა",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.columns.reference",
+   "cs": "RiCommissionTexts.Columns.Reference",
+   "value": "საფუძველი",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.columns.note",
+   "cs": "RiCommissionTexts.Columns.Note",
+   "value": "შენიშვნა",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "map",
+   "ts": "riCommissionTexts.columns",
+   "cs": "RiCommissionTexts.Columns.ByKey",
+   "entries": [
+    [
+     "treaty",
+     "ხელშეკრულება"
+    ],
+    [
+     "reinsurer",
+     "გადამზღვეველი"
+    ],
+    [
+     "currency",
+     "ვალუტა"
+    ],
+    [
+     "accrued",
+     "დარიცხული"
+    ],
+    [
+     "settled",
+     "ანგარიშსწორება"
+    ],
+    [
+     "balance",
+     "მისაღები"
+    ],
+    [
+     "date",
+     "თარიღი"
+    ],
+    [
+     "kind",
+     "სახე"
+    ],
+    [
+     "amount",
+     "თანხა"
+    ],
+    [
+     "reference",
+     "საფუძველი"
+    ],
+    [
+     "note",
+     "შენიშვნა"
+    ]
+   ],
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.total",
+   "cs": "RiCommissionTexts.Total",
+   "value": "სულ ლარში (N1-4 00140)",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.ratesUsed",
+   "cs": "RiCommissionTexts.RatesUsed",
+   "value": "კურსი საანგარიშო თარიღისთვის",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.overSettled",
+   "cs": "RiCommissionTexts.OverSettled",
+   "value": "ამ ხელშეკრულებებზე ანგარიშსწორება დარიცხულს აღემატება (მაგ. პოლისის გაუქმების შემდეგ). 00140-ში ისინი არ ჯამდება; რა ვუყოთ ზედმეტს — მფლობელის გადასაწყვეტია.",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "map",
+   "ts": "riCommissionTexts.kinds",
+   "cs": "RiCommissionTexts.Kinds",
+   "entries": [
+    [
+     "offset",
+     "ჩათვლა"
+    ],
+    [
+     "receipt",
+     "ჩარიცხვა"
+    ]
+   ],
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.settlementsTitle",
+   "cs": "RiCommissionTexts.SettlementsTitle",
+   "value": "ანგარიშსწორებები",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.record.title",
+   "cs": "RiCommissionTexts.Record.Title",
+   "value": "ანგარიშსწორების ჩაწერა",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.record.submit",
+   "cs": "RiCommissionTexts.Record.Submit",
+   "value": "ჩაწერა",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.record.reverse",
+   "cs": "RiCommissionTexts.Record.Reverse",
+   "value": "შებრუნება",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.record.reversedMark",
+   "cs": "RiCommissionTexts.Record.ReversedMark",
+   "value": "შებრუნებულია",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "riCommissionTexts.record.reversalMark",
+   "cs": "RiCommissionTexts.Record.ReversalMark",
+   "value": "შებრუნება",
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "map",
+   "ts": "riCommissionTexts.record",
+   "cs": "RiCommissionTexts.Record.ByKey",
+   "entries": [
+    [
+     "title",
+     "ანგარიშსწორების ჩაწერა"
+    ],
+    [
+     "submit",
+     "ჩაწერა"
+    ],
+    [
+     "reverse",
+     "შებრუნება"
+    ],
+    [
+     "reversedMark",
+     "შებრუნებულია"
+    ],
+    [
+     "reversalMark",
+     "შებრუნება"
+    ]
+   ],
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "map",
+   "ts": "riCommissionTexts.outcomes",
+   "cs": "RiCommissionTexts.Outcomes",
+   "entries": [
+    [
+     "ok",
+     "ჩაიწერა"
+    ],
+    [
+     "reversed",
+     "შებრუნდა"
+    ],
+    [
+     "invalid",
+     "შეავსეთ ხელშეკრულება, თარიღი (არა მომავალი), სახე, ვალუტა და დადებითი თანხა"
+    ],
+    [
+     "exceeds",
+     "თანხა ამ თარიღისთვის დარჩენილ მისაღებ საკომისიოს აღემატება"
+    ],
+    [
+     "period-closed",
+     "ეს თვე დახურულია — აირჩიეთ ღია თვის თარიღი"
+    ],
+    [
+     "already",
+     "ეს ანგარიშსწორება უკვე შებრუნებულია"
+    ],
+    [
+     "state",
+     "ანგარიშსწორება ვერ მოიძებნა ან თვითონ შებრუნებაა"
+    ],
+    [
+     "not-allowed",
+     "ანგარიშსწორების ჩაწერის უფლება არ გაქვთ"
+    ]
+   ],
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "map",
+   "ts": "permissionTexts.permissions",
+   "cs": "PermissionTexts.Permissions",
+   "entries": [
+    [
+     "premium.receipt.create",
+     "პრემიის მიღება"
+    ],
+    [
+     "claim.recovery.receive",
+     "რეგრესის / გადარჩენილი ქონების თანხის მიღება"
+    ],
+    [
+     "claim.payment.record",
+     "ზარალის გადახდის შეყვანა"
+    ],
+    [
+     "claim.payment.reverse",
+     "ზარალის გადახდის შებრუნება"
+    ],
+    [
+     "claim.reserve.approve",
+     "რეზერვის ცვლილების დამტკიცება"
+    ],
+    [
+     "audit.log.view",
+     "ცვლილებების ჟურნალის ნახვა"
+    ],
+    [
+     "payment.large.authorize",
+     "ზღვარზე მეტი გადახდის ავტორიზაცია (ფინანსური დირექტორი)"
+    ],
+    [
+     "finance.panel.view",
+     "ფინანსური დირექტორის პანელის ნახვა"
+    ],
+    [
+     "policy.approve",
+     "პოლისის დამტკიცება"
+    ],
+    [
+     "accounting.period.close",
+     "თვის დახურვა"
+    ],
+    [
+     "reinsurance.commission.settle",
+     "გადამზღვევლის საკომისიოს ანგარიშსწორება"
+    ]
+   ],
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "map",
+   "ts": "permissionTexts.sections",
+   "cs": "PermissionTexts.Sections",
+   "entries": [
+    [
+     "premiums",
+     "პრემიები"
+    ],
+    [
+     "claims",
+     "ზარალები"
+    ],
+    [
+     "policies",
+     "პოლისები"
+    ],
+    [
+     "periods",
+     "საანგარიშო პერიოდები"
+    ],
+    [
+     "audit",
+     "აუდიტი"
+    ],
+    [
+     "finance",
+     "ფინანსები"
+    ],
+    [
+     "reinsurance",
+     "გადაზღვევა"
+    ]
+   ],
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "map",
+   "ts": "regulatoryTexts.n14Lines",
+   "cs": "RegulatoryTexts.N14Lines",
+   "entries": [
+    [
+     "E10",
+     "00010 სადაზღვევო მოთხოვნები"
+    ],
+    [
+     "E11",
+     "00020 გაუფასურება"
+    ],
+    [
+     "E13",
+     "00040 მოთხოვნები ბროკერებისგან"
+    ],
+    [
+     "E14",
+     "00050 გაუფასურება"
+    ],
+    [
+     "E16",
+     "00070 მოთხოვნები აგენტებისგან"
+    ],
+    [
+     "E17",
+     "00080 გაუფასურება"
+    ],
+    [
+     "E19",
+     "00100 სულ სადაზღვევო მოთხოვნები, წმინდა"
+    ],
+    [
+     "E26",
+     "00140 სხვა მოთხოვნები გადაზღვევიდან (გადამზღვევლის საკომისიო)"
+    ]
+   ],
+   "origin": "Insurance-Software PR #362 head 540e81a (reinsurer's commission receivable, N1-4 00140; owner, 20.10.2026, docs/05 3ე)"
+  },
+  {
+   "kind": "text",
+   "ts": "(rewrite) claim errors: claims of the event in another currency (H46)",
+   "cs": "ClaimTexts.Errors.CurrencyMixed",
+   "value": "ამ შემთხვევის ზარალები სხვა ვალუტაშია: ერთ შემთხვევაში ლარისა და სხვა ვალუტის ზარალის აღრიცხვის წესი ჯერ დასადასტურებელია — არაფერი ჩაწერილა",
+   "origin": "rewrite, H46: old program docs/07 §4.5, owner 06.10.2026; wording proposed, not approved"
+  },
+  {
+   "kind": "text",
+   "ts": "(rewrite) claim errors: total loss across currencies (H46)",
+   "cs": "ClaimTexts.Errors.TotalLossCurrency",
+   "value": "ზარალი ლარშია, პოლისი კი სხვა ვალუტაში: სრული განადგურებისას პრემიის დაკავების წესი ასეთ ზარალზე ჯერ დასადასტურებელია — ანაზღაურება არ გატარდა",
+   "origin": "rewrite, H46: old program docs/07 §4.5, owner 06.10.2026; wording proposed, not approved"
+  },
+  {
+   "kind": "text",
+   "ts": "(rewrite) claim errors: excess of loss on a GEL claim of a foreign-currency coverage (H46)",
+   "cs": "ClaimTexts.Errors.XlCurrency",
+   "value": "ზარალი ლარშია, დაფარვა კი სხვა ვალუტაში: ზარალის ექსცედენტის (XL) ხელშეკრულების გამოყენების წესი ასეთ ზარალზე ჯერ დასადასტურებელია — ზარალი არ დარეგისტრირდა",
+   "origin": "rewrite, H46: old program docs/07 §4.5, owner 06.10.2026; wording proposed, not approved"
+  },
+  {
+   "kind": "text",
+   "ts": "(rewrite) claim notes: payment of a GEL claim on a foreign-currency policy (H46)",
+   "cs": "ClaimTexts.Notes.PaymentGel",
+   "value": "თანხა ლარშია; გასაცემი = თანხა − ფრანშიზა − პრემიასთან ჩათვლა. პრემიის დავალიანება პოლისის ვალუტაშია: ჩათვლა მასში ანაზღაურების დღის კურსით იანგარიშება, ცენტამდე ქვემოთ დამრგვალებით.",
+   "origin": "rewrite, H46: old program docs/07 §4.5, owner 06.10.2026; wording proposed, not approved"
+  },
+  {
+   "kind": "text",
+   "ts": "(rewrite) claim notes: registration of a GEL claim on a foreign-currency policy (H46)",
+   "cs": "ClaimTexts.Notes.GelOnForeign",
+   "value": "ზარალი აღირიცხება ლარში. სადაზღვევო თანხა და ფრანშიზა პოლისის ვალუტაშია და ლარში გადაიყვანება შემთხვევის დღის ოფიციალური კურსით.",
+   "origin": "rewrite, H46: old program docs/07 §4.5, owner 06.10.2026; wording proposed, not approved"
+  },
+  {
+   "kind": "map2",
+   "ts": "ka.settings.choices",
+   "cs": "Ka.Settings.Choices",
+   "entries": [
+    [
+     "policy.reduction_order",
+     [
+      [
+       "last_first",
+       "ბოლო შენატანები მცირდება (ბოლოდან წინ)"
+      ],
+      [
+       "equal_unpaid",
+       "თანაბრად ნაწილდება გადაუხდელ შენატანებზე"
+      ]
+     ]
+    ],
+    [
+     "claim.currency",
+     [
+      [
+       "gel",
+       "ლარში (ლიმიტი და ფრანშიზა — შემთხვევის დღის კურსით)"
+      ],
+      [
+       "policy",
+       "პოლისის ვალუტაში"
+      ]
+     ]
+    ]
+   ],
+   "origin": "baseline policy.reduction_order unchanged; claim.currency added: rewrite, H46: old program docs/07 §4.5, owner 06.10.2026; wording proposed, not approved"
+  },
+  {
+   "kind": "text",
+   "ts": "regulatoryTexts.form1Coverage",
+   "cs": "RegulatoryTexts.Form1Coverage",
+   "value": "ფინანსური ანგარიშგების დანართი N1, მისი სადაზღვევო ნაწილი, პროგრამაში არსებული მონაცემებით. N1-7 — არასიცოცხლის რეზერვები და გადამზღვევლის წილი (თვის პრემიის ანგარიშიდან); N1-4 — სადაზღვევო მოთხოვნები პირდაპირი / ბროკერებისგან / აგენტებისგან და მათი გაუფასურება (გაუფასურების ანგარიშიდან); Info — კომპანიის რეკვიზიტები პარამეტრებიდან და თარიღი. ბალანსის (N1) სადაზღვევო სტრიქონებს შაბლონის ფორმულები ქვეფორმებიდან კრებს. „გასული წლის შესაბამისი პერიოდი“, სიცოცხლე, გადაზღვევის მოთხოვნები, გადავადებული საკომისიო და დანარჩენი ფორმები ცარიელია — ეს მონაცემები პროგრამაში არ აღირიცხება. ბალანსის სრული შევსება ეს არ არის. მოგება-ზარალის სადაზღვევო ნაწილი (N2, N2-1, N4) — ქვემოთ.",
+   "origin": "Insurance-Software PR #366 head d251848 (form 1 profit and loss; owner 20.10.2026 and 21.10.2026, docs/05 ბ6)"
+  },
+  {
+   "kind": "function",
+   "ts": "regulatoryTexts.incomeTitle",
+   "cs": "RegulatoryTexts.IncomeTitle",
+   "params": [
+    "string",
+    "string"
+   ],
+   "calls": [
+    {
+     "args": [
+      "",
+      ""
+     ],
+     "result": "მოგება-ზარალი (არასიცოცხლე),  – "
+    },
+    {
+     "args": [
+      "01.01.2026",
+      "31.10.2026"
+     ],
+     "result": "მოგება-ზარალი (არასიცოცხლე), 01.01.2026 – 31.10.2026"
+    }
+   ],
+   "origin": "Insurance-Software PR #366 head d251848 (form 1 profit and loss; owner 20.10.2026 and 21.10.2026, docs/05 ბ6)"
+  },
+  {
+   "kind": "text",
+   "ts": "regulatoryTexts.incomeCoverage",
+   "cs": "RegulatoryTexts.IncomeCoverage",
+   "value": "წლის დასაწყისიდან საანგარიშო თარიღამდე (მფლობელი, 20.10.2026). P&C(NL) (N4): მოზიდული პრემია (Corrected), გადაზღვევის პრემია, ანაზღაურებული ზარალები და გადამზღვევლის წილი მათში — სახეობით და სეგმენტით (კორპორატიული / საცალო / სახელმწიფო), რაოდენობით; IS-ის 00010, 00020, 00060, 00070 შაბლონის ფორმულებით ამ ფურცლიდან მოდის. ცვლილება UPR-სა და ზარალების რეზერვში (RBNS + IBNR) ჩაწერილია როგორც „ბოლო − საწყისი“ (საწყისი = წინა წლის 31 დეკემბერი), რომ შაბლონის ფორმულამ გამომუშავებული პრემია და დამდგარი ზარალი სწორად დათვალოს. 00100 — რეგრესი და გადარჩენილი ქონება მიღებისას; 00500 — დებიტორების გაუფასურების ცვლილება; IS-COM — გადაზღვევის, ბროკერისა და აგენტის (თანამშრომლის ჩათვლით) საკომისიო და მისი გადავადებული ნაწილის ცვლილება. მფლობელის პასუხებით (20.10.2026): პოლისის ცვლილება ახალი პოლისია; ზარალის შემთხვევა = ზარალი × სახეობა (ერთ სახეობაზე ერთხელ, რამდენი გადახდაც არ უნდა ჰქონდეს; ორ სახეობაზე — 2 შემთხვევა); ერთსახეობიანი XL ხელშეკრულების პრემია მის სახეობაზეა; ბანკის საკომისიო — N2-6-ის 00160-ში (პერიოდში დარიცხული, არ გადავადდება); გადავადებული საკომისიო — N1-8-ში, საიდანაც ბალანსის 00130 / 00270 შაბლონის ფორმულით ივსება. სეგმენტი — გაცემისას პოლისზე დაფიქსირებული (მფლობელი, 21.10.2026: „ეს მონაცემი არ იცვლება. არის ის, როგორც გაიცა“). ბონუსები, ცედენტის საკომისიო, შემომავალი გადაზღვევა, ცვეთა და „გასული წლის“ სვეტი ცარიელია — პროგრამაში არ აღირიცხება.",
+   "origin": "Insurance-Software PR #366 head d251848 (form 1 profit and loss; owner 20.10.2026 and 21.10.2026, docs/05 ბ6)"
+  },
+  {
+   "kind": "text",
+   "ts": "regulatoryTexts.isTitle",
+   "cs": "RegulatoryTexts.IsTitle",
+   "value": "N2. სრული შემოსავლის ანგარიშგება (სადაზღვევო საქმიანობა, არასიცოცხლე)",
+   "origin": "Insurance-Software PR #366 head d251848 (form 1 profit and loss; owner 20.10.2026 and 21.10.2026, docs/05 ბ6)"
+  },
+  {
+   "kind": "text",
+   "ts": "regulatoryTexts.otherExpensesTitle",
+   "cs": "RegulatoryTexts.OtherExpensesTitle",
+   "value": "N2-6. სხვა ხარჯები (მხოლოდ ბანკის საკომისიო)",
+   "origin": "Insurance-Software PR #366 head d251848 (form 1 profit and loss; owner 20.10.2026 and 21.10.2026, docs/05 ბ6)"
+  },
+  {
+   "kind": "map",
+   "ts": "regulatoryTexts.otherExpensesLines",
+   "cs": "RegulatoryTexts.OtherExpensesLines",
+   "entries": [
+    [
+     "E31",
+     "00160 ბანკის მომსახურების საკომისიოები (ბანკის საკომისიო, პერიოდში დარიცხული)"
+    ]
+   ],
+   "origin": "Insurance-Software PR #366 head d251848 (form 1 profit and loss; owner 20.10.2026 and 21.10.2026, docs/05 ბ6)"
+  },
+  {
+   "kind": "text",
+   "ts": "regulatoryTexts.deferredTitle",
+   "cs": "RegulatoryTexts.DeferredTitle",
+   "value": "N1-8. გადავადებული საკომისიო (საანგარიშო თარიღზე; ბალანსის 00130 და 00270 აქედან)",
+   "origin": "Insurance-Software PR #366 head d251848 (form 1 profit and loss; owner 20.10.2026 and 21.10.2026, docs/05 ბ6)"
+  },
+  {
+   "kind": "map",
+   "ts": "regulatoryTexts.deferredLines",
+   "cs": "RegulatoryTexts.DeferredLines",
+   "entries": [
+    [
+     "E11",
+     "00020 ბროკერის კუთვნილი საკომისიო"
+    ],
+    [
+     "E12",
+     "00030 აგენტის (და თანამშრომლის) კუთვნილი საკომისიო"
+    ],
+    [
+     "E13",
+     "00040 სულ გადავადებული საკომისიო ხარჯი"
+    ],
+    [
+     "E16",
+     "00050 გადაზღვევიდან კუთვნილი საკომისიო"
+    ],
+    [
+     "E17",
+     "00060 სულ გადავადებული საკომისიო შემოსავალი"
+    ]
+   ],
+   "origin": "Insurance-Software PR #366 head d251848 (form 1 profit and loss; owner 20.10.2026 and 21.10.2026, docs/05 ბ6)"
+  },
+  {
+   "kind": "function",
+   "ts": "regulatoryTexts.claimCountCheck",
+   "cs": "RegulatoryTexts.ClaimCountCheck",
+   "params": [
+    "number",
+    "number"
+   ],
+   "calls": [
+    {
+     "args": [
+      0,
+      0
+     ],
+     "result": "ანაზღაურებული ზარალების რაოდენობა (P&C(NL), III ნაწილი): 0 შემთხვევა — ზარალი × სახეობა (მფლობელი, 20.10.2026: „2 სახეობაში 1 ზარალი, 2 შემთხვევაა“); ეს 0 ზარალია."
+    },
+    {
+     "args": [
+      4,
+      3
+     ],
+     "result": "ანაზღაურებული ზარალების რაოდენობა (P&C(NL), III ნაწილი): 4 შემთხვევა — ზარალი × სახეობა (მფლობელი, 20.10.2026: „2 სახეობაში 1 ზარალი, 2 შემთხვევაა“); ეს 3 ზარალია."
+    },
+    {
+     "args": [
+      2,
+      1
+     ],
+     "result": "ანაზღაურებული ზარალების რაოდენობა (P&C(NL), III ნაწილი): 2 შემთხვევა — ზარალი × სახეობა (მფლობელი, 20.10.2026: „2 სახეობაში 1 ზარალი, 2 შემთხვევაა“); ეს 1 ზარალია."
+    }
+   ],
+   "origin": "Insurance-Software PR #366 head d251848 (form 1 profit and loss; owner 20.10.2026 and 21.10.2026, docs/05 ბ6)"
+  },
+  {
+   "kind": "map",
+   "ts": "regulatoryTexts.treatyReasons",
+   "cs": "RegulatoryTexts.TreatyReasons",
+   "entries": [
+    [
+     "no-class",
+     "სახეობა არ აქვს მითითებული"
+    ],
+    [
+     "several-classes",
+     "რამდენიმე სახეობა — თანხა არ იყოფა (თითო სახეობას თავისი XL უნდა ჰქონდეს)"
+    ],
+    [
+     "not-xl",
+     "არც XL, არც კვოტური"
+    ],
+    [
+     "negative-key",
+     "გადაცემული პრემიის გამომუშავებული ნაწილი უარყოფითია — გაყოფა გადასაწყვეტია"
+    ],
+    [
+     "no-row",
+     "სახეობას ფორმაში სტრიქონი არ აქვს"
+    ]
+   ],
+   "origin": "Insurance-Software PR #366 head d251848 (form 1 profit and loss; owner 20.10.2026 and 21.10.2026, docs/05 ბ6)"
+  },
+  {
+   "kind": "text",
+   "ts": "regulatoryTexts.comTitle",
+   "cs": "RegulatoryTexts.ComTitle",
+   "value": "N2-1. საკომისიო შემოსავალი (ხარჯი), არასიცოცხლე",
+   "origin": "Insurance-Software PR #366 head d251848 (form 1 profit and loss; owner 20.10.2026 and 21.10.2026, docs/05 ბ6)"
+  },
+  {
+   "kind": "map",
+   "ts": "regulatoryTexts.isLines",
+   "cs": "RegulatoryTexts.IsLines",
+   "entries": [
+    [
+     "E9",
+     "00010 მოზიდული პრემია, ბრუტო"
+    ],
+    [
+     "E10",
+     "00020 გადაზღვევის პრემია"
+    ],
+    [
+     "E11",
+     "00030 ცვლილება UPR-ში, ბრუტო"
+    ],
+    [
+     "E12",
+     "00040 ცვლილება UPR-ში, გადამზღვევლის წილი"
+    ],
+    [
+     "E13",
+     "00050 გამომუშავებული პრემია (ნეტო)"
+    ],
+    [
+     "E14",
+     "00060 ანაზღაურებული ზარალები"
+    ],
+    [
+     "E15",
+     "00070 გადამზღვევლის წილი ანაზღაურებულ ზარალებში"
+    ],
+    [
+     "E16",
+     "00080 ცვლილება ზარალების რეზერვში, ბრუტო"
+    ],
+    [
+     "E17",
+     "00090 ცვლილება ზარალების რეზერვში, გადამზღვევლის წილი"
+    ],
+    [
+     "E18",
+     "00100 შემოსავალი რეგრესიდან და გადარჩენილი ქონებიდან"
+    ],
+    [
+     "E19",
+     "00110 დამდგარი ზარალები, ნეტო"
+    ],
+    [
+     "E20",
+     "00120 დარიცხული ბონუსები"
+    ],
+    [
+     "E21",
+     "00130 საკომისიო შემოსავალი (ხარჯი), წმინდა"
+    ],
+    [
+     "E22",
+     "00140 სადაზღვევო მოგება (ზარალი), წმინდა"
+    ],
+    [
+     "E67",
+     "00500 ცვეთის, ამორტიზაციის და გაუფასურების ხარჯი (მხოლოდ გაუფასურების ცვლილება)"
+    ]
+   ],
+   "origin": "Insurance-Software PR #366 head d251848 (form 1 profit and loss; owner 20.10.2026 and 21.10.2026, docs/05 ბ6)"
+  },
+  {
+   "kind": "map",
+   "ts": "regulatoryTexts.comLines",
+   "cs": "RegulatoryTexts.ComLines",
+   "entries": [
+    [
+     "E11",
+     "00020 გადაზღვევიდან კუთვნილი საკომისიო (გადავადებას დაქვემდებარებული)"
+    ],
+    [
+     "E12",
+     "00030 ცვლილება გადავადებულ შემოსავალში"
+    ],
+    [
+     "E13",
+     "00040 გადამზღვევლისგან მიღებული საკომისიო, წმინდა"
+    ],
+    [
+     "E19",
+     "00100 ბროკერის საკომისიო (გადავადებას დაქვემდებარებული)"
+    ],
+    [
+     "E20",
+     "00110 ცვლილება გადავადებულ ხარჯში"
+    ],
+    [
+     "E21",
+     "00120 ბროკერის საკომისიო, წმინდა"
+    ],
+    [
+     "E23",
+     "00140 აგენტის საკომისიო (გადავადებას დაქვემდებარებული)"
+    ],
+    [
+     "E24",
+     "00150 ცვლილება გადავადებულ ხარჯში"
+    ],
+    [
+     "E25",
+     "00160 აგენტის საკომისიო, წმინდა"
+    ],
+    [
+     "E26",
+     "00170 საკომისიო შემოსავალი (ხარჯი), წმინდა"
+    ]
+   ],
+   "origin": "Insurance-Software PR #366 head d251848 (form 1 profit and loss; owner 20.10.2026 and 21.10.2026, docs/05 ბ6)"
+  },
+  {
+   "kind": "text",
+   "ts": "regulatoryTexts.incomeUnplacedNote",
+   "cs": "RegulatoryTexts.IncomeUnplacedNote",
+   "value": "ეს თანხები პროგრამაშია, მაგრამ ფორმის არცერთ სტრიქონში არ შევიდა: სახეობა, რომლის სტრიქონიც ფორმაში ქვესახეობებადაა დაყოფილი (სახეობა 5-ის გარდა, რომელიც 05.1-ში შედის); ხელშეკრულების პრემია, რომელსაც ერთი სახეობა არ აქვს ან XL არ არის (მიზეზი ფრჩხილებშია). პროგრამა თავად არ წყვეტს, სად შევიდეს. სვეტები: რაოდენობა, თანხა.",
+   "origin": "Insurance-Software PR #366 head d251848 (form 1 profit and loss; owner 20.10.2026 and 21.10.2026, docs/05 ბ6)"
+  },
+  {
+   "kind": "map",
+   "ts": "regulatoryTexts.incomeParts",
+   "cs": "RegulatoryTexts.IncomeParts",
+   "entries": [
+    [
+     "written",
+     "მოზიდული პრემია"
+    ],
+    [
+     "ceded",
+     "გადაზღვევის პრემია"
+    ],
+    [
+     "paid",
+     "ანაზღაურებული ზარალები"
+    ],
+    [
+     "reinsurerPaid",
+     "გადამზღვევლის წილი ზარალებში"
+    ],
+    [
+     "treaty",
+     "ხელშეკრულების პრემია"
+    ]
+   ],
+   "origin": "Insurance-Software PR #366 head d251848 (form 1 profit and loss; owner 20.10.2026 and 21.10.2026, docs/05 ბ6)"
+  },
+  {
+   "kind": "text",
+   "ts": "(rewrite) regulatory balance: a line partly kept (00070)",
+   "cs": "RegulatoryTexts.PartlyKept",
+   "value": "ნაწილობრივ: აქ მხოლოდ გადამზღვევლის საკომისიოს მოთხოვნაა (N1-4 00140); გადაზღვევის სხვა მოთხოვნები პროგრამაში არ აღირიცხება",
+   "origin": "rewrite, Codex R004-01 (INS-DOTNET-MSSQL-004, 24.10.2026): balance 00070 shown with what it holds; wording proposed by Claude, not approved by the owner"
+  }
+ ]
+}

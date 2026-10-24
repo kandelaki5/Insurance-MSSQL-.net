@@ -1,0 +1,105 @@
+@page "/policies/import"
+@model Insurance.Web.Pages.Policies.ImportModel
+@using I = Insurance.Application.Texts.PolicyTexts.Import
+@using F = Insurance.Application.Texts.PolicyTexts.Fields
+@{
+    ViewData["Title"] = I.Title;
+}
+<h1>@I.Title</h1>
+<p class="note">@I.Note</p>
+@if (Model.FormError is not null)
+{
+    <div class="alert error">@Model.FormError</div>
+}
+<form method="post" asp-page-handler="Preview" enctype="multipart/form-data">
+    <div class="card">
+        <div class="grid">
+            <div class="wide">
+                <label for="policyholder_id_number">@F.PolicyholderIdNumber</label>
+                <input id="policyholder_id_number" name="policyholder_id_number" type="text" value="@Model.Value("policyholder_id_number")" required />
+            </div>
+            <div>
+                <label for="file">@I.File</label>
+                <input id="file" name="file" type="file" accept=".xlsx,.xls,.csv" required />
+            </div>
+            <div>
+                <label for="effective_from">@F.EffectiveFrom (@I.DefaultHint)</label>
+                <date-input id="effective_from" name="effective_from" value="@Model.Value("effective_from")" />
+            </div>
+            <div>
+                <label for="effective_to">@F.EffectiveTo (@I.DefaultHint)</label>
+                <date-input id="effective_to" name="effective_to" value="@Model.Value("effective_to")" />
+            </div>
+            <div>
+                <label for="currency">@F.Currency (@I.DefaultHint)</label>
+                <select id="currency" name="currency">
+                    @foreach (var code in new[] { "GEL", "USD", "EUR" })
+                    {
+                        <option value="@code" selected="@(Model.Value("currency", "GEL") == code)">@code</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label for="installments">@F.Installments (@I.DefaultHint)</label>
+                <select id="installments" name="installments">
+                    @foreach (var (n, title) in PolicyTexts.PaymentPlans)
+                    {
+                        <option value="@n" selected="@(Model.Value("installments", "1") == n)">@title</option>
+                    }
+                </select>
+            </div>
+        </div>
+    </div>
+    <div class="toolbar">
+        <button class="btn">@I.Check</button>
+        <a class="btn secondary" href="/policies/import/template">@I.Template</a>
+        <a class="btn secondary" href="/policies">@Ka.Common.Cancel</a>
+    </div>
+</form>
+
+@if (Model.Preview is { Rows: { } rows } preview)
+{
+    <h2 class="section">@I.PreviewTitle: @preview.Policyholder</h2>
+    <p class="note">@I.PreviewSummary(rows.Count, Model.Valid)</p>
+    <table>
+        <thead>
+        <tr>
+            <th>@I.RowNo</th>
+            <th>@F.Object</th>
+            <th>@F.Term</th>
+            <th class="num">@F.Premium</th>
+            <th>@I.Problems</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var r in rows)
+        {
+            <tr>
+                <td>@r.Row</td>
+                <td>@r.Description</td>
+                <td>@r.Term</td>
+                <td class="num">@r.Premium</td>
+                <td>
+                    @if (r.Errors.Count == 0)
+                    {
+                        <span class="badge low">@I.Ok</span>
+                    }
+                    else
+                    {
+                        <span class="field-error">@string.Join("; ", r.Errors)</span>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+    @if (preview.Payload is not null)
+    {
+        <form method="post" asp-page-handler="Confirm" class="toolbar" style="margin-top: 14px">
+            <input type="hidden" name="payload" value="@preview.Payload" />
+            <input type="hidden" name="preview_state" value="@Model.PreviewState" />
+            <button class="btn">@I.Confirm(Model.Valid)</button>
+            <span class="hint">@I.ConfirmHint</span>
+        </form>
+    }
+}

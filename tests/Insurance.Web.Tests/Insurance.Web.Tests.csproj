@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <PackageReference Include="Microsoft.Playwright" Version="1.64.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.13" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Insurance.Web\Insurance.Web.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The same fresh-database fixture as the integration tests. -->
+    <Compile Include="..\Insurance.Integration.Tests\TestDatabase.cs" Link="TestDatabase.cs" />
+    <Compile Include="..\Insurance.Integration.Tests\TestClock.cs" Link="TestClock.cs" />
+    <!-- Fictional rows for the policy, payment and claim pages' tests (World and ClaimWorld use Fixtures). -->
+    <Compile Include="..\Insurance.Integration.Tests\Fixtures.cs" Link="Fixtures.cs" />
+    <Compile Include="..\Insurance.Integration.Tests\ClaimWorld.cs" Link="ClaimWorld.cs" />
+    <Compile Include="..\Insurance.Integration.Tests\Policies\World.cs" Link="Policies\World.cs" />
+    <!-- The gap tests' helpers: a database of its own, an armed fault, permission decisions (docs/legacy-tests-gaps-b.md). -->
+    <Compile Include="..\Insurance.Integration.Tests\Policies\GapsSupport.cs" Link="Policies\GapsSupport.cs" />
+    <Compile Include="..\Insurance.Integration.Tests\Policies\LegacyDays.cs" Link="Policies\LegacyDays.cs" />
+    <Compile Include="..\Insurance.Integration.Tests\ComplianceFixtures.cs" Link="ComplianceFixtures.cs" />
+    <!-- The command interceptor of the failure-injection tests (DbOptions.Interceptor). -->
+    <Compile Include="..\Insurance.Integration.Tests\FailureInjection\Faults.cs" Link="FailureInjection\Faults.cs" />
+    <!-- The report worlds of the integration tests, for the report pages over the same rows. -->
+    <Compile Include="..\Insurance.Integration.Tests\Worlds\*.cs" LinkBase="Worlds" />
+    <!-- The month-report cases of the legacy precision check, read here also through the report page and the panel. -->
+    <Compile Include="..\Insurance.Integration.Tests\Accounting\MonthReport*.cs" LinkBase="Accounting" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

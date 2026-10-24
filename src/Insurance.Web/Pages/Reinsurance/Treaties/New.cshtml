@@ -1,0 +1,114 @@
+@page "/reinsurance/treaties/new"
+@model Insurance.Web.Pages.Reinsurance.Treaties.NewModel
+@{
+    ViewData["Title"] = ReinsuranceTexts.New;
+    var kind = Model.Value("kind", "quota_share");
+    // Fields shown for a kind only; the others are hidden and disabled, so they are not posted (as the old form did not render them).
+    string? Only(params string[] kinds) => kinds.Contains(kind) ? null : "hidden";
+}
+<h1>@ReinsuranceTexts.New</h1>
+@functions {
+    private Microsoft.AspNetCore.Html.IHtmlContent Field(string name, string label, string type = "text", string? className = null, string? kinds = null, bool hidden = false)
+    {
+        var e = (Func<string?, string>)(s => System.Net.WebUtility.HtmlEncode(s ?? ""));
+        var b = new System.Text.StringBuilder();
+        b.Append($"<div{(className is null ? "" : $" class=\"{className}\"")}{(kinds is null ? "" : $" data-kinds=\"{kinds}\"")}{(hidden ? " hidden" : "")}>");
+        b.Append($"<label for=\"{name}\">{e(label)}</label>");
+        {
+            b.Append($"<input id=\"{name}\" name=\"{name}\" type=\"{type}\"{(type == "number" ? " step=\"0.0001\"" : "")} value=\"{e(Model.Value(name))}\"{(hidden ? " disabled" : "")} />");
+        }
+        if (Model.Error(name) is { } error) b.Append($"<div class=\"field-error\">{e(error)}</div>");
+        b.Append("</div>");
+        return new Microsoft.AspNetCore.Html.HtmlString(b.ToString());
+    }
+}
+<form method="post" id="treaty-form">
+    @if (Model.FormError is not null)
+    {
+        <div class="alert error">@Model.FormError</div>
+    }
+    <div class="card">
+        <div class="grid">
+            @Field("name", ReinsuranceTexts.Fields.Name, "text", "wide")
+            <div>
+                <label for="kind">@ReinsuranceTexts.Fields.Kind</label>
+                <select id="kind" name="kind">
+                    @foreach (var (value, title) in ReinsuranceTexts.Kinds)
+                    {
+                        <option value="@value" selected="@(value == kind)">@title</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label for="currency">@ReinsuranceTexts.Fields.Currency</label>
+                <select id="currency" name="currency">
+                    @foreach (var c in new[] { "GEL", "USD", "EUR" })
+                    {
+                        <option value="@c" selected="@(c == Model.Value("currency", "GEL"))">@c</option>
+                    }
+                </select>
+            </div>
+            @Field("reinsurer_id_number", ReinsuranceTexts.Fields.ReinsurerIdNumber)
+            @Field("broker_id_number", ReinsuranceTexts.Fields.BrokerIdNumber)
+            <div>
+                <label for="period_from">@ReinsuranceTexts.Fields.PeriodFrom</label>
+                <date-input id="period_from" name="period_from" value="@Model.Value("period_from")" />
+                @if (Model.Error("period_from") is { } fromError) { <div class="field-error">@fromError</div> }
+            </div>
+            <div>
+                <label for="period_to">@ReinsuranceTexts.Fields.PeriodTo</label>
+                <date-input id="period_to" name="period_to" value="@Model.Value("period_to")" />
+                @if (Model.Error("period_to") is { } toError) { <div class="field-error">@toError</div> }
+            </div>
+            @Field("ceded_percent", ReinsuranceTexts.Fields.CededPercent, "number", null, "quota_share facultative", Only("quota_share", "facultative") is not null)
+            @Field("retention", ReinsuranceTexts.Fields.Retention, "number", null, "surplus", Only("surplus") is not null)
+            @Field("lines", ReinsuranceTexts.Fields.Lines, "number", null, "surplus", Only("surplus") is not null)
+            @Field("priority", ReinsuranceTexts.Fields.Priority, "number", null, "excess_of_loss", Only("excess_of_loss") is not null)
+            @Field("treaty_limit", ReinsuranceTexts.Fields.TreatyLimit, "number", null, "excess_of_loss", Only("excess_of_loss") is not null)
+            @Field("treaty_premium", ReinsuranceTexts.Fields.TreatyPremium, "number", null, "excess_of_loss", Only("excess_of_loss") is not null)
+            @Field("commission_percent", ReinsuranceTexts.Fields.CommissionPercent, "number")
+            @Field("broker_percent", ReinsuranceTexts.Fields.BrokerPercent, "number")
+            @Field("reinsurer_rating", ReinsuranceTexts.Fields.ReinsurerRating)
+            @Field("rating_agency", ReinsuranceTexts.Fields.RatingAgency)
+            @Field("note", ReinsuranceTexts.Fields.Note, "text", "wide")
+        </div>
+    </div>
+    <div class="card" data-kinds="quota_share surplus excess_of_loss" hidden="@(kind == "facultative")">
+        <h2>@ReinsuranceTexts.Fields.Classes</h2>
+        <div class="grid">
+            @foreach (var c in Model.Classes)
+            {
+                <div class="check">
+                    <input id="class_@c.Code" name="class_@c.Code" type="checkbox" checked="@(Model.Value("class_" + c.Code) == "on")" disabled="@(kind == "facultative")" />
+                    <label for="class_@c.Code">@c.Code. @c.Name</label>
+                </div>
+            }
+        </div>
+        @if (Model.Error("classes") is { } classesError)
+        {
+            <div class="field-error">@classesError</div>
+        }
+    </div>
+    <div class="toolbar">
+        <button class="btn">@ReinsuranceTexts.Create</button>
+        <a class="btn secondary" href="/reinsurance/treaties">@Ka.Common.Cancel</a>
+    </div>
+</form>
+@section Scripts {
+    <script>
+        // The fields of the chosen kind only (the old form rendered nothing else); hidden fields are disabled, so they are not posted.
+        (function () {
+            var form = document.getElementById('treaty-form');
+            var kind = document.getElementById('kind');
+            function show() {
+                form.querySelectorAll('[data-kinds]').forEach(function (block) {
+                    var on = block.getAttribute('data-kinds').split(' ').indexOf(kind.value) >= 0;
+                    block.hidden = !on;
+                    block.querySelectorAll('input').forEach(function (input) { input.disabled = !on; });
+                });
+            }
+            kind.addEventListener('change', show);
+            show();
+        })();
+    </script>
+}

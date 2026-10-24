@@ -1,0 +1,24 @@
+bin/
+obj/
+*.user
+.vs/
+.vscode/
+TestResults/
+*.trx
+# Local secrets and data: never committed (connection strings, test passwords, client data).
+.env
+.env.*
+!.env.example
+!.env.test.example
+appsettings.Local.json
+appsettings.*.Local.json
+*.xlsx
+*.xls
+*.pdf
+*.bak
+!src/Insurance.Domain/Regulatory/Templates/*.xlsx
+artifacts/
+
+# Angular's standalone index is not served; authenticated Razor pages bootstrap the workspace.
+/src/Insurance.Web/wwwroot/ui/index.html
+/src/Insurance.Web/wwwroot/ui/favicon.ico

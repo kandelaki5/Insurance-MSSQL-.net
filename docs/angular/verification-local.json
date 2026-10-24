@@ -1,0 +1,189 @@
+{
+  "active": 12,
+  "activePremiumGel": 51900.0,
+  "checkedAt": "2026-10-23T18:15:59.0852880+00:00",
+  "exactBalance": true,
+  "base": "http://127.0.0.1:5200/",
+  "pages": [
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": ""
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "policies"
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "policies/new"
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "policies/pending"
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "policies/import"
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "parties"
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "parties/new?kind=person"
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "claims"
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "claims/new"
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "complaints"
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "intermediaries"
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "payments/overdue"
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "reinsurance/treaties"
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "reinsurance/treaties/new"
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "reference/classes"
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "reference/rates"
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "accounting/periods"
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "accounting/premium-report"
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "accounting/policy-premium"
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "accounting/impairment"
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "accounting/regulatory"
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "audit"
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "finance/panel"
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "users"
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "settings"
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "settings/products"
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "compliance/sanctions"
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "compliance/aml-cases"
+    },
+    {
+      "angularShell": true,
+      "serverFormPreserved": true,
+      "status": 200,
+      "path": "compliance/aml-report"
+    }
+  ],
+  "policyCount": 14,
+  "search": true,
+  "anonymousApiDenied": true,
+  "csrf": true,
+  "login": true,
+  "reinsuranceCededGel": 2400
+}

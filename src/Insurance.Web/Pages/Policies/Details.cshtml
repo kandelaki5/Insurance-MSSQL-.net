@@ -1,0 +1,508 @@
+@page "/policies/{id:guid}"
+@model Insurance.Web.Pages.Policies.DetailsModel
+@using Vq = Insurance.Application.Texts.BillingTexts.Payment.ReversalRequests
+@using Rq = Insurance.Application.Texts.BillingTexts.Payment.RefundRequests
+@using T = Insurance.Application.Texts.BillingTexts.Payment
+@using Fin = Insurance.Application.Texts.PolicyTexts.Finance
+@using F = Insurance.Application.Texts.PolicyTexts.Fields
+@using System.Numerics
+@using Insurance.Application.Services
+@using Insurance.Domain.Common
+@using Insurance.Domain.Finance
+@{
+    var p = Model.Policy;
+    var currency = p.Currency;
+    var id = p.Id;
+    var writes = Model.Me.CanWrite;
+    var r = Model.Receivable;
+    ViewData["Title"] = p.Number;
+    string Stored(decimal v) => PolicyCard.Stored(v);
+    string Grouped(BigInteger v) => PolicyCard.Grouped(v);
+    var reversal = Model.Q("reversal");
+    var refund = Model.Q("refund");
+    var advance = Model.Q("advance");
+    var facultative = Model.Q("facultative");
+    var paid = Model.Tetri("paid");
+    var gel = Model.Tetri("gel");
+    var left = Model.Tetri("left");
+    var released = Model.Tetri("released");
+    var leftOk = Model.Q("left") is null || left is not null;
+}
+<h1>@p.Number <span class="badge @(p.Status == "active" ? "low" : "")">@PolicyTexts.Status.GetValueOrDefault(p.Status)</span></h1>
+<partial name="_ApproveAnswer" model="(Model.Answer, false)" />
+@if (!string.IsNullOrEmpty(Model.Q("issued")))
+{
+    <div class="alert ok">@PolicyTexts.Issued</div>
+}
+@if (!string.IsNullOrEmpty(Model.Q("cancelled")))
+{
+    <div class="alert ok">@PolicyTexts.Cancel.Done</div>
+}
+@if (QueryParams.Known(T.ReversalOutcomes, reversal) is { } reversalText)
+{
+    <div class="alert @(reversal == "approved" ? "ok" : reversal == "requested" ? "warn" : "error")">@reversalText</div>
+}
+@if (QueryParams.Known(T.RefundOutcomes, refund) is { } refundText)
+{
+    <div class="alert @(refund == "approved" ? "ok" : refund == "requested" ? "warn" : "error")">@refundText</div>
+}
+@if (Model.Q("blocked") == "fms")
+{
+    <div class="alert error">@AmlTexts.Suspension.Blocked</div>
+}
+@if (p.Status == "cancelled")
+{
+    <div class="alert warn">@PolicyTexts.Cancel.CancelledOn: @(p.CancelledOn is { } c ? Fmt.Date(c) : "") · @PolicyTexts.Cancel.CancelledReason: @p.CancelReason</div>
+}
+@if (p.Status == "pending_approval")
+{
+    <div class="alert warn">
+        @PolicyTexts.AwaitingApproval
+        @if (Model.Approves)
+        {
+            <form method="post" asp-page-handler="Approve" style="margin-top: 8px">
+                <input type="hidden" name="id" value="@p.Id" />
+                <button class="btn">@PolicyTexts.Approve</button>
+            </form>
+        }
+    </div>
+}
+@if (paid is { } paidTetri)
+{
+    <div class="alert ok">@T.Saved@(paidTetri > 0 ? $". {T.Advance}: {Grouped(paidTetri)}" : "")</div>
+}
+@if (advance == "allocated" && gel is { } allocatedGel && leftOk)
+{
+    <div class="alert ok">@T.Advances.Allocated: @Grouped(allocatedGel) ₾@(left is { } l && l > 0 ? $". {T.Advances.Left}: {Grouped(l)} ₾" : "")</div>
+}
+@if (advance == "transferred" && gel is { } transferredGel && released is { } releasedGel && leftOk)
+{
+    <div class="alert ok">@T.Advances.Transferred: @Grouped(transferredGel) ₾@($" ({T.Advances.Released}: {Grouped(releasedGel)} ₾)")@(left is { } l2 && l2 > 0 ? $". {T.Advances.Left}: {Grouped(l2)} ₾" : "")</div>
+}
+@if (advance == "suspended")
+{
+    <div class="alert error">@AmlTexts.Suspension.Blocked</div>
+}
+@if (QueryParams.Known(T.Advances.Outcomes, advance) is { } advanceText)
+{
+    <div class="alert error">@advanceText</div>
+}
+@if (Model.AdvancesGel > 0 && r.Outstanding > 0)
+{
+    <div class="alert warn">@T.Advances.CardNote: @Grouped(Model.AdvancesGel) ₾. <a href="/policies/@id/payment">@T.Advances.Open</a></div>
+}
+@if (Model.ReleasableGel > 0 && r.Outstanding > 0)
+{
+    <div class="alert warn">@T.Advances.CardOverpaid: @Grouped(Model.ReleasableGel) ₾. <a href="/policies/@id/payment">@T.Advances.Open</a></div>
+}
+
+<div class="card">
+    <dl class="facts">
+        <div><dt>@F.ContractNumber</dt><dd>@p.ContractNumber</dd></div>
+        <div><dt>@F.Policyholder</dt><dd><a href="/parties/@p.PolicyholderId">@p.Policyholder</a></dd></div>
+        <div><dt>@F.Product</dt><dd>@p.Product</dd></div>
+        <div><dt>@F.Object</dt><dd>@Model.Objects</dd></div>
+        <div><dt>@F.IssuedOn</dt><dd>@Fmt.Date(p.IssuedOn)</dd></div>
+        <div>
+            <dt>@F.Term</dt>
+            <dd>@Fmt.Date(p.EffectiveFrom) – @Fmt.Date(p.EffectiveTo) (@Dates.DaysBetween(p.EffectiveFrom, p.EffectiveTo) @PolicyTexts.Days)</dd>
+        </div>
+        <div><dt>@F.Currency</dt><dd>@currency</dd></div>
+        @if (currency != "GEL")
+        {
+            <div><dt>@F.Rate</dt><dd>@Fmt.Fixed(p.PremiumRate, 4)</dd></div>
+        }
+        <div>
+            <dt>@F.Intermediary</dt>
+            <dd>@(Model.Intermediaries.Count == 0 ? PolicyTexts.NoIntermediary : string.Join(", ", Model.Intermediaries.Select(i => $"{i.Name} ({Fmt.Plain(i.CommissionPercent)}%)")))</dd>
+        </div>
+        @if (p.ReplacesPolicyId is { } replaces)
+        {
+            <div>
+                <dt>@PolicyTexts.Endorse.Replaces</dt>
+                <dd><a href="/policies/@replaces">@p.ReplacesNumber</a> · @p.ChangeNote</dd>
+            </div>
+        }
+    </dl>
+    @if (Model.Changes.Count > 0)
+    {
+        <h2 style="margin-top: 16px">@PolicyTexts.Endorse.Changes</h2>
+        <ul class="changes">
+            @foreach (var c in Model.Changes)
+            {
+                <li><a href="/policies/@c.Id">@c.Number</a> · @Fmt.Date(c.EffectiveFrom) · @Stored(c.Premium) @currency · @PolicyTexts.Status.GetValueOrDefault(c.Status)@(string.IsNullOrEmpty(c.ChangeNote) ? "" : $" · {c.ChangeNote}")</li>
+            }
+        </ul>
+    }
+</div>
+
+<h2>@PolicyTexts.Sections.Coverages</h2>
+<table>
+    <thead>
+    <tr>
+        <th>@F.Coverage</th>
+        <th>@F.InsuranceClass</th>
+        <th class="num">@F.SumInsured</th>
+        <th class="num">@F.Deductible</th>
+        <th class="num">@PolicyTexts.CoverageColumns.InitialPremium, @currency</th>
+        <th class="num">@PolicyTexts.CoverageColumns.InitialPremiumGel</th>
+        <th class="num">@PolicyTexts.CoverageColumns.CurrentPremium, @currency</th>
+    </tr>
+    </thead>
+    <tbody>
+    @foreach (var line in Model.Lines)
+    {
+        <tr>
+            <td>@line.Coverage</td>
+            <td>@line.ClassCode</td>
+            <td class="num">@(line.SumInsured is { } s ? Stored(s) : "")</td>
+            <td class="num">@(line.Deductible is { } d ? Stored(d) : "")</td>
+            <td class="num">@Stored(line.Premium)</td>
+            <td class="num">@Stored(line.PremiumGel)</td>
+            <td class="num">@Grouped(Model.CurrentByLine.GetValueOrDefault(line.Id))</td>
+        </tr>
+    }
+    </tbody>
+</table>
+
+<h2 class="section">@ReinsuranceTexts.Cessions.Title</h2>
+@if (facultative == "placed")
+{
+    <div class="alert ok">@ReinsuranceTexts.Cessions.Placed</div>
+}
+@if (facultative == "already-placed")
+{
+    <div class="alert warn">@ReinsuranceTexts.Cessions.AlreadyPlaced</div>
+}
+@if (facultative == "period-closed")
+{
+    <div class="alert error">@ReinsuranceTexts.Cessions.PeriodClosed</div>
+}
+@if (facultative is "over-ceded" or "xol-with-proportional")
+{
+    <div class="alert error">@ReinsuranceTexts.Problems[facultative]</div>
+}
+@if (Model.Cessions.Count == 0)
+{
+    <div class="card empty">@ReinsuranceTexts.Cessions.None</div>
+}
+else
+{
+    <table>
+        <thead>
+        <tr>
+            <th>@ReinsuranceTexts.Cessions.Treaty</th>
+            <th>@F.InsuranceClass</th>
+            <th>@F.Term</th>
+            <th class="num">@ReinsuranceTexts.Cessions.Share</th>
+            <th class="num">@ReinsuranceTexts.Cessions.CededPremium, @currency</th>
+            <th class="num">@ReinsuranceTexts.Cessions.CededPremiumGel</th>
+            <th class="num">@ReinsuranceTexts.Cessions.Commission, ₾</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var c in Model.Cessions)
+        {
+            <tr>
+                <td><a href="/reinsurance/treaties/@c.TreatyId">@c.TreatyNumber</a> · @c.TreatyName (@ReinsuranceTexts.Kinds.GetValueOrDefault(c.Kind))@(c.IsCancellation ? $" · {PolicyTexts.Status["cancelled"]}" : "")</td>
+                <td>@c.ClassCode</td>
+                <td>@Fmt.Date(c.CoverFrom) – @Fmt.Date(c.CoverTo)</td>
+                <td class="num">@Fmt.Plain(c.SharePercent)</td>
+                <td class="num">@Stored(c.Amount)</td>
+                <td class="num">@Stored(c.AmountGel)</td>
+                <td class="num">@Stored(c.CommissionGel)</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+@if (writes && p.Status == "active")
+{
+    if (Model.FacultativeTreaties.Count == 0)
+    {
+        <p class="hint">@ReinsuranceTexts.Cessions.NoFacultative</p>
+    }
+    else
+    {
+        <form method="post" asp-page-handler="PlaceFacultative" class="inline-form" style="margin-top: 10px">
+            <input type="hidden" name="policy_id" value="@p.Id" />
+            <label for="treaty_id">@ReinsuranceTexts.Cessions.FacultativeTreaty</label>
+            <select id="treaty_id" name="treaty_id" style="width: auto">
+                @foreach (var ft in Model.FacultativeTreaties)
+                {
+                    <option value="@ft.Id">@ft.Number · @ft.Name (@(ft.CededPercent is { } cp ? Fmt.Plain(cp) : "0") %)</option>
+                }
+            </select>
+            <button class="btn secondary">@ReinsuranceTexts.Cessions.Place</button>
+        </form>
+    }
+}
+
+<h2 class="section">@PolicyTexts.Sections.Finance</h2>
+<p class="note">
+    @Fin.AsOf: @Fmt.Date(Model.Today)
+    @if (currency != "GEL")
+    {
+        @: · @Fin.ValuationRate: @Fmt.Fixed(Model.Valuation.Rate, 4) (@Fmt.Date(Model.Valuation.Date))
+        if (Model.Valuation.Date != Model.Today)
+        {
+            <span class="badge high" style="margin-left: 6px">@Fin.StaleRate</span>
+        }
+    }
+</p>
+@{
+    var figures = new List<(string Label, BigInteger InCurrency, BigInteger InGel)>
+    {
+        (Fin.Written, Model.Position.Written, Model.PositionGel.Written),
+        (Fin.Earned, Model.Position.Earned, Model.PositionGel.Earned),
+        (Fin.Unearned, Model.Position.Unearned, Model.PositionGel.Unearned),
+        (Fin.Receivable, r.Outstanding, r.OutstandingGel),
+    };
+    if (r.Overpaid > 0) figures.Add((PolicyTexts.Cancel.Overpaid, r.Overpaid, r.InGel(r.Overpaid)));
+}
+<table>
+    <thead>
+    <tr>
+        <th></th>
+        @if (currency != "GEL")
+        {
+            <th class="num">@Fin.InCurrency, @currency</th>
+        }
+        <th class="num">@Fin.InGel</th>
+    </tr>
+    </thead>
+    <tbody>
+    @foreach (var (label, inCurrency, inGel) in figures)
+    {
+        <tr>
+            <td>@label</td>
+            @if (currency != "GEL")
+            {
+                <td class="num">@Grouped(inCurrency)</td>
+            }
+            <td class="num">@Grouped(inGel)</td>
+        </tr>
+    }
+    @if (Model.CommissionBasisPoints > 0)
+    {
+        <tr>
+            <td>@Fin.Commission</td>
+            @if (currency != "GEL")
+            {
+                <td></td>
+            }
+            <td class="num">@Grouped(Model.CommissionGel.Written)</td>
+        </tr>
+        <tr>
+            <td>@Fin.DeferredCommission</td>
+            @if (currency != "GEL")
+            {
+                <td></td>
+            }
+            <td class="num">@Grouped(Model.CommissionGel.Unearned)</td>
+        </tr>
+    }
+    </tbody>
+</table>
+
+<h2 class="section">@PolicyTexts.Sections.Schedule</h2>
+<table style="max-width: 640px">
+    <thead>
+    <tr>
+        <th>@F.DueOn</th>
+        <th class="num">@F.Amount, @currency</th>
+        <th class="num">@F.Outstanding, @currency</th>
+        <th></th>
+    </tr>
+    </thead>
+    <tbody>
+    @foreach (var b in r.Balances.Where(b => b.Amount > 0))
+    {
+        <tr>
+            <td>@Fmt.Date(b.DueOn)</td>
+            <td class="num">@Grouped(b.Amount)</td>
+            <td class="num">@Grouped(b.Outstanding)</td>
+            <td>
+                @if (b.Outstanding > 0 && b.DueOn < Model.Today)
+                {
+                    <span class="badge high">@PolicyTexts.Overdue</span>
+                }
+            </td>
+        </tr>
+    }
+    </tbody>
+</table>
+@if (Model.CancelDate is { } cancelDate)
+{
+    <p class="note" style="margin-top: 10px">@Fin.CancellableFrom: @Fmt.Date(cancelDate)</p>
+}
+@if (r.Overpaid > 0 && writes)
+{
+    <form method="post" asp-page-handler="RefundOverpayment" class="inline-form" style="margin-top: 10px">
+        <input type="hidden" name="policy_id" value="@id" />
+        <select name="method" style="width: auto">
+            @foreach (var (value, title) in T.Methods)
+            {
+                <option value="@value" selected="@(value == "bank")">@title</option>
+            }
+        </select>
+        <input name="reference" type="text" placeholder="@T.Reference" />
+        <button class="btn">@T.Refund: @Grouped(r.Overpaid) @currency</button>
+        <span class="hint">@T.RefundNote</span>
+    </form>
+}
+@if (Model.RefundRequests.Count > 0)
+{
+    <div class="card" style="margin-top: 10px">
+        <h3>@Rq.Title</h3>
+        <p class="note">@Rq.Note</p>
+        <table style="max-width: 760px">
+            <thead>
+            <tr><th>@Rq.RefundedOn</th><th class="num">@Rq.AmountGel</th><th>@Rq.RequestedBy</th><th></th></tr>
+            </thead>
+            <tbody>
+            @foreach (var q in Model.RefundRequests)
+            {
+                <tr>
+                    <td>@Fmt.Date(q.RefundedOn)</td>
+                    <td class="num">@Stored(q.AmountGel)</td>
+                    <td>@q.Requester</td>
+                    <td>
+                        @if (!string.IsNullOrEmpty(q.Approver))
+                        {
+                            @Rq.Approved(q.Approver)
+                        }
+                        else if (Model.AuthorisesLarge)
+                        {
+                            <form method="post" asp-page-handler="ApproveRefundRequest">
+                                <input type="hidden" name="policy_id" value="@id" />
+                                <input type="hidden" name="request_id" value="@q.Id" />
+                                <button class="btn">@Rq.Approve</button>
+                            </form>
+                        }
+                        else
+                        {
+                            @Rq.Pending
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+@if ((writes || Model.Receives) && p.Status != "draft")
+{
+    <p class="row-actions" style="margin-top: 10px">
+        @if (Model.Receives && r.Outstanding > 0)
+        {
+            <a class="btn" href="/policies/@id/payment">@T.Record</a>
+        }
+        @if (writes)
+        {
+            <a class="btn secondary" href="/print/policies/@id" target="_blank" rel="noopener">@PolicyTexts.Print.Button</a>
+        }
+        @if (writes && p.Status == "active")
+        {
+            <a class="btn secondary" href="/policies/@id/endorse">@PolicyTexts.Endorse.Button</a>
+            <a class="btn secondary" href="/policies/@id/cancel">@PolicyTexts.Cancel.Button</a>
+        }
+    </p>
+}
+
+<h2 class="section">@T.History</h2>
+@if (Model.ReversalRequests.Count > 0)
+{
+    <div class="card">
+        <h3>@Vq.Title</h3>
+        <p class="note">@Vq.Note</p>
+        <table style="max-width: 860px">
+            <thead>
+            <tr><th>@Vq.ReversedOn</th><th class="num">@Vq.AmountGel</th><th>@Vq.Reason</th><th>@Vq.RequestedBy</th><th></th></tr>
+            </thead>
+            <tbody>
+            @foreach (var q in Model.ReversalRequests)
+            {
+                <tr>
+                    <td>@Fmt.Date(q.ReversedOn)</td>
+                    <td class="num">@Stored(q.AmountGel)</td>
+                    <td>@q.Reason</td>
+                    <td>@q.Requester</td>
+                    <td>
+                        @if (!string.IsNullOrEmpty(q.Approver))
+                        {
+                            @Vq.Approved(q.Approver)
+                        }
+                        else if (Model.AuthorisesLarge)
+                        {
+                            <form method="post" asp-page-handler="ApproveReversalRequest">
+                                <input type="hidden" name="policy_id" value="@id" />
+                                <input type="hidden" name="request_id" value="@q.Id" />
+                                <button class="btn">@Vq.Approve</button>
+                            </form>
+                        }
+                        else
+                        {
+                            @Vq.Pending
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+@if (Model.Payments.Count == 0)
+{
+    <div class="card empty">@Ka.Common.NoData</div>
+}
+else
+{
+    <table style="max-width: 640px">
+        <thead>
+        <tr>
+            <th>@T.ReceivedOn</th>
+            <th>@T.AllocatedOn</th>
+            <th>@T.Kind</th>
+            <th>@T.Method</th>
+            <th class="num">@T.AmountGel</th>
+            <th class="num">@T.HerePolicy</th>
+            <th>@T.Reference</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var pm in Model.Payments)
+        {
+            <tr>
+                <td>@Fmt.Date(pm.ReceivedOn)</td>
+                <td>@pm.AllocatedOn</td>
+                <td>@(T.Kinds.GetValueOrDefault(pm.Kind) ?? pm.Kind)</td>
+                <td>@(T.MethodLabels.GetValueOrDefault(pm.Method) ?? pm.Method)</td>
+                <td class="num">@Stored(pm.AmountGel)</td>
+                <td class="num">@(pm.HereGel is { } here ? Stored(here) : "")</td>
+                <td>@pm.Reference</td>
+                <td>
+                    @if (pm.Kind == "receipt" && pm.Reversed)
+                    {
+                        <span class="badge">@T.Reversed</span>
+                    }
+                    @if (pm.Kind == "receipt" && !pm.Reversed && pm.Method != "claim_offset" && writes)
+                    {
+                        <form method="post" asp-page-handler="ReversePayment" class="inline-form">
+                            <input type="hidden" name="payment_id" value="@pm.Id" />
+                            <input type="hidden" name="policy_id" value="@id" />
+                            <input name="reason" type="text" placeholder="@T.ReverseReason" required />
+                            <button class="btn secondary">@T.Reverse</button>
+                            @if (pm.Shared)
+                            {
+                                <div class="hint">@T.ReverseShared</div>
+                            }
+                        </form>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
