@@ -49,7 +49,10 @@ public sealed class LegacyDbCheckClaimTests(TestDatabase db) : IClassFixture<Tes
 
     // ---------------------------------------------------------------- claim-reversal-db-check.ts (0033, 0034)
 
-    /// <summary>The mirror of a payment written by the database from the stored row, as reverseClaimPayment writes it.</summary>
+    /// <summary>
+    /// The mirror of a payment written by the database from the stored row, as reverseClaimPayment writes it — the set-off's rate and
+    /// currency (H46, 0012) included, which 0015 (Codex R006-01) compares NULL-safely.
+    /// </summary>
     private static Task<Guid> MirrorAsync(Held h, Guid paymentId, DateOnly on, Guid by, decimal? amount = null, decimal? rate = null, Guid? offset = null,
         string reason = "correction", DateOnly? returned = null, string? bank = null) => MirrorCoreAsync(h, paymentId, on, by, amount, rate, offset, reason, returned, bank);
 
@@ -58,9 +61,10 @@ public sealed class LegacyDbCheckClaimTests(TestDatabase db) : IClassFixture<Tes
         var id = Guid.NewGuid();
         await h.Run("""
             insert core.claim_payment (id, claim_id, paid_on, amount, deductible_withheld, premium_offset, net_paid, net_paid_gel, rate, payee_kind, payee_party_id,
-                                       offset_payment_id, note, created_by, kind, reverses_claim_payment_id, reversal_reason, returned_on, bank_reference)
+                                       offset_payment_id, note, created_by, kind, reverses_claim_payment_id, reversal_reason, returned_on, bank_reference,
+                                       offset_rate, offset_currency)
             select @id, claim_id, @on, coalesce(@amount, -amount), -deductible_withheld, -premium_offset, -net_paid, -net_paid_gel, coalesce(@rate, rate), payee_kind,
-                   payee_party_id, @offset, N'check-0033', @by, N'reversal', id, @reason, @returned, @bank
+                   payee_party_id, @offset, N'check-0033', @by, N'reversal', id, @reason, @returned, @bank, offset_rate, offset_currency
             from core.claim_payment where id = @paymentId
             """, new { id, paymentId, on, amount, rate, offset, by, reason, returned, bank });
         return id;
