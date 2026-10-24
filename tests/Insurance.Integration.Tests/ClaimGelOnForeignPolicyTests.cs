@@ -288,4 +288,100 @@ public sealed class ClaimGelOnForeignPolicyTests(TestDatabase db) : IClassFixtur
         // What the claim's own actions change still goes through (the guard looks only at the currency and the snapshot).
         await w.ExecAsync("update core.claim set description = N'განახლებული აღწერა' where id = @c", new { c = x.Claim });
     }
+
+    /// <summary>
+    /// Codex R006-01 as the application role: a reversal written by hand, with everything else the guard asks for in place (the
+    /// set-off receipt reversed by the program's own MirrorReceiptAsync on the same day, the exact opposite amounts), cannot drop or
+    /// change the set-off's rate or currency, nor the payee: [CP002] for NULL/NULL, one NULL, another rate, another currency and
+    /// another payee — "not (a = b or both null)" was UNKNOWN for a NULL against a value, so 0012 let the first ones through. The
+    /// exact mirror, the program's own reversal, still goes through.
+    /// </summary>
+    [Fact]
+    public async Task R006_01_a_reversal_cannot_drop_or_change_the_set_offs_rate_currency_or_payee_only_the_exact_mirror_goes_through()
+    {
+        var x = await WorldAsync();
+        await ApproveAsync(x, "1260");
+        Assert.NotNull((await PayAsync(x, "1260")).RedirectTo);
+        var payment = await w.ScalarAsync<Guid>("select id from core.claim_payment where claim_id = @c", new { c = x.Claim });
+        var receipt = await w.ScalarAsync<Guid>("select offset_payment_id from core.claim_payment where id = @payment", new { payment });
+        foreach (var (offsetRate, offsetCurrency, payee) in new[]
+        {
+            ("null", "null", "payee_party_id"), ("null", "offset_currency", "payee_party_id"), ("offset_rate", "null", "payee_party_id"),
+            ("2.8", "offset_currency", "payee_party_id"), ("offset_rate", "N'EUR'", "payee_party_id"),
+            ("offset_rate", "offset_currency", "case when payee_party_id is null then @party else null end"),
+        })
+        {
+            var e = await Assert.ThrowsAnyAsync<Exception>(() => w.App.AsUserAsync(x.Accountant.Id, async tx =>
+            {
+                var r = (await tx.QuerySingleOrDefaultAsync<(decimal AmountGel, string Method, Guid? Payer)?>("select amount_gel, method, payer_party_id from core.payment where id = @receipt", new { receipt }))!.Value;
+                var back = await ReceiptReversal.MirrorReceiptAsync(tx, new ReceiptReversal.ReceiptToReverse(receipt, r.AmountGel, r.Method, r.Payer), x.Paid, "R006-01", x.Accountant.Id);
+                return await tx.ExecuteAsync($"""
+                    insert into core.claim_payment (claim_id, paid_on, amount, deductible_withheld, premium_offset, net_paid, net_paid_gel, rate, payee_kind, payee_party_id,
+                                                    offset_payment_id, kind, reverses_claim_payment_id, reversal_reason, offset_rate, offset_currency, created_by)
+                    select claim_id, paid_on, -amount, -deductible_withheld, -premium_offset, -net_paid, -net_paid_gel, rate, payee_kind, {payee},
+                           @back, N'reversal', id, N'correction', {offsetRate}, {offsetCurrency}, created_by from core.claim_payment where id = @payment
+                    """, new { payment, back, party = x.Policy.PartyId });
+            }));
+            Assert.Contains("CP002", e.Message);
+            Assert.Equal(1, await w.ScalarAsync<int>("select count(*) from core.claim_payment where claim_id = @c", new { c = x.Claim }));
+            Assert.Equal(0, await w.ScalarAsync<int>("select count(*) from core.payment where reverses_payment_id = @receipt", new { receipt }));
+        }
+        // The exact mirror: the program's own reversal.
+        Assert.Equal($"/claims/{x.Claim}?reversal=ok", await ClaimActions.ReverseClaimPaymentAsync(w.App, x.Accountant, ClaimWorld.Form(("claim_id", x.Claim.ToString()),
+            ("claim_payment_id", payment.ToString()), ("reason", "correction"), ("reversed_on", ClaimWorld.D(x.Paid))), x.Paid));
+        var rows = (await PaymentsAsync(x.Claim)).Select(p => (p.OffsetRate, p.OffsetCurrency?.Trim())).ToList();
+        Assert.Equal([((decimal?)2.7m, "USD"), ((decimal?)2.7m, "USD")], rows);
+    }
+
+    /// <summary>
+    /// Codex R006-01: a CHECK refuses only FALSE, so 0012's checks let a partial row in where one of their comparisons was UNKNOWN.
+    /// Now refused as the application role: a set-off currency without its rate on a payment request, and a claim whose snapshot
+    /// has its rate without the rate's day, or the day without the rate. The all-null request (no set-off) and a whole snapshot still go in.
+    /// </summary>
+    [Fact]
+    public async Task R006_01_a_partial_set_off_or_snapshot_is_refused_by_the_checks_and_the_all_null_rows_still_go_in()
+    {
+        var x = await WorldAsync();
+        await ApproveAsync(x, "1260");
+        const string request = """
+            insert into core.claim_payment_request (claim_id, paid_on, amount, deductible_withheld, premium_offset, net_paid, net_paid_gel, rate,
+                                                    payee_kind, payee_party_id, offset_premium, total_loss_mode, offset_rate, offset_currency, created_by)
+            values (@claim, @paid, 1260, 260, {0}, {1}, {1}, 1, N'policyholder', @holder, {2}, N'none', {3}, {4}, @by)
+            """;
+        var args = new { claim = x.Claim, paid = x.Paid, by = x.Accountant.Id, holder = x.Policy.PartyId };
+        foreach (var (rate, currency) in new[] { ("null", "N'USD'"), ("null", "N'GEL'") })
+        {
+            var e = await Assert.ThrowsAnyAsync<Exception>(() => w.ExecAsync(string.Format(request, "270", "730", "1", rate, currency), args));
+            Assert.Contains("claim_payment_request_offset_rate", e.Message);
+        }
+        Assert.Equal(0, await w.ScalarAsync<int>("select count(*) from core.claim_payment_request where claim_id = @c", new { c = x.Claim }));
+        await w.ExecAsync(string.Format(request, "0", "1000", "0", "null", "null"), args);
+
+        // A claim copied from this one, column by column, on an event of its own, with its snapshot made partial.
+        var columns = string.Join(", ", await w.RowsAsync<string>("""
+            select quotename(name) from sys.columns where object_id = object_id(N'core.claim') and is_computed = 0
+              and name not in (N'id', N'number', N'loss_event_id', N'limit_rate', N'limit_rate_on')
+            order by column_id
+            """));
+        var lossEvent = Guid.NewGuid();
+        await w.ExecAsync("""
+            insert into core.loss_event (id, number, policy_id, occurred_on, reported_on, description)
+            select @lossEvent, number + N'-P', policy_id, occurred_on, reported_on, description from core.loss_event
+            where id = (select loss_event_id from core.claim where id = @c)
+            """, new { lossEvent, c = x.Claim });
+        foreach (var (rate, on) in new[] { ("limit_rate", "null"), ("null", "limit_rate_on") })
+        {
+            var e = await Assert.ThrowsAnyAsync<Exception>(() => w.ExecAsync($"""
+                insert into core.claim (id, number, loss_event_id, limit_rate, limit_rate_on, {columns})
+                select newid(), number + N'-P', @lossEvent, {rate}, {on}, {columns} from core.claim where id = @c
+                """, new { c = x.Claim, lossEvent }));
+            Assert.Contains("claim_limit_snapshot", e.Message);
+        }
+        // The whole snapshot copied goes in (the same rule, nothing else changed).
+        await w.ExecAsync($"""
+            insert into core.claim (id, number, loss_event_id, limit_rate, limit_rate_on, {columns})
+            select newid(), number + N'-W', @lossEvent, limit_rate, limit_rate_on, {columns} from core.claim where id = @c
+            """, new { c = x.Claim, lossEvent });
+        Assert.Equal(0, await w.ScalarAsync<int>("select count(*) from core.claim where number = (select number from core.claim where id = @c) + N'-P'", new { c = x.Claim }));
+    }
 }
